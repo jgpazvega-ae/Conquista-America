@@ -10,6 +10,7 @@ import { AISystem } from './AI';
 import { ResourceSystem } from './ResourceSystem';
 import { EconomyManager } from './EconomyManager';
 import { DiplomacyManager } from './Diplomacy';
+import { FogOfWarManager } from './FogOfWar';
 import { CIVILIZATIONS } from './civilizations';
 import { CIV_COLORS } from './constants';
 import type { DamageEvent } from './CombatSystem';
@@ -38,6 +39,7 @@ export class Game {
   private resourceSys   = new ResourceSystem();
   private economy       = new EconomyManager();
   private diplomacy     = new DiplomacyManager();
+  readonly fog: FogOfWarManager;
 
   damageEvents: DamageEvent[] = [];
   status: GameStatus = 'PLAYING';
@@ -50,6 +52,7 @@ export class Game {
     this.generateResourceNodes();
     this.spawnInitialBuildings();
     this.diplomacy.init();
+    this.fog = new FogOfWarManager(this.players.length);
   }
 
   private spawnPlayers() {
@@ -180,6 +183,8 @@ export class Game {
     this.resourceSys.update(this);
 
     this.economy.update(dt, this);
+
+    this.fog.update(this);
 
     this.aiSystem.update(dt, this);
 

@@ -124,7 +124,11 @@ export class InputHandler {
 
     if (hit?.type === 'unit') {
       const unit = this.game.getUnitById(hit.unitId);
-      if (unit?.isAlive()) unit.setSelected(true);
+      // Only select if alive and either owned by player or visible through fog
+      if (unit?.isAlive()) {
+        const canSee = this.game.fog.canSeeUnit(unit, this.game.humanPlayerId);
+        if (canSee) unit.setSelected(true);
+      }
     }
 
     this.onSelectionChange?.();
