@@ -7,6 +7,8 @@ import { ResourceNode, ResourceType } from './ResourceNode';
 import { Player } from './Player';
 import { CombatSystem } from './CombatSystem';
 import { AISystem } from './AI';
+import { ResourceSystem } from './ResourceSystem';
+import { DiplomacyManager } from './Diplomacy';
 import { CIVILIZATIONS } from './civilizations';
 import { CIV_COLORS } from './constants';
 import type { DamageEvent } from './CombatSystem';
@@ -30,18 +32,22 @@ export class Game {
   readonly allWorkers: Worker[] = [];
   readonly resourceNodes: ResourceNode[] = [];
 
-  private combat    = new CombatSystem();
-  private aiSystem  = new AISystem();
+  private combat        = new CombatSystem();
+  private aiSystem      = new AISystem();
+  private resourceSys   = new ResourceSystem();
+  private diplomacy     = new DiplomacyManager();
 
   damageEvents: DamageEvent[] = [];
   status: GameStatus = 'PLAYING';
   humanPlayerId = 0;
+  gameTime = 0;
 
   constructor() {
     this.map = new GameMap(12345);
     this.spawnPlayers();
     this.generateResourceNodes();
     this.spawnInitialBuildings();
+    this.diplomacy.init();
   }
 
   private spawnPlayers() {
@@ -149,6 +155,8 @@ export class Game {
   update(dt: number) {
     if (this.status !== 'PLAYING') return;
 
+    this.gameTime += dt;
+
     for (const unit of this.allUnits) {
       unit.update(dt, this.map);
     }
@@ -166,6 +174,8 @@ export class Game {
     }
 
     this.damageEvents = this.combat.update(this.allUnits, this.map);
+
+    this.resourceSys.update(this);
 
     this.aiSystem.update(dt, this);
 

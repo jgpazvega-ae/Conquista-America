@@ -29,6 +29,7 @@ export class HUD {
 
   private minimapBuilt = false;
   private minimapBase: ImageData | null = null;
+  private gameTime = 0;
 
   constructor(game: Game) {
     this.game = game;
@@ -36,7 +37,6 @@ export class HUD {
     this.minimapCanvas.height = 180;
     this.minimapCtx = this.minimapCanvas.getContext('2d')!;
 
-    // Civ badge
     const civ = game.humanPlayer.civType;
     this.elCivBadge.textContent = `${CIV_EMOJIS[civ]} ${CIV_NAMES[civ]}`;
     this.elCivBadge.style.color = hex(CIV_COLORS[civ]);
@@ -133,17 +133,43 @@ export class HUD {
     const map   = this.game.map;
     const tw    = W / map.cols;
     const th    = H / map.rows;
-    const size  = Math.max(2, Math.min(tw, th) * 1.5);
+    const unitSize  = Math.max(1.5, Math.min(tw, th) * 1.2);
+    const buildSize = Math.max(2.5, Math.min(tw, th) * 1.8);
 
+    // Draw buildings
+    for (const building of this.game.allBuildings) {
+      if (!building.isAlive()) continue;
+      const col = CIV_COLORS[building.playerId >= 0 && building.playerId < this.game.players.length ? this.game.players[building.playerId].civType : 0];
+      ctx.fillStyle = hex(col);
+      ctx.globalAlpha = building.isComplete() ? 0.8 : 0.4;
+      ctx.beginPath();
+      ctx.rect(building.col * tw - buildSize / 2, building.row * th - buildSize / 2, buildSize, buildSize);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1.0;
+
+    // Draw units
     for (const player of this.game.players) {
       const col = CIV_COLORS[player.civType];
       ctx.fillStyle = hex(col);
       for (const unit of player.aliveUnits) {
         ctx.beginPath();
-        ctx.arc(unit.col * tw + tw / 2, unit.row * th + th / 2, size / 2, 0, Math.PI * 2);
+        ctx.arc(unit.col * tw + tw / 2, unit.row * th + th / 2, unitSize / 2, 0, Math.PI * 2);
         ctx.fill();
       }
     }
+
+    // Draw workers
+    for (const worker of this.game.allWorkers) {
+      const player = this.game.players[worker.playerId];
+      const col = CIV_COLORS[player.civType];
+      ctx.fillStyle = hex(col);
+      ctx.globalAlpha = 0.6;
+      ctx.beginPath();
+      ctx.arc(worker.col * tw + tw / 2, worker.row * th + th / 2, unitSize / 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1.0;
   }
 
   showDamageNumbers(events: DamageEvent[]) {
