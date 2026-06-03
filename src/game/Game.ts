@@ -8,6 +8,7 @@ import { Player } from './Player';
 import { CombatSystem } from './CombatSystem';
 import { AISystem } from './AI';
 import { ResourceSystem } from './ResourceSystem';
+import { EconomyManager } from './EconomyManager';
 import { DiplomacyManager } from './Diplomacy';
 import { CIVILIZATIONS } from './civilizations';
 import { CIV_COLORS } from './constants';
@@ -35,6 +36,7 @@ export class Game {
   private combat        = new CombatSystem();
   private aiSystem      = new AISystem();
   private resourceSys   = new ResourceSystem();
+  private economy       = new EconomyManager();
   private diplomacy     = new DiplomacyManager();
 
   damageEvents: DamageEvent[] = [];
@@ -176,6 +178,8 @@ export class Game {
     this.damageEvents = this.combat.update(this.allUnits, this.map);
 
     this.resourceSys.update(this);
+
+    this.economy.update(dt, this);
 
     this.aiSystem.update(dt, this);
 

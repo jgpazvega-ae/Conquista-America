@@ -2,6 +2,7 @@ import { UnitState } from './types';
 import type { Unit } from './Unit';
 import type { GameMap } from './Map';
 import { findPath } from './Pathfinding';
+import { getDamageMultiplier } from './UnitBalancing';
 
 export interface DamageEvent {
   attacker: Unit;
@@ -42,7 +43,9 @@ export class CombatSystem {
         }
 
         if (unit.attackTimer <= 0) {
-          const dmg = unit.attack + Math.floor(Math.random() * 6) - 3;
+          let dmg = unit.attack + Math.floor(Math.random() * 6) - 3;
+          const multiplier = getDamageMultiplier(unit.type, target.type);
+          dmg = Math.round(dmg * multiplier);
           const actual = target.takeDamage(dmg);
           unit.attackTimer = unit.attackCooldown;
           this.events.push({ attacker: unit, target, damage: actual, worldX: target.worldX, worldZ: target.worldZ });
