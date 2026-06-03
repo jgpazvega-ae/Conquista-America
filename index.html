@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Conquista América</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌎</text></svg>" />
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="game-canvas"></canvas>
+
+      <!-- HUD Top Bar -->
+      <div id="hud-top">
+        <div id="civ-badge"></div>
+        <div id="resources">
+          <span class="res"><span class="res-icon">🌽</span><span id="res-food">200</span></span>
+          <span class="res"><span class="res-icon">⚜️</span><span id="res-gold">100</span></span>
+          <span class="res"><span class="res-icon">🪨</span><span id="res-stone">150</span></span>
+        </div>
+        <div id="game-status"></div>
+      </div>
+
+      <!-- Minimap -->
+      <div id="minimap-container">
+        <canvas id="minimap"></canvas>
+        <div id="minimap-label">Mapa</div>
+      </div>
+
+      <!-- Unit info panel -->
+      <div id="unit-panel" class="hidden">
+        <div id="unit-portrait"></div>
+        <div id="unit-info">
+          <div id="unit-name"></div>
+          <div id="unit-civ"></div>
+          <div class="stat-row">
+            <span class="stat-label">❤️</span>
+            <div class="hp-bar-wrap"><div id="hp-bar"></div></div>
+            <span id="hp-text"></span>
+          </div>
+          <div id="unit-stats"></div>
+        </div>
+      </div>
+
+      <!-- Selection count -->
+      <div id="selection-count" class="hidden"></div>
+
+      <!-- Controls hint -->
+      <div id="controls-hint">
+        <b>Controles:</b> WASD / ↑↓←→ mover cámara &nbsp;|&nbsp;
+        Rueda: zoom &nbsp;|&nbsp;
+        Clic: seleccionar unidad &nbsp;|&nbsp;
+        Clic derecho: mover / atacar &nbsp;|&nbsp;
+        Arrastrar: selección múltiple
+      </div>
+
+      <!-- Selection box overlay -->
+      <div id="selection-box"></div>
+
+      <!-- Loading screen -->
+      <div id="loading-screen">
+        <div id="loading-content">
+          <h1>🌎 Conquista América</h1>
+          <p>Cargando el mundo...</p>
+          <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
