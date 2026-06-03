@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { GameMap, Tile } from '../game/Map';
 import type { Unit } from '../game/Unit';
+import { EffectManager } from './Effects';
 import { TILE_SIZE, TERRAIN_COLORS, TERRAIN_HEIGHTS } from '../game/constants';
 
 export class Renderer {
@@ -11,6 +12,7 @@ export class Renderer {
   private tileMeshes = new Map<string, THREE.Mesh>();
   private tileGroup  = new THREE.Group();
   private unitGroup  = new THREE.Group();
+  readonly effects: EffectManager;
 
   // For click picking
   readonly raycaster = new THREE.Raycaster();
@@ -28,6 +30,7 @@ export class Renderer {
 
     this.scene  = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.5, 400);
+    this.effects = new EffectManager(this.scene);
 
     this.setupScene();
 
@@ -120,6 +123,10 @@ export class Renderer {
 
   addResourceNode(node: any) {
     this.unitGroup.add(node.mesh);
+  }
+
+  updateEffects(dt: number) {
+    this.effects.update(dt);
   }
 
   render() {

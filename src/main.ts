@@ -77,10 +77,17 @@ async function main() {
 
     game.update(dt);
     rtsCamera.update(dt);
+    renderer.updateEffects(dt);
 
-    // Show damage numbers
+    // Show damage numbers and effects
     if (game.damageEvents.length > 0) {
       hud.showDamageNumbers(game.damageEvents);
+      for (const evt of game.damageEvents) {
+        renderer.effects.createHitEffect(evt.worldX, 0.5, evt.worldZ);
+        if (evt.damage > 20) {
+          renderer.effects.createExplosion(evt.worldX, 0.5, evt.worldZ, evt.damage / 40);
+        }
+      }
     }
 
     // Add newly spawned units if any (future expansion)
