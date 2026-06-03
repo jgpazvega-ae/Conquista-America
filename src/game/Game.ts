@@ -46,22 +46,24 @@ export class Game {
   humanPlayerId = 0;
   gameTime = 0;
 
-  constructor() {
+  constructor(humanCiv: CivilizationType = CivilizationType.AZTEC) {
     this.map = new GameMap(12345);
-    this.spawnPlayers();
+    this.spawnPlayers(humanCiv);
     this.generateResourceNodes();
     this.spawnInitialBuildings();
     this.diplomacy.init();
     this.fog = new FogOfWarManager(this.players.length);
   }
 
-  private spawnPlayers() {
-    const civs = [
+  private spawnPlayers(humanCiv: CivilizationType) {
+    // Put the human civ first (player 0), rest as AI
+    const allCivs = [
       CivilizationType.AZTEC,
       CivilizationType.MAYA,
       CivilizationType.INCA,
       CivilizationType.CONQUISTADOR,
     ];
+    const civs = [humanCiv, ...allCivs.filter(c => c !== humanCiv)];
 
     civs.forEach((civ, idx) => {
       const isHuman = idx === this.humanPlayerId;

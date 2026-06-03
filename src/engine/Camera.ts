@@ -121,4 +121,30 @@ export class RTSCamera {
     this.targetX = worldX;
     this.targetZ = worldZ;
   }
+
+  // ── Touch support ──────────────────────────────────────────────────────────
+
+  getZoom(): number { return this.zoom; }
+
+  setZoom(z: number) {
+    this.zoom = THREE.MathUtils.clamp(z, CAMERA_ZOOM_MIN, CAMERA_ZOOM_MAX);
+  }
+
+  /** Translate screen pixel delta → world pan (called from TouchHandler) */
+  panByPixels(dx: number, dy: number) {
+    const fovH = (this.camera.fov * Math.PI / 180) * this.camera.aspect;
+    const worldPerPxX = (this.zoom * Math.tan(fovH / 2) * 2) / window.innerWidth;
+    const worldPerPxY = (this.zoom * Math.tan(this.camera.fov * Math.PI / 360) * 2) / window.innerHeight;
+
+    const fwd  = new THREE.Vector2(Math.sin(this.yaw), Math.cos(this.yaw));
+    const right = new THREE.Vector2(fwd.y, -fwd.x);
+
+    this.targetX += right.x * dx * worldPerPxX + fwd.x * dy * worldPerPxY;
+    this.targetZ += right.y * dx * worldPerPxX + fwd.y * dy * worldPerPxY;
+
+    const maxX = MAP_COLS * TILE_SIZE;
+    const maxZ = MAP_ROWS * TILE_SIZE;
+    this.targetX = THREE.MathUtils.clamp(this.targetX, 0, maxX);
+    this.targetZ = THREE.MathUtils.clamp(this.targetZ, 0, maxZ);
+  }
 }
