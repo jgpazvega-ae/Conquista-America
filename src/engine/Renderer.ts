@@ -110,6 +110,18 @@ export class Renderer {
     this.unitGroup.remove(unit.mesh);
   }
 
+  addBuilding(building: any) {
+    this.unitGroup.add(building.mesh);
+  }
+
+  addWorker(worker: any) {
+    this.unitGroup.add(worker.mesh);
+  }
+
+  addResourceNode(node: any) {
+    this.unitGroup.add(node.mesh);
+  }
+
   render() {
     this.renderer.render(this.scene, this.camera);
   }

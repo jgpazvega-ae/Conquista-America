@@ -31,9 +31,18 @@ async function main() {
   hud.setLoadingProgress(50);
   await frame();
 
-  // Add all units to scene
+  // Add all units, buildings, workers, resources to scene
   for (const unit of game.getAllUnits()) {
     renderer.addUnit(unit);
+  }
+  for (const building of game.allBuildings) {
+    renderer.addBuilding(building);
+  }
+  for (const worker of game.allWorkers) {
+    renderer.addWorker(worker);
+  }
+  for (const node of game.resourceNodes) {
+    renderer.addResourceNode(node);
   }
   hud.setLoadingProgress(80);
   await frame();
