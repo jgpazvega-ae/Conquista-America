@@ -12,16 +12,20 @@ import { ResourceType } from './ResourceNode';
 import { CIV_COLORS } from './constants';
 import { TRAIN_COSTS } from './unitProduction';
 
-const AI_THINK_INTERVAL  = 4.0;
-const AI_BUILD_INTERVAL  = 12.0;
+const AI_BUILD_INTERVAL  = 14.0;
 const AI_WORKER_INTERVAL = 5.0;
 const AI_TRAIN_INTERVAL  = 10.0;
 
+// Wave-attack phases: gather forces then launch coordinated assault
+const GATHER_DURATION  = 40.0; // seconds to mass forces before attacking
+const ATTACK_DURATION  = 25.0; // seconds of active assault before regrouping
+
 interface AIState {
-  thinkTimer:  number;
   buildTimer:  number;
   workerTimer: number;
   trainTimer:  number;
+  phase:       'gathering' | 'attacking';
+  phaseTimer:  number;
 }
 
 export class AISystem {
@@ -33,18 +37,33 @@ export class AISystem {
 
       let state = this.aiStates.get(player.id);
       if (!state) {
-        state = { thinkTimer: 0, buildTimer: 0, workerTimer: 0, trainTimer: Math.random() * 8 };
+        state = {
+          buildTimer: 0, workerTimer: 0,
+          trainTimer: Math.random() * 8,
+          phase: 'gathering', phaseTimer: Math.random() * 15,
+        };
         this.aiStates.set(player.id, state);
       }
 
-      state.thinkTimer  += dt;
       state.buildTimer  += dt;
       state.workerTimer += dt;
       state.trainTimer  += dt;
+      state.phaseTimer  += dt;
 
-      if (state.thinkTimer >= AI_THINK_INTERVAL) {
-        state.thinkTimer = 0;
-        this.orderAttack(player, game);
+      // Phase-based attack logic
+      if (state.phase === 'gathering') {
+        this.rallyTroops(player, game);
+        if (state.phaseTimer >= GATHER_DURATION || player.aliveUnits.length >= 15) {
+          state.phase = 'attacking';
+          state.phaseTimer = 0;
+        }
+      } else {
+        this.waveAttack(player, game);
+        const allDead = game.allUnits.filter(u => u.playerId !== player.id && u.isAlive()).length === 0;
+        if (state.phaseTimer >= ATTACK_DURATION || allDead) {
+          state.phase = 'gathering';
+          state.phaseTimer = 0;
+        }
       }
 
       if (state.buildTimer >= AI_BUILD_INTERVAL && player.resources.stone >= 50) {
@@ -64,59 +83,53 @@ export class AISystem {
     }
   }
 
-  private orderAttack(player: Player, game: Game) {
-    const myUnits = player.aliveUnits;
-    const enemies = game.allUnits.filter(u => u.playerId !== player.id && u.isAlive());
+  /** Gather-phase: move idle units toward the settlement to mass forces. */
+  private rallyTroops(player: Player, game: Game) {
+    const settlement = game.allBuildings.find(
+      b => b.playerId === player.id && (b.type as string) === 'SETTLEMENT' && b.isComplete(),
+    );
+    if (!settlement) return;
+    const cx = settlement.col, cz = settlement.row;
 
-    if (myUnits.length === 0 || enemies.length === 0) return;
-
-    const clusters = this.findEnemyClusters(enemies);
-
-    for (const cluster of clusters) {
-      const availableUnits = myUnits.filter(u => u.state === UnitState.IDLE || u.state === UnitState.MOVING);
-      if (availableUnits.length === 0) break;
-
-      const unitsToAssign = Math.min(4, availableUnits.length);
-      for (let i = 0; i < unitsToAssign; i++) {
-        const unit = availableUnits[i];
-        const target = cluster.units[Math.floor(Math.random() * cluster.units.length)];
-
-        if (unit.distanceTo(target) <= unit.attackRange + 1.0) {
-          unit.attackUnit(target);
-        } else {
-          const path = findPath(game.map, unit.gridPos(), target.gridPos(), 300);
+    for (const unit of player.aliveUnits) {
+      if (unit.state !== UnitState.IDLE) continue;
+      const d = Math.sqrt((unit.col - cx) ** 2 + (unit.row - cz) ** 2);
+      if (d > 6) {
+        const tc = cx + Math.floor(Math.random() * 5) - 2;
+        const tr = cz + Math.floor(Math.random() * 5) - 2;
+        const near = game.map.findWalkableNear(tc, tr, 3);
+        if (near) {
+          const path = findPath(game.map, unit.gridPos(), { col: near[0], row: near[1] }, 200);
           if (path.length > 0) unit.moveTo(path);
         }
       }
     }
   }
 
-  private findEnemyClusters(enemies: Unit[]) {
-    const clusters: { units: Unit[]; cx: number; cz: number }[] = [];
-    const visited = new Set<number>();
+  /** Attack-phase: send all available units in a coordinated wave. */
+  private waveAttack(player: Player, game: Game) {
+    const myUnits = player.aliveUnits;
+    const enemies = game.allUnits.filter(u => u.playerId !== player.id && u.isAlive());
+    if (myUnits.length === 0 || enemies.length === 0) return;
 
-    for (const enemy of enemies) {
-      if (visited.has(enemy.id)) continue;
+    // Send 80% of forces; keep 20% near settlement as garrison
+    const available = myUnits.filter(u => u.state === UnitState.IDLE || u.state === UnitState.MOVING);
+    const toSend = Math.ceil(available.length * 0.8);
 
-      const cluster = { units: [enemy], cx: enemy.col, cz: enemy.row };
-      visited.add(enemy.id);
+    for (let i = 0; i < Math.min(toSend, available.length); i++) {
+      const unit = available[i];
+      // Pick nearest enemy
+      let best = enemies[0];
+      let bestD = unit.distanceTo(best);
+      for (const e of enemies) { const d = unit.distanceTo(e); if (d < bestD) { bestD = d; best = e; } }
 
-      for (const other of enemies) {
-        if (visited.has(other.id)) continue;
-        if (enemy.distanceTo(other) <= 6) {
-          cluster.units.push(other);
-          cluster.cx += other.col;
-          cluster.cz += other.row;
-          visited.add(other.id);
-        }
+      if (unit.distanceTo(best) <= unit.attackRange + 1.0) {
+        unit.attackUnit(best);
+      } else {
+        const path = findPath(game.map, unit.gridPos(), best.gridPos(), 400);
+        if (path.length > 0) unit.moveTo(path);
       }
-
-      cluster.cx /= cluster.units.length;
-      cluster.cz /= cluster.units.length;
-      clusters.push(cluster);
     }
-
-    return clusters;
   }
 
   private orderConstruction(player: Player, game: Game) {
