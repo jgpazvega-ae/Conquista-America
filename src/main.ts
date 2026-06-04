@@ -100,6 +100,7 @@ class GameInstance {
   private killCount   = 0;
   private builtCount  = 0;
   private endHandled  = false;
+  private unitGroups  = new Map<number, number[]>(); // hotkey → unit id array
 
   constructor(civ: CivilizationType, saveSystem: SaveSystem) {
     this.civ        = civ;
@@ -426,6 +427,34 @@ class GameInstance {
         e.preventDefault();
         for (const u of this.game.getAllUnits()) {
           u.setSelected(u.isAlive() && u.playerId === this.game.humanPlayerId);
+        }
+        this.hud.update(this.input.getSelectedUnits());
+        return;
+      }
+      // Ctrl+1-5: save unit group
+      if (e.ctrlKey && /^Digit[1-5]$/.test(e.code)) {
+        e.preventDefault();
+        const n = parseInt(e.code.replace('Digit', ''));
+        const sel = this.input.getSelectedUnits();
+        this.unitGroups.set(n, sel.map(u => u.id));
+        this.hud.notify(`Grupo ${n} guardado — ${sel.length} unidades`, 'info');
+        return;
+      }
+      // 1-5 (no ctrl): recall unit group + center camera
+      if (!e.ctrlKey && !e.altKey && /^Digit[1-5]$/.test(e.code)) {
+        const n = parseInt(e.code.replace('Digit', ''));
+        const ids = this.unitGroups.get(n);
+        if (!ids?.length) return;
+        for (const u of this.game.getAllUnits()) u.setSelected(false);
+        const recalled: import('./game/Unit').Unit[] = [];
+        for (const id of ids) {
+          const u = this.game.getUnitById(id);
+          if (u?.isAlive()) { u.setSelected(true); recalled.push(u); }
+        }
+        if (recalled.length > 0) {
+          let sx = 0, sz = 0;
+          for (const u of recalled) { sx += u.worldX; sz += u.worldZ; }
+          this.camera.panTo(sx / recalled.length, sz / recalled.length);
         }
         this.hud.update(this.input.getSelectedUnits());
         return;
