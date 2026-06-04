@@ -107,11 +107,13 @@ export class Game {
         idx,
         baseCol,
         baseRow,
-        color
+        color,
+        civ
       );
       settlement.buildProgress = 1;
       settlement.hp = settlement.maxHp;
       settlement.state = 'COMPLETE' as any;
+      settlement.progressBar.visible = false;
       this.allBuildings.push(settlement);
 
       for (let w = 0; w < 3; w++) {

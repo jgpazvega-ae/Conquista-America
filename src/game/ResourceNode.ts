@@ -17,8 +17,9 @@ export class ResourceNode {
   row: number;
   amount: number;
   maxAmount: number;
+  baseY = 0;
 
-  mesh!: THREE.Mesh;
+  mesh!: THREE.Group;
 
   constructor(type: ResourceType, col: number, row: number, amount: number) {
     this.id = nextNodeId++;
@@ -32,28 +33,48 @@ export class ResourceNode {
   }
 
   private buildMesh() {
-    let color: number;
-    let emoji: string;
-    let shape: THREE.BufferGeometry;
+    this.mesh = new THREE.Group();
 
     if (this.type === ResourceType.FOOD) {
-      color = 0xd4a850;
-      emoji = '🌽';
-      shape = new THREE.ConeGeometry(0.25, 0.4, 8);
+      // Berry bushes — green foliage clumps with red berries
+      const leaf = new THREE.MeshStandardMaterial({ color: 0x3c7a32, roughness: 0.9, flatShading: true });
+      const berry = new THREE.MeshStandardMaterial({ color: 0xd03030, roughness: 0.6, emissive: 0x801010, emissiveIntensity: 0.2 });
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2;
+        const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(0.28, 0), leaf);
+        bush.position.set(Math.cos(a) * 0.28, 0.26, Math.sin(a) * 0.28);
+        bush.castShadow = true; this.mesh.add(bush);
+        const b = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 5), berry);
+        b.position.set(Math.cos(a) * 0.28 + 0.1, 0.36, Math.sin(a) * 0.28);
+        this.mesh.add(b);
+      }
     } else if (this.type === ResourceType.GOLD) {
-      color = 0xffdd00;
-      emoji = '💛';
-      shape = new THREE.OctahedronGeometry(0.2);
+      // Rocky outcrop laced with glittering gold veins
+      const rock = new THREE.MeshStandardMaterial({ color: 0x6a6258, roughness: 1, flatShading: true });
+      const gold = new THREE.MeshStandardMaterial({ color: 0xffcc20, roughness: 0.3, metalness: 0.8, emissive: 0xffaa00, emissiveIntensity: 0.4 });
+      const base = new THREE.Mesh(new THREE.DodecahedronGeometry(0.4, 0), rock);
+      base.position.y = 0.3; base.castShadow = true; this.mesh.add(base);
+      for (let i = 0; i < 5; i++) {
+        const nug = new THREE.Mesh(new THREE.OctahedronGeometry(0.08, 0), gold);
+        const a = Math.random() * Math.PI * 2;
+        nug.position.set(Math.cos(a) * 0.3, 0.25 + Math.random() * 0.3, Math.sin(a) * 0.3);
+        this.mesh.add(nug);
+      }
     } else {
-      color = 0x8a7a6a;
-      emoji = '🪨';
-      shape = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+      // Stone — pile of grey boulders
+      const rock = new THREE.MeshStandardMaterial({ color: 0x8a847c, roughness: 1, flatShading: true });
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2;
+        const s = 0.2 + Math.random() * 0.18;
+        const b = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), rock);
+        b.position.set(Math.cos(a) * 0.25, s * 0.8, Math.sin(a) * 0.25);
+        b.rotation.set(i, i * 1.7, i * 0.5);
+        b.castShadow = true; this.mesh.add(b);
+      }
     }
 
-    const mat = new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.3 });
-    this.mesh = new THREE.Mesh(shape, mat);
-    this.mesh.position.set(this.col * TILE_SIZE, 0.35, this.row * TILE_SIZE);
-    this.mesh.castShadow = true;
+    this.mesh.position.set(this.col * TILE_SIZE, 0, this.row * TILE_SIZE);
+    this.mesh.traverse(c => { c.userData.nodeId = this.id; });
     this.mesh.userData.nodeId = this.id;
   }
 
@@ -68,9 +89,8 @@ export class ResourceNode {
   }
 
   updateVisibility() {
-    const alpha = Math.max(0.3, this.amount / this.maxAmount);
-    const mat = this.mesh.material as THREE.MeshLambertMaterial;
-    mat.opacity = alpha;
-    mat.transparent = alpha < 1;
+    // Shrink the cluster as it is depleted
+    const ratio = Math.max(0.35, this.amount / this.maxAmount);
+    this.mesh.scale.setScalar(ratio);
   }
 }

@@ -154,6 +154,7 @@ class GameInstance {
     const dt = Math.min(this.clock.getDelta(), 0.1);
 
     this.game.update(dt);
+    this.renderer.syncHeights(this.game.allUnits, this.game.allWorkers);
     this.camera.update(dt);
     this.renderer.updateEffects(dt);
 

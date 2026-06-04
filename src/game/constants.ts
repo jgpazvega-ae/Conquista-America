@@ -3,26 +3,33 @@ export const MAP_ROWS = 72;
 export const TILE_SIZE = 2;
 export const TILE_GAP = 0.05;
 
+// ── Relieve del terreno (malla continua suavizada) ─────────────────────────────
+export const SEA_LEVEL_ELEV = 0.18;  // umbral de elevación para agua (coincide con Map.ts)
+export const HEIGHT_SCALE   = 7.0;   // escala vertical: cuánto se elevan montañas/colinas
+export const WATER_LEVEL    = 0.12;  // altura del plano de agua animada
+
+// Altura base relativa por tipo de terreno (para vegetación / referencia)
 export const TERRAIN_HEIGHTS: Record<string, number> = {
-  WATER:    0.05,
-  BEACH:    0.15,
-  GRASS:    0.25,
-  JUNGLE:   0.30,
-  DESERT:   0.25,
-  HIGHLAND: 0.50,
-  MOUNTAIN: 1.10,
-  SNOW:     1.40,
+  WATER:    0.0,
+  BEACH:    0.3,
+  GRASS:    0.9,
+  JUNGLE:   1.1,
+  DESERT:   0.8,
+  HIGHLAND: 2.8,
+  MOUNTAIN: 5.0,
+  SNOW:     6.5,
 };
 
+// Paleta natural — colores más ricos y orgánicos (no caricaturescos)
 export const TERRAIN_COLORS: Record<string, number> = {
-  WATER:    0x1a5f8a,
-  BEACH:    0xd4b878,
-  GRASS:    0x3a8c2a,
-  JUNGLE:   0x1a5c14,
-  DESERT:   0xc8954a,
-  HIGHLAND: 0x6a8c4a,
-  MOUNTAIN: 0x7a6c54,
-  SNOW:     0xe8e8ee,
+  WATER:    0x2a6f97,
+  BEACH:    0xe6d2a0,
+  GRASS:    0x5d9b3e,
+  JUNGLE:   0x2f6d28,
+  DESERT:   0xd8b066,
+  HIGHLAND: 0x7d9450,
+  MOUNTAIN: 0x877b6b,
+  SNOW:     0xf2f4f8,
 };
 
 export const TERRAIN_WALKABLE: Record<string, boolean> = {

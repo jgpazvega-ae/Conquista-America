@@ -33,7 +33,9 @@ export class Worker {
   carryAmount: number = 0;
 
   mesh!: THREE.Group;
+  private rig!: THREE.Group;
   resourceIndicator!: THREE.Mesh;
+  private animT = Math.random() * 10;
 
   constructor(playerId: number, col: number, row: number, civColor: number) {
     this.id = nextWorkerId++;
@@ -48,25 +50,34 @@ export class Worker {
 
   private buildMesh(civColor: number) {
     this.mesh = new THREE.Group();
+    this.rig  = new THREE.Group();
+    this.mesh.add(this.rig);
 
-    const mat = new THREE.MeshLambertMaterial({ color: civColor });
-    const lightMat = new THREE.MeshLambertMaterial({ color: Math.min(0xffffff, civColor + 0x333333) });
+    const cloth = new THREE.MeshStandardMaterial({ color: civColor, roughness: 0.9 });
+    const skin  = new THREE.MeshStandardMaterial({ color: 0xc28a5a, roughness: 0.75 });
+    const wood  = new THREE.MeshStandardMaterial({ color: 0x6a4a2a, roughness: 0.9 });
+    const lightMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 });
 
-    // Body
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, 0.55, 8), mat);
-    body.position.y = 0.38;
-    body.castShadow = true;
-    this.mesh.add(body);
-
+    // Legs
+    for (const x of [-0.09, 0.09]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.34, 0.12), wood);
+      leg.position.set(x, 0.18, 0); leg.castShadow = true; this.rig.add(leg);
+    }
+    // Torso (tunic)
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.42, 0.2), cloth);
+    body.position.y = 0.56; body.castShadow = true; this.rig.add(body);
     // Head
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6), mat);
-    head.position.y = 0.85;
-    head.castShadow = true;
-    this.mesh.add(head);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), skin);
+    head.position.y = 0.9; head.castShadow = true; this.rig.add(head);
+    // Tool over shoulder (pick/hoe)
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.6, 6), wood);
+    handle.position.set(0.22, 0.7, 0); handle.rotation.z = 0.5; this.rig.add(handle);
+    const headTool = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.06, 0.06), new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5, metalness: 0.6 }));
+    headTool.position.set(0.38, 0.95, 0); this.rig.add(headTool);
 
-    // Carry indicator (small box above)
-    this.resourceIndicator = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.16), lightMat);
-    this.resourceIndicator.position.y = 1.1;
+    // Carry indicator (resource crate above)
+    this.resourceIndicator = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 0.18), lightMat);
+    this.resourceIndicator.position.y = 1.18;
     this.resourceIndicator.visible = false;
     this.mesh.add(this.resourceIndicator);
 
@@ -83,10 +94,13 @@ export class Worker {
     this.taskProgress = 0;
   }
 
-  update(dt: number, map: GameMap) {
+  update(dt: number, _map: GameMap) {
+    this.animT += dt;
+    const gathering = this.task === WorkerTask.GATHERING_FOOD || this.task === WorkerTask.GATHERING_GOLD || this.task === WorkerTask.GATHERING_STONE;
+
     if (this.task === WorkerTask.MOVING) {
       this.updateMovement(dt);
-    } else if (this.task === WorkerTask.GATHERING_FOOD || this.task === WorkerTask.GATHERING_GOLD || this.task === WorkerTask.GATHERING_STONE) {
+    } else if (gathering) {
       this.taskProgress += dt;
       if (this.taskProgress >= 3.0) {
         this.carryAmount = 30;
@@ -98,7 +112,21 @@ export class Worker {
       }
     }
 
-    this.mesh.position.set(this.worldX, 0, this.worldZ);
+    // Animation on the rig (mesh.y owned by renderer)
+    if (this.rig) {
+      if (this.task === WorkerTask.MOVING) {
+        this.rig.position.y = Math.abs(Math.sin(this.animT * 10)) * 0.05;
+      } else if (gathering) {
+        this.rig.rotation.x = Math.sin(this.animT * 8) * 0.25; // swinging tool
+        this.rig.position.y = 0;
+      } else {
+        this.rig.position.y = 0;
+        this.rig.rotation.x = 0;
+      }
+    }
+
+    this.mesh.position.x = this.worldX;
+    this.mesh.position.z = this.worldZ;
   }
 
   private updateMovement(dt: number) {
@@ -134,10 +162,10 @@ export class Worker {
   private updateResourceIndicator() {
     if (this.carrying) {
       this.resourceIndicator.visible = true;
-      const mat = this.resourceIndicator.material as THREE.MeshLambertMaterial;
+      const mat = this.resourceIndicator.material as THREE.MeshStandardMaterial;
       if (this.carrying === 'food') mat.color.setHex(0xddaa44);
-      else if (this.carrying === 'gold') mat.color.setHex(0xffff00);
-      else mat.color.setHex(0x888888);
+      else if (this.carrying === 'gold') mat.color.setHex(0xffd000);
+      else mat.color.setHex(0x999999);
     } else {
       this.resourceIndicator.visible = false;
     }

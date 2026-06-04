@@ -9,6 +9,7 @@ import { Building } from './Building';
 import type { Worker } from './Worker';
 import { WorkerTask } from './Worker';
 import { ResourceType } from './ResourceNode';
+import { CIV_COLORS } from './constants';
 
 const AI_THINK_INTERVAL = 4.0;
 const AI_BUILD_INTERVAL = 12.0;
@@ -141,7 +142,7 @@ export class AISystem {
     const pos = game.map.findWalkableNear(settlement.col + 3, settlement.row + 3, 5);
     if (!pos) return;
 
-    const building = new Building(buildType, def, player.id, pos[0], pos[1], 0xcccccc);
+    const building = new Building(buildType, def, player.id, pos[0], pos[1], CIV_COLORS[player.civType], player.civType);
     game.allBuildings.push(building);
     player.resources.food -= def.cost.food;
     player.resources.gold -= def.cost.gold;
