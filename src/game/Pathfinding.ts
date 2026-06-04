@@ -1,58 +1,110 @@
 import type { GridPos } from './types';
 import type { GameMap } from './Map';
 
+// Binary min-heap for the A* open list — O(log n) instead of O(n) linear scan
+class MinHeap {
+  private data: { f: number; idx: number }[] = [];
+  private nodes: Node[] = [];
+
+  push(node: Node, idx: number) {
+    this.nodes[idx] = node;
+    this.data.push({ f: node.f, idx });
+    this._siftUp(this.data.length - 1);
+  }
+
+  pop(): Node | null {
+    if (this.data.length === 0) return null;
+    const top = this.data[0];
+    const last = this.data.pop()!;
+    if (this.data.length > 0) {
+      this.data[0] = last;
+      this._siftDown(0);
+    }
+    return this.nodes[top.idx];
+  }
+
+  updateKey(idx: number, f: number) {
+    for (let i = 0; i < this.data.length; i++) {
+      if (this.data[i].idx === idx) {
+        this.data[i].f = f;
+        this._siftUp(i);
+        return;
+      }
+    }
+  }
+
+  get size() { return this.data.length; }
+
+  private _siftUp(i: number) {
+    while (i > 0) {
+      const p = (i - 1) >> 1;
+      if (this.data[p].f <= this.data[i].f) break;
+      [this.data[p], this.data[i]] = [this.data[i], this.data[p]];
+      i = p;
+    }
+  }
+  private _siftDown(i: number) {
+    const n = this.data.length;
+    while (true) {
+      let s = i;
+      const l = 2 * i + 1, r = 2 * i + 2;
+      if (l < n && this.data[l].f < this.data[s].f) s = l;
+      if (r < n && this.data[r].f < this.data[s].f) s = r;
+      if (s === i) break;
+      [this.data[s], this.data[i]] = [this.data[i], this.data[s]];
+      i = s;
+    }
+  }
+}
+
 interface Node {
-  col: number;
-  row: number;
-  g: number;
-  h: number;
-  f: number;
+  col: number; row: number;
+  g: number; h: number; f: number;
   parent: Node | null;
+  inOpen: boolean;
 }
 
-function heuristic(a: GridPos, b: GridPos): number {
-  // Chebyshev distance (allows diagonal)
-  return Math.max(Math.abs(a.col - b.col), Math.abs(a.row - b.row));
-}
-
-function key(col: number, row: number): string {
-  return `${col},${row}`;
+function heuristic(ac: number, ar: number, bc: number, br: number): number {
+  return Math.max(Math.abs(ac - bc), Math.abs(ar - br));
 }
 
 export function findPath(
-  map: GameMap,
-  start: GridPos,
-  goal: GridPos,
+  map:     GameMap,
+  start:   GridPos,
+  goal:    GridPos,
   maxIter = 400,
 ): GridPos[] {
   if (!map.isWalkable(goal.col, goal.row)) {
-    // Try to find nearest walkable
     const near = map.findWalkableNear(goal.col, goal.row);
     if (!near) return [];
     goal = { col: near[0], row: near[1] };
   }
-
   if (start.col === goal.col && start.row === goal.row) return [];
 
-  const open: Node[]  = [];
-  const closed = new Set<string>();
-  const nodeMap = new Map<string, Node>();
+  const cols = map.cols;
+  const nodeGrid = new Map<number, Node>();
 
-  const startNode: Node = { col: start.col, row: start.row, g: 0, h: heuristic(start, goal), f: 0, parent: null };
+  const key = (c: number, r: number) => r * cols + c;
+
+  const startNode: Node = {
+    col: start.col, row: start.row,
+    g: 0, h: heuristic(start.col, start.row, goal.col, goal.row),
+    f: 0, parent: null, inOpen: true,
+  };
   startNode.f = startNode.h;
-  open.push(startNode);
-  nodeMap.set(key(start.col, start.row), startNode);
+  nodeGrid.set(key(start.col, start.row), startNode);
 
+  const heap = new MinHeap();
+  heap.push(startNode, key(start.col, start.row));
+
+  const closed = new Uint8Array(cols * map.rows);
   let iters = 0;
-  while (open.length > 0 && iters++ < maxIter) {
-    // Find node with lowest f
-    let bestIdx = 0;
-    for (let i = 1; i < open.length; i++) {
-      if (open[i].f < open[bestIdx].f) bestIdx = i;
-    }
-    const current = open.splice(bestIdx, 1)[0];
+
+  while (heap.size > 0 && iters++ < maxIter) {
+    const current = heap.pop()!;
     const ck = key(current.col, current.row);
-    closed.add(ck);
+    if (closed[ck]) continue;
+    closed[ck] = 1;
 
     if (current.col === goal.col && current.row === goal.row) {
       return reconstructPath(current);
@@ -61,24 +113,26 @@ export function findPath(
     for (const [nc, nr] of map.getNeighborCoords(current.col, current.row)) {
       if (!map.isWalkable(nc, nr)) continue;
       const nk = key(nc, nr);
-      if (closed.has(nk)) continue;
+      if (closed[nk]) continue;
 
-      const isDiag = nc !== current.col && nr !== current.row;
-      const moveCost = isDiag ? 1.414 : 1.0;
-      const g = current.g + moveCost;
-      const existing = nodeMap.get(nk);
+      const diag = nc !== current.col && nr !== current.row;
+      const g = current.g + (diag ? 1.414 : 1.0);
+      let node = nodeGrid.get(nk);
 
-      if (!existing || g < existing.g) {
-        const h = heuristic({ col: nc, row: nr }, goal);
-        const node: Node = { col: nc, row: nr, g, h, f: g + h, parent: current };
-        nodeMap.set(nk, node);
-        if (!existing) open.push(node);
-        else {
-          // Update in place
-          existing.g = node.g;
-          existing.f = node.f;
-          existing.parent = node.parent;
-        }
+      if (!node) {
+        node = {
+          col: nc, row: nr,
+          g, h: heuristic(nc, nr, goal.col, goal.row),
+          f: 0, parent: current, inOpen: true,
+        };
+        node.f = g + node.h;
+        nodeGrid.set(nk, node);
+        heap.push(node, nk);
+      } else if (g < node.g) {
+        node.g = g;
+        node.f = g + node.h;
+        node.parent = current;
+        heap.updateKey(nk, node.f);
       }
     }
   }
@@ -89,10 +143,9 @@ export function findPath(
 function reconstructPath(node: Node): GridPos[] {
   const path: GridPos[] = [];
   let cur: Node | null = node;
-  while (cur) {
+  while (cur?.parent) {
     path.unshift({ col: cur.col, row: cur.row });
     cur = cur.parent;
   }
-  path.shift(); // Remove start position
   return path;
 }
