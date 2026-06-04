@@ -99,15 +99,9 @@ export class AuthScreen {
 
   private handleGuest() {
     const guestName = `Invitado_${Math.floor(Math.random() * 9999)}`;
-    this.saveSystem.register(guestName, 'guest_' + Math.random().toString(36).slice(2), );
-    this.saveSystem.login(guestName, 'guest_' + Math.random().toString(36).slice(2), false);
-    // Just log in as guest without password check
-    (this.saveSystem as any).session = {
-      username: guestName,
-      civType: 'AZTEC',
-      loginTime: Date.now(),
-      remember: false,
-    };
+    const guestPass = 'guest_' + Math.random().toString(36).slice(2);
+    this.saveSystem.register(guestName, guestPass);
+    this.saveSystem.login(guestName, guestPass, false);
     this.showSuccess('Entrando como invitado...');
     setTimeout(() => this.onSuccess?.(), 700);
   }

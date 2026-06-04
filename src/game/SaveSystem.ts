@@ -74,15 +74,16 @@ export class SaveSystem {
         const arr: PlayerProfile[] = JSON.parse(raw);
         arr.forEach(p => this.profiles.set(p.username.toLowerCase(), p));
       }
-      const sessRaw = localStorage.getItem(STORAGE_KEYS.session);
+      const sessRaw = localStorage.getItem(STORAGE_KEYS.session)
+                   ?? sessionStorage.getItem(STORAGE_KEYS.session);
       if (sessRaw) {
         const sess: GameSession = JSON.parse(sessRaw);
-        // Validate session (24h remember, 2h normal)
         const maxAge = sess.remember ? 86400_000 : 7200_000;
         if (Date.now() - sess.loginTime < maxAge) {
           this.session = sess;
         } else {
           localStorage.removeItem(STORAGE_KEYS.session);
+          sessionStorage.removeItem(STORAGE_KEYS.session);
         }
       }
     } catch { /* ignore */ }

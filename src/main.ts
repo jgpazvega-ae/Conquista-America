@@ -277,4 +277,15 @@ function sleep(ms: number) {
 }
 
 // ── Start ──────────────────────────────────────────────────────────────────────
-boot().catch(console.error);
+boot().catch(err => {
+  console.error(err);
+  document.body.innerHTML = `
+    <div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#050202;color:#e8d5a0;font-family:sans-serif;padding:24px;text-align:center">
+      <div style="font-size:48px;margin-bottom:16px">🌎</div>
+      <div style="font-size:22px;font-weight:bold;margin-bottom:8px">Conquista América</div>
+      <div style="color:#e74c3c;margin-bottom:16px">Error al iniciar el juego</div>
+      <div style="font-size:13px;color:#888;max-width:400px;word-break:break-all">${err?.message ?? 'Error desconocido'}</div>
+      <button onclick="location.reload()" style="margin-top:24px;padding:10px 24px;background:#c4820a;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:15px">🔄 Reintentar</button>
+    </div>
+  `;
+});
