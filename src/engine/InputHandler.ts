@@ -1,4 +1,5 @@
 import type { Renderer } from './Renderer';
+import type { RTSCamera } from './Camera';
 import type { Game } from '../game/Game';
 import type { Unit } from '../game/Unit';
 import { UnitState } from '../game/types';
@@ -6,24 +7,26 @@ import { findPath } from '../game/Pathfinding';
 import { TILE_SIZE } from '../game/constants';
 
 interface DragState {
-  active:  boolean;
-  startX:  number;
-  startY:  number;
+  active:   boolean;
+  startX:   number;
+  startY:   number;
   currentX: number;
   currentY: number;
 }
 
 export class InputHandler {
-  private renderer:      Renderer;
-  private game:          Game;
-  private selectionBox:  HTMLElement;
-  private drag:          DragState = { active: false, startX: 0, startY: 0, currentX: 0, currentY: 0 };
-  private mouseDownPos:  { x: number; y: number } | null = null;
+  private renderer:     Renderer;
+  private camera:       RTSCamera;
+  private game:         Game;
+  private selectionBox: HTMLElement;
+  private drag: DragState = { active: false, startX: 0, startY: 0, currentX: 0, currentY: 0 };
+  private mouseDownPos: { x: number; y: number } | null = null;
 
   onSelectionChange: (() => void) | null = null;
 
-  constructor(renderer: Renderer, game: Game) {
+  constructor(renderer: Renderer, game: Game, camera: RTSCamera) {
     this.renderer     = renderer;
+    this.camera       = camera;
     this.game         = game;
     this.selectionBox = document.getElementById('selection-box')!;
     this.bind();
@@ -31,11 +34,12 @@ export class InputHandler {
 
   private bind() {
     const canvas = this.renderer.renderer.domElement;
-    canvas.addEventListener('mousedown', this.onMouseDown.bind(this));
-    canvas.addEventListener('mousemove', this.onMouseMove.bind(this));
-    canvas.addEventListener('mouseup',   this.onMouseUp.bind(this));
-    canvas.addEventListener('contextmenu', e => e.preventDefault());
-    canvas.addEventListener('mousedown', e => { if (e.button === 2) this.onRightClick(e); });
+    canvas.addEventListener('mousedown',    this.onMouseDown.bind(this));
+    canvas.addEventListener('mousemove',    this.onMouseMove.bind(this));
+    canvas.addEventListener('mouseup',      this.onMouseUp.bind(this));
+    canvas.addEventListener('contextmenu',  e => e.preventDefault());
+    // Right-click ORDER fires on mouseup (so drag is detected first)
+    canvas.addEventListener('mouseup',      e => { if (e.button === 2) this.onRightUp(e); });
   }
 
   private onMouseDown(e: MouseEvent) {
@@ -70,12 +74,15 @@ export class InputHandler {
     this.selectionBox.style.display = 'none';
   }
 
-  private onRightClick(e: MouseEvent) {
+  // Right-click fires AFTER Camera has had a chance to accumulate drag distance
+  private onRightUp(e: MouseEvent) {
     e.preventDefault();
+    // If the right mouse was dragged to pan the camera, don't issue a game order
+    if (this.camera.rightClickWasDrag()) return;
+
     const selected = this.getSelectedUnits();
     if (selected.length === 0) return;
 
-    // Only move human player's units
     const myUnits = selected.filter(u => u.playerId === this.game.humanPlayerId);
     if (myUnits.length === 0) return;
 
@@ -86,15 +93,15 @@ export class InputHandler {
       const target = this.game.getUnitById(hit.unitId);
       if (!target || !target.isAlive()) return;
       if (target.playerId !== this.game.humanPlayerId) {
-        // Attack order
         for (const u of myUnits) u.attackUnit(target);
       }
       return;
     }
 
     if (hit.type === 'tile') {
-      // Move order – spread units around target tile
       const map = this.game.map;
+      // Compute centroid for move marker
+      let sumX = 0, sumZ = 0, moved = 0;
       myUnits.forEach((unit, i) => {
         const offset = this.spreadOffset(i, myUnits.length);
         const tc = hit.col + offset[0];
@@ -102,9 +109,19 @@ export class InputHandler {
         const near = map.findWalkableNear(tc, tr, 3);
         if (!near) return;
         const path = findPath(map, unit.gridPos(), { col: near[0], row: near[1] }, 400);
-        if (path.length > 0) unit.moveTo(path);
-        else unit.state = UnitState.IDLE;
+        if (path.length > 0) {
+          unit.moveTo(path);
+          sumX += near[0] * TILE_SIZE;
+          sumZ += near[1] * TILE_SIZE;
+          moved++;
+        } else {
+          unit.state = UnitState.IDLE;
+        }
       });
+      // Show move marker at centroid of ordered destinations
+      if (moved > 0) {
+        this.renderer.showMoveMarker(sumX / moved, sumZ / moved);
+      }
     }
   }
 
@@ -119,12 +136,10 @@ export class InputHandler {
   private handleClick(screenX: number, screenY: number) {
     const hit = this.renderer.pickFromScreen(screenX, screenY);
 
-    // Deselect all first
     for (const unit of this.game.getAllUnits()) unit.setSelected(false);
 
     if (hit?.type === 'unit') {
       const unit = this.game.getUnitById(hit.unitId);
-      // Only select if alive and either owned by player or visible through fog
       if (unit?.isAlive()) {
         const canSee = this.game.fog.canSeeUnit(unit, this.game.humanPlayerId);
         if (canSee) unit.setSelected(true);
@@ -140,10 +155,8 @@ export class InputHandler {
     const x2 = Math.max(this.drag.startX, this.drag.currentX);
     const y2 = Math.max(this.drag.startY, this.drag.currentY);
 
-    // Deselect all
     for (const unit of this.game.getAllUnits()) unit.setSelected(false);
 
-    // Select units whose screen position falls inside the box
     for (const unit of this.game.getAllUnits()) {
       if (!unit.isAlive()) continue;
       if (unit.playerId !== this.game.humanPlayerId) continue;

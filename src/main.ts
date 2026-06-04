@@ -12,6 +12,8 @@ import { RTSCamera } from './engine/Camera';
 import { InputHandler } from './engine/InputHandler';
 import { TouchHandler } from './engine/TouchHandler';
 import { HUD } from './ui/HUD';
+import { BuildingType } from './game/buildings';
+import { TILE_SIZE } from './game/constants';
 
 // ── Historical facts shown during loading ─────────────────────────────────────
 const LOADING_FACTS = [
@@ -106,7 +108,7 @@ class GameInstance {
     this.renderer = new Renderer(canvas);
     this.hud      = new HUD(this.game);
     this.camera   = new RTSCamera(this.renderer.camera);
-    this.input    = new InputHandler(this.renderer, this.game);
+    this.input    = new InputHandler(this.renderer, this.game, this.camera);
     this.touch    = new TouchHandler(this.camera, this.renderer, this.game);
     this.settings = new SettingsPanel(this.saveSystem);
 
@@ -138,6 +140,17 @@ class GameInstance {
       let sx = 0, sz = 0;
       for (const u of army) { sx += u.worldX; sz += u.worldZ; }
       this.camera.panTo(sx / army.length, sz / army.length);
+    }
+
+    // Enemy settlement objective marker
+    const enemySettlement = this.game.allBuildings.find(
+      b => b.playerId !== this.game.humanPlayerId && b.type === BuildingType.SETTLEMENT,
+    );
+    if (enemySettlement) {
+      this.renderer.addObjectiveMarker(
+        enemySettlement.col * TILE_SIZE,
+        enemySettlement.row * TILE_SIZE,
+      );
     }
 
     await loadingStep(100, '¡Que comience la conquista!');

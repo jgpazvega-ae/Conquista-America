@@ -35,6 +35,10 @@ export class Renderer {
   readonly raycaster = new THREE.Raycaster();
   readonly mouse     = new THREE.Vector2();
 
+  // ── Markers ────────────────────────────────────────────────────────────────
+  private moveMarkers: { mesh: THREE.Mesh; age: number }[] = [];
+  private objMarkers:  { group: THREE.Group; phase: number }[] = [];
+
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -495,9 +499,104 @@ export class Renderer {
     }
   }
 
+  // ── Move order marker — pulsing green ring that fades in ~1.6 s ─────────────
+  showMoveMarker(worldX: number, worldZ: number) {
+    const y = this.getHeightAt(worldX, worldZ) + 0.12;
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x44ff88, transparent: true, opacity: 0.90,
+      side: THREE.DoubleSide, depthWrite: false,
+    });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.28, 0.48, 24), mat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(worldX, y, worldZ);
+    ring.renderOrder = 5;
+    this.scene.add(ring);
+    // Inner bright dot
+    const dotMat = new THREE.MeshBasicMaterial({ color: 0xaaffcc, transparent: true, opacity: 0.80, depthWrite: false });
+    const dot = new THREE.Mesh(new THREE.CircleGeometry(0.14, 12), dotMat);
+    dot.rotation.x = -Math.PI / 2;
+    dot.position.set(worldX, y + 0.01, worldZ);
+    dot.renderOrder = 5;
+    this.scene.add(dot);
+    // Store both; share same age via userData
+    (ring as any)._dot = dot;
+    this.moveMarkers.push({ mesh: ring, age: 0 });
+  }
+
+  // ── Enemy base objective marker — red chevron + exclamation floating above ──
+  addObjectiveMarker(worldX: number, worldZ: number) {
+    const baseY = this.getHeightAt(worldX, worldZ) + 5.5;
+    const group = new THREE.Group();
+    group.position.set(worldX, baseY, worldZ);
+    group.userData.baseY = baseY;
+
+    // Downward-pointing arrow (cone)
+    const arrowMat = new THREE.MeshBasicMaterial({ color: 0xff3333, transparent: true, opacity: 0.92, depthWrite: false });
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.5, 6), arrowMat);
+    cone.rotation.x = Math.PI;   // tip points down
+    cone.position.y = -0.2;
+    group.add(cone);
+
+    // Pulsing ring beneath the arrow
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0xff4444, transparent: true, opacity: 0.78, side: THREE.DoubleSide, depthWrite: false });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.65, 0.95, 24), ringMat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = -1.2;
+    group.add(ring);
+
+    // Exclamation shaft
+    const exMat = new THREE.MeshBasicMaterial({ color: 0xffee22, transparent: true, opacity: 0.95, depthWrite: false });
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.80, 6), exMat);
+    shaft.position.y = 1.30;
+    group.add(shaft);
+    const exDot = new THREE.Mesh(new THREE.SphereGeometry(0.18, 7, 5), exMat);
+    exDot.position.y = 0.72;
+    group.add(exDot);
+
+    group.renderOrder = 8;
+    this.scene.add(group);
+    this.objMarkers.push({ group, phase: Math.random() * Math.PI * 2 });
+  }
+
+  private updateMarkers(dt: number) {
+    const MAX_AGE = 1.6;
+    // Move markers
+    for (let i = this.moveMarkers.length - 1; i >= 0; i--) {
+      const m = this.moveMarkers[i];
+      m.age += dt;
+      const t    = m.age / MAX_AGE;
+      const fade = 1 - t;
+      const scale = 1 + Math.sin(t * Math.PI * 5) * 0.18;
+      m.mesh.scale.set(scale, scale, scale);
+      (m.mesh.material as THREE.MeshBasicMaterial).opacity = fade * 0.90;
+      const dot: THREE.Mesh | undefined = (m.mesh as any)._dot;
+      if (dot) {
+        dot.scale.set(scale, scale, scale);
+        (dot.material as THREE.MeshBasicMaterial).opacity = fade * 0.80;
+      }
+      if (m.age >= MAX_AGE) {
+        this.scene.remove(m.mesh);
+        m.mesh.geometry.dispose();
+        (m.mesh.material as THREE.MeshBasicMaterial).dispose();
+        if (dot) { this.scene.remove(dot); dot.geometry.dispose(); (dot.material as THREE.MeshBasicMaterial).dispose(); }
+        this.moveMarkers.splice(i, 1);
+      }
+    }
+    // Objective markers — gentle bob + ring pulse
+    for (const m of this.objMarkers) {
+      m.phase += dt * 1.8;
+      m.group.position.y = m.group.userData.baseY + Math.sin(m.phase) * 0.45;
+      // Pulse ring scale
+      const ring = m.group.children[1] as THREE.Mesh;
+      const ps = 1 + Math.sin(m.phase * 2) * 0.12;
+      ring.scale.set(ps, ps, ps);
+    }
+  }
+
   updateEffects(dt: number) {
     this.effects.update(dt);
     if (this.waterMat) this.waterMat.uniforms.time.value += dt;
+    this.updateMarkers(dt);
   }
 
   render() {
