@@ -35,6 +35,9 @@ export class HUD {
 
   onMinimapClick: ((worldX: number, worldZ: number) => void) | null = null;
 
+  private camera: import('../engine/Camera').RTSCamera | null = null;
+  setCamera(cam: import('../engine/Camera').RTSCamera) { this.camera = cam; }
+
   constructor(game: Game) {
     this.game = game;
     this.minimapCanvas.width  = 180;
@@ -213,6 +216,19 @@ export class HUD {
           }
         }
       }
+    }
+
+    // Camera viewport rectangle
+    if (this.camera) {
+      const pos = this.camera.getPosition();
+      const zoom = this.camera.getZoom();
+      const nx = (pos.x / (map.cols * TILE_SIZE)) * W;
+      const nz = (pos.z / (map.rows * TILE_SIZE)) * H;
+      const rectW = (zoom / (map.cols * TILE_SIZE)) * W * 2.5;
+      const rectH = (zoom / (map.rows * TILE_SIZE)) * H * 2.0;
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(nx - rectW / 2, nz - rectH / 2, rectW, rectH);
     }
   }
 

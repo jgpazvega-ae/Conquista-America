@@ -48,6 +48,9 @@ export class Renderer {
   private moveMarkers: { mesh: THREE.Mesh; age: number }[] = [];
   private objMarkers:  { group: THREE.Group; phase: number }[] = [];
 
+  // ── Ghost building preview ─────────────────────────────────────────────────
+  private _ghostMesh: THREE.Group | null = null;
+
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -717,5 +720,31 @@ export class Renderer {
       x: ((v.x + 1) / 2) * window.innerWidth,
       y: ((-v.y + 1) / 2) * window.innerHeight,
     };
+  }
+
+  showGhost(color: number) {
+    this.hideGhost();
+    const group = new THREE.Group();
+    const geo = new THREE.BoxGeometry(1.8, 2, 1.8);
+    const mat = new THREE.MeshStandardMaterial({
+      color,
+      opacity: 0.35,
+      transparent: true,
+      depthWrite: false,
+    });
+    group.add(new THREE.Mesh(geo, mat));
+    this.scene.add(group);
+    this._ghostMesh = group;
+  }
+
+  updateGhostAt(col: number, row: number) {
+    if (!this._ghostMesh) return;
+    this._ghostMesh.position.set(col * TILE_SIZE, 1, row * TILE_SIZE);
+  }
+
+  hideGhost() {
+    if (!this._ghostMesh) return;
+    this.scene.remove(this._ghostMesh);
+    this._ghostMesh = null;
   }
 }

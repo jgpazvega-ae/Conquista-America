@@ -333,6 +333,16 @@ export class Building {
   takeDamage(amount: number) {
     if (this.state === BuildingState.DESTROYED) return;
     this.hp = Math.max(0, this.hp - amount);
+    // Show HP bar when damaged
+    if (this.hp > 0 && this.hp < this.maxHp) {
+      const pct = this.hp / this.maxHp;
+      this.progressBar.visible = true;
+      this.progressBar.scale.x = pct;
+      this.progressBar.position.x = (pct - 1) * 0.44;
+      (this.progressBar.material as THREE.MeshBasicMaterial).color.setHex(
+        pct > 0.5 ? 0x55dd44 : pct > 0.25 ? 0xddaa00 : 0xdd2222
+      );
+    }
     if (this.hp <= 0) {
       this.state = BuildingState.DESTROYED;
       this.mesh.visible = false;
