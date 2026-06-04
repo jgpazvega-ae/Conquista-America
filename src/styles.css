@@ -15,6 +15,59 @@ button { cursor: pointer; border: none; background: none; }
 
 .hidden { display: none !important; }
 
+/* ═══════════════════════════════════════ NARRATIVE PROLOGUE ══ */
+#narrative-screen {
+  position: fixed; inset: 0; z-index: 1500;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.narr-bg {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 50% 30%, #3a2a10 0%, #0a0805 70%);
+  transition: background 1.4s ease;
+}
+.narr-vignette {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.85) 100%);
+  pointer-events: none;
+}
+.narr-content {
+  position: relative; z-index: 2;
+  max-width: 720px; padding: 40px; text-align: center;
+}
+.narr-content.narr-in .narr-chapter { animation: narrFade 0.7s ease both; }
+.narr-content.narr-in .narr-title   { animation: narrFade 0.9s ease 0.15s both; }
+.narr-content.narr-in .narr-text    { animation: narrRise 1.1s ease 0.3s both; }
+@keyframes narrFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes narrRise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+.narr-chapter {
+  font-size: 14px; letter-spacing: 4px; text-transform: uppercase;
+  color: #d4a84a; margin-bottom: 12px; font-weight: 600;
+}
+.narr-title {
+  font-size: 38px; font-weight: 800; color: #f3e3bd; margin-bottom: 24px;
+  text-shadow: 0 4px 24px rgba(0,0,0,0.7); line-height: 1.1;
+}
+.narr-text {
+  font-size: 18px; line-height: 1.75; color: #d8cab0;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.8); margin-bottom: 36px;
+}
+.narr-controls {
+  display: flex; align-items: center; justify-content: center; gap: 20px; flex-wrap: wrap;
+}
+.narr-skip {
+  background: none; border: none; color: rgba(200,170,110,0.55);
+  font-size: 13px; cursor: pointer; transition: color 0.2s;
+}
+.narr-skip:hover { color: rgba(220,190,130,0.9); }
+.narr-progress { color: rgba(212,168,74,0.7); font-size: 12px; letter-spacing: 3px; }
+@media (max-width: 640px) {
+  .narr-title { font-size: 28px; }
+  .narr-text  { font-size: 16px; }
+  .narr-content { padding: 24px; }
+}
+
 /* ═══════════════════════════════════════ AUTH SCREEN ══ */
 #auth-screen {
   position: fixed; inset: 0; z-index: 1000;

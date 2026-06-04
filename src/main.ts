@@ -4,6 +4,7 @@ import { CivilizationType } from './game/types';
 import { SaveSystem } from './game/SaveSystem';
 import { AuthScreen } from './ui/AuthScreen';
 import { CivSelectScreen } from './ui/CivSelect';
+import { NarrativeScreen } from './ui/Narrative';
 import { SettingsPanel } from './ui/SettingsPanel';
 import { Game } from './game/Game';
 import { Renderer } from './engine/Renderer';
@@ -28,6 +29,7 @@ const LOADING_FACTS = [
 
 // ── App state ──────────────────────────────────────────────────────────────────
 const saveSystem = new SaveSystem();
+const narrative  = new NarrativeScreen();
 let activeGame: GameInstance | null = null;
 
 // ── Boot ───────────────────────────────────────────────────────────────────────
@@ -50,7 +52,7 @@ async function boot() {
 
   civSelect.setOnStart(async (civ) => {
     civSelect.hide();
-    await startGame(civ);
+    narrative.play(civ, () => { void startGame(civ); });
   });
 }
 
@@ -130,9 +132,13 @@ class GameInstance {
     this.hud.buildMinimap(this.game.map);
     await loadingStep(95, 'Iniciando partida...');
 
-    // Pan to human player's starting position
-    const first = this.game.humanPlayer.aliveUnits[0];
-    if (first) this.camera.panTo(first.worldX, first.worldZ);
+    // Frame the human army: center on the centroid of all starting units
+    const army = this.game.humanPlayer.aliveUnits;
+    if (army.length > 0) {
+      let sx = 0, sz = 0;
+      for (const u of army) { sx += u.worldX; sz += u.worldZ; }
+      this.camera.panTo(sx / army.length, sz / army.length);
+    }
 
     await loadingStep(100, '¡Que comience la conquista!');
     await sleep(400);
@@ -154,6 +160,7 @@ class GameInstance {
     const dt = Math.min(this.clock.getDelta(), 0.1);
 
     this.game.update(dt);
+    this.renderer.syncHeights(this.game.allUnits, this.game.allWorkers);
     this.camera.update(dt);
     this.renderer.updateEffects(dt);
 
