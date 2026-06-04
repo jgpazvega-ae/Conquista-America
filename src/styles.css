@@ -600,6 +600,112 @@ input.toggle { width: 22px; height: 22px; accent-color: #d4880a; }
   100% { transform: translate(-50%,-50%) scale(2.0); opacity: 0; }
 }
 
+/* ═══════════════════════════════════════ END GAME SCREEN ══ */
+#endgame-screen {
+  position: fixed; inset: 0; z-index: 2000;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.endgame-bg {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 50% 40%, #1a0d04 0%, #050202 70%);
+  animation: endgameBgIn 1.2s ease both;
+}
+@keyframes endgameBgIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.endgame-particles {
+  position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+}
+.endgame-particle {
+  position: absolute;
+  width: 6px; height: 6px; border-radius: 50%;
+  animation: particleFly 3s ease-out forwards;
+}
+@keyframes particleFly {
+  0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+  100% { opacity: 0; transform: translate(var(--px), var(--py)) scale(0.2); }
+}
+.endgame-content {
+  position: relative; z-index: 2;
+  display: flex; flex-direction: column; align-items: center; gap: 20px;
+  text-align: center; padding: 40px 32px;
+  max-width: 520px; width: 100%;
+  background: rgba(8, 4, 1, 0.82);
+  border: 1px solid rgba(200,160,80,0.2);
+  border-radius: 24px;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 0 80px rgba(0,0,0,0.8);
+  animation: endgameCardIn 0.9s cubic-bezier(0.34,1.56,0.64,1) 0.3s both;
+}
+@keyframes endgameCardIn {
+  from { opacity: 0; transform: scale(0.7); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.endgame-icon {
+  font-size: 88px; line-height: 1;
+  filter: drop-shadow(0 0 32px currentColor);
+  animation: iconPulse 2s ease-in-out infinite;
+}
+@keyframes iconPulse {
+  0%,100% { transform: scale(1); }
+  50%     { transform: scale(1.08); }
+}
+.endgame-title {
+  font-size: 42px; font-weight: 900;
+  text-transform: uppercase; letter-spacing: 5px;
+  animation: titleReveal 0.7s ease 0.8s both;
+}
+@keyframes titleReveal {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.endgame-title.victory { color: #f0c060; text-shadow: 0 0 40px rgba(240,192,80,0.6); }
+.endgame-title.defeat  { color: #e84040; text-shadow: 0 0 40px rgba(232,64,64,0.5); }
+.endgame-subtitle {
+  font-size: 17px; color: rgba(232,213,160,0.75); letter-spacing: 1px;
+  animation: titleReveal 0.7s ease 1.0s both;
+}
+.endgame-stats {
+  display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;
+  animation: titleReveal 0.7s ease 1.2s both;
+}
+.endgame-stat {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(200,160,80,0.15);
+  border-radius: 12px; padding: 12px 20px; min-width: 100px;
+}
+.endgame-stat-val {
+  font-size: 28px; font-weight: 800;
+  color: #f0c060;
+}
+.endgame-stat-lbl {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px;
+  color: rgba(200,160,80,0.6);
+}
+.endgame-actions {
+  display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
+  animation: titleReveal 0.7s ease 1.5s both;
+}
+
+/* ═══════════════════════════════════════ HUD EXTRAS ══ */
+#hud-timer {
+  font-size: 13px; color: rgba(200,160,80,0.7);
+  font-variant-numeric: tabular-nums;
+  padding: 3px 8px;
+  background: rgba(0,0,0,0.35);
+  border-radius: 6px;
+}
+#hud-pop {
+  font-size: 13px; color: rgba(200,160,80,0.7);
+  padding: 3px 8px;
+  background: rgba(0,0,0,0.35);
+  border-radius: 6px;
+}
+#minimap-container { cursor: crosshair; }
+
 /* ═══════════════════════════════════════ MOBILE RESPONSIVE ══ */
 @media (max-width: 640px) {
   /* Auth */

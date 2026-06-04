@@ -12,6 +12,7 @@ import { RTSCamera } from './engine/Camera';
 import { InputHandler } from './engine/InputHandler';
 import { TouchHandler } from './engine/TouchHandler';
 import { HUD } from './ui/HUD';
+import { AudioManager } from './engine/AudioManager';
 import { BuildingType } from './game/buildings';
 import { TILE_SIZE } from './game/constants';
 
@@ -88,12 +89,14 @@ class GameInstance {
   private input!:     InputHandler;
   private touch!:     TouchHandler;
   private hud!:       HUD;
+  private audio!:     AudioManager;
   private settings!:  SettingsPanel;
   private animId:     number = 0;
   private clock       = new THREE.Clock();
   private gameStartT  = Date.now();
   private killCount   = 0;
   private builtCount  = 0;
+  private endHandled  = false;
 
   constructor(civ: CivilizationType, saveSystem: SaveSystem) {
     this.civ        = civ;
@@ -110,10 +113,21 @@ class GameInstance {
     this.camera   = new RTSCamera(this.renderer.camera);
     this.input    = new InputHandler(this.renderer, this.game, this.camera);
     this.touch    = new TouchHandler(this.camera, this.renderer, this.game);
+    this.audio    = new AudioManager();
     this.settings = new SettingsPanel(this.saveSystem);
 
-    this.input.onSelectionChange = () => this.hud.update(this.input.getSelectedUnits());
+    this.input.onSelectionChange = () => {
+      this.hud.update(this.input.getSelectedUnits());
+      this.audio.playClick();
+    };
     this.touch.onSelectionChange = () => this.hud.update(this.touch ? [] : []);
+    this.input.onMoveOrder = () => this.audio.playMove();
+    this.hud.onMinimapClick = (wx, wz) => this.camera.panTo(wx, wz);
+
+    this.settings.onVolumeChange = (fx, mu) => {
+      this.audio.setEffectsVolume(fx);
+      this.audio.setMusicVolume(mu);
+    };
 
     this.bindHUDButtons();
     this.bindMobileButtons();
@@ -180,13 +194,18 @@ class GameInstance {
     // Kill tracking
     const prevAlive = this.game.getAllUnits().filter(u => !u.isAlive() && u.playerId !== this.game.humanPlayerId).length;
 
-    // Visual effects on damage
+    // Visual + audio effects on damage
     if (this.game.damageEvents.length > 0) {
       this.hud.showDamageNumbers(this.game.damageEvents);
       for (const evt of this.game.damageEvents) {
         this.renderer.effects.createHitEffect(evt.worldX, 0.5, evt.worldZ);
         if (evt.damage > 20) this.renderer.effects.createExplosion(evt.worldX, 0.5, evt.worldZ, evt.damage / 40);
-        if (!evt.target.isAlive() && evt.target.playerId !== this.game.humanPlayerId) this.killCount++;
+        if (!evt.target.isAlive()) {
+          this.audio.playDeath();
+          if (evt.target.playerId !== this.game.humanPlayerId) this.killCount++;
+        } else {
+          this.audio.playHit(evt.damage / 30);
+        }
       }
     }
 
@@ -200,21 +219,87 @@ class GameInstance {
   }
 
   private handleGameEnd() {
-    if (this.destroyed) return;
+    if (this.destroyed || this.endHandled) return;
+    this.endHandled = true;
+
     const won = this.game.status === 'VICTORY';
     const seconds = Math.round((Date.now() - this.gameStartT) / 1000);
     this.saveSystem.recordGame(this.civ, won, this.killCount, this.builtCount, seconds);
 
     setTimeout(() => {
-      const msg = won
-        ? `🏆 ¡VICTORIA! Has conquistado el continente.\n\nTiempo: ${Math.floor(seconds/60)}m ${seconds%60}s\nBajas: ${this.killCount}`
-        : `☠️ DERROTA. Has sido eliminado.\n\nTiempo: ${Math.floor(seconds/60)}m ${seconds%60}s\nBajas: ${this.killCount}`;
-
-      if (confirm(msg + '\n\n¿Jugar de nuevo?')) {
-        this.destroy();
-        showRestartMenu();
+      if (won) {
+        this.audio.playVictory();
+      } else {
+        this.audio.playDefeat();
       }
-    }, 1500);
+    }, 400);
+
+    setTimeout(() => {
+      this.showEndScreen(won, seconds);
+    }, 1600);
+  }
+
+  private showEndScreen(won: boolean, seconds: number) {
+    const screen = document.getElementById('endgame-screen')!;
+    const icon   = document.getElementById('endgame-icon')!;
+    const title  = document.getElementById('endgame-title')!;
+    const sub    = document.getElementById('endgame-subtitle')!;
+    const stats  = document.getElementById('endgame-stats')!;
+
+    icon.textContent = won ? '🏆' : '☠️';
+    title.textContent = won ? '¡VICTORIA!' : 'DERROTA';
+    title.className = 'endgame-title ' + (won ? 'victory' : 'defeat');
+    sub.textContent = won
+      ? '¡Has conquistado el continente americano!'
+      : 'Tus fuerzas han sido aniquiladas.';
+
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    stats.innerHTML = `
+      <div class="endgame-stat">
+        <div class="endgame-stat-val">${m}:${String(s).padStart(2,'0')}</div>
+        <div class="endgame-stat-lbl">Tiempo</div>
+      </div>
+      <div class="endgame-stat">
+        <div class="endgame-stat-val">${this.killCount}</div>
+        <div class="endgame-stat-lbl">Bajas</div>
+      </div>
+    `;
+
+    // Particle burst
+    if (won) this.spawnEndParticles();
+
+    screen.classList.remove('hidden');
+
+    document.getElementById('endgame-replay')?.addEventListener('click', () => {
+      screen.classList.add('hidden');
+      this.destroy();
+      showRestartMenu();
+    });
+    document.getElementById('endgame-menu')?.addEventListener('click', () => {
+      screen.classList.add('hidden');
+      this.destroy();
+      document.getElementById('app')!.classList.add('hidden');
+      window.location.reload();
+    });
+  }
+
+  private spawnEndParticles() {
+    const container = document.getElementById('endgame-particles')!;
+    const colors = ['#f0c060', '#ffdd44', '#e08020', '#ffe090', '#ffffff'];
+    for (let i = 0; i < 60; i++) {
+      const p = document.createElement('div');
+      p.className = 'endgame-particle';
+      p.style.left = `${Math.random() * 100}%`;
+      p.style.top  = `${Math.random() * 100}%`;
+      p.style.background = colors[Math.floor(Math.random() * colors.length)];
+      p.style.setProperty('--px', `${(Math.random() - 0.5) * 300}px`);
+      p.style.setProperty('--py', `${(Math.random() - 0.5) * 300}px`);
+      p.style.animationDelay = `${Math.random() * 1.5}s`;
+      p.style.animationDuration = `${2 + Math.random() * 2}s`;
+      container.appendChild(p);
+      setTimeout(() => p.remove(), 4000);
+    }
   }
 
   private bindHUDButtons() {

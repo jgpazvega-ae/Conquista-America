@@ -23,6 +23,7 @@ export class InputHandler {
   private mouseDownPos: { x: number; y: number } | null = null;
 
   onSelectionChange: (() => void) | null = null;
+  onMoveOrder:       (() => void) | null = null;
 
   constructor(renderer: Renderer, game: Game, camera: RTSCamera) {
     this.renderer     = renderer;
@@ -121,6 +122,7 @@ export class InputHandler {
       // Show move marker at centroid of ordered destinations
       if (moved > 0) {
         this.renderer.showMoveMarker(sumX / moved, sumZ / moved);
+        this.onMoveOrder?.();
       }
     }
   }

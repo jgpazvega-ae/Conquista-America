@@ -1,7 +1,7 @@
 import type { Game } from '../game/Game';
 import type { Unit } from '../game/Unit';
 import type { GameMap } from '../game/Map';
-import { TERRAIN_COLORS, CIV_COLORS, CIV_NAMES, CIV_EMOJIS } from '../game/constants';
+import { TERRAIN_COLORS, CIV_COLORS, CIV_NAMES, CIV_EMOJIS, TILE_SIZE } from '../game/constants';
 import type { DamageEvent } from '../game/CombatSystem';
 
 function hex(n: number): string {
@@ -29,7 +29,10 @@ export class HUD {
 
   private minimapBuilt = false;
   private minimapBase: ImageData | null = null;
-  private gameTime = 0;
+  private elTimer = document.getElementById('game-timer');
+  private elPop   = document.getElementById('pop-count');
+
+  onMinimapClick: ((worldX: number, worldZ: number) => void) | null = null;
 
   constructor(game: Game) {
     this.game = game;
@@ -40,6 +43,16 @@ export class HUD {
     const civ = game.humanPlayer.civType;
     this.elCivBadge.textContent = `${CIV_EMOJIS[civ]} ${CIV_NAMES[civ]}`;
     this.elCivBadge.style.color = hex(CIV_COLORS[civ]);
+
+    this.minimapCanvas.addEventListener('click', (e) => {
+      if (!this.minimapBuilt) return;
+      const rect = this.minimapCanvas.getBoundingClientRect();
+      const nx = (e.clientX - rect.left) / rect.width;
+      const nz = (e.clientY - rect.top)  / rect.height;
+      const worldX = nx * game.map.cols * TILE_SIZE;
+      const worldZ = nz * game.map.rows * TILE_SIZE;
+      this.onMinimapClick?.(worldX, worldZ);
+    });
   }
 
   buildMinimap(map: GameMap) {
@@ -69,6 +82,15 @@ export class HUD {
     this.elFood.textContent  = String(player.resources.food);
     this.elGold.textContent  = String(player.resources.gold);
     this.elStone.textContent = String(player.resources.stone);
+
+    // Timer
+    const secs = Math.floor(this.game.gameTime);
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    if (this.elTimer) this.elTimer.textContent = `${m}:${String(s).padStart(2, '0')}`;
+
+    // Population (human alive units)
+    if (this.elPop) this.elPop.textContent = String(player.aliveUnits.length);
 
     // Game status
     if (this.game.status === 'VICTORY') {

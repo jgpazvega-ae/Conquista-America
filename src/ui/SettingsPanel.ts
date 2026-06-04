@@ -26,6 +26,7 @@ export class SettingsPanel {
   settings: GameSettings;
   onClose: (() => void) | null = null;
   onLogout: (() => void) | null = null;
+  onVolumeChange: ((effects: number, music: number) => void) | null = null;
 
   constructor(saveSystem: SaveSystem) {
     this.saveSystem = saveSystem;
@@ -68,6 +69,7 @@ export class SettingsPanel {
         (this.settings as any)[key] = parseFloat(el.value);
         const display = this.el.querySelector(`#${id}-val`);
         if (display) display.textContent = `${Math.round(parseFloat(el.value) * 100)}%`;
+        this.onVolumeChange?.(this.settings.effectsVolume, this.settings.musicVolume);
       });
     };
 
