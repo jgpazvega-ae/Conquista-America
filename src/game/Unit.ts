@@ -53,9 +53,10 @@ export class Unit {
   private rightArm: THREE.Group | null = null;
   healthBar!: THREE.Mesh;
   selectionRing!: THREE.Mesh;
-  private selected  = false;
-  private animT     = Math.random() * 10;
-  private attackAnim = 0;
+  private selected    = false;
+  private animT       = Math.random() * 10;
+  private attackAnim  = 0;
+  private _deathTimer = -1; // -1 = not dying; ≥0 = falling animation
 
   constructor(
     type: UnitType, civ: CivilizationType, playerId: number,
@@ -629,9 +630,10 @@ export class Unit {
   }
 
   private die() {
-    this.state = UnitState.DEAD;
-    this.mesh.visible = false;
-    this.selected = false;
+    this.state         = UnitState.DEAD;
+    this.selected      = false;
+    this.selectionRing.visible = false;
+    this._deathTimer   = 0;   // start fall animation; mesh hides after animation completes
   }
 
   private updateHealthBar() {
@@ -645,6 +647,21 @@ export class Unit {
 
   // ── Per-frame update ──────────────────────────────────────────────────────────
   update(dt: number, map: GameMap) {
+    // Death fall animation (runs even after state=DEAD)
+    if (this._deathTimer >= 0) {
+      this._deathTimer += dt;
+      const fallT = Math.min(1, this._deathTimer / 0.55);
+      if (this.rig) {
+        this.rig.rotation.z  = fallT * Math.PI / 2;   // tilt 90° sideways
+        this.rig.position.y  = -fallT * 0.25;          // sink into ground
+      }
+      (this.healthBar.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 1 - this._deathTimer * 2);
+      if (this._deathTimer >= 2.2) {
+        this.mesh.visible  = false;
+        this._deathTimer   = -1;
+      }
+      return;
+    }
     if (this.state === UnitState.DEAD) return;
 
     this.attackTimer = Math.max(0, this.attackTimer - dt);

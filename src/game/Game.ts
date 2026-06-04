@@ -1,4 +1,4 @@
-import { CivilizationType } from './types';
+import { CivilizationType, UnitState } from './types';
 import { GameMap } from './Map';
 import { Unit } from './Unit';
 import { Building } from './Building';
@@ -17,11 +17,13 @@ import type { DamageEvent } from './CombatSystem';
 import { BuildingType } from './buildings';
 import { BUILDING_DEFS } from './buildingDefs';
 
+// Positions aligned to the real-geography map:
+// Mexico (top-center), Yucatan (top-right), Peru/Andes (mid-left), Caribbean (mid-right)
 const START_POSITIONS: Record<CivilizationType, [number, number]> = {
-  [CivilizationType.AZTEC]:        [27, 8],
-  [CivilizationType.MAYA]:         [24, 19],
-  [CivilizationType.INCA]:         [15, 44],
-  [CivilizationType.CONQUISTADOR]: [42, 38],
+  [CivilizationType.AZTEC]:        [28,  8],   // Mexican highlands
+  [CivilizationType.MAYA]:         [38, 14],   // Yucatan peninsula
+  [CivilizationType.INCA]:         [19, 36],   // Peruvian Andes
+  [CivilizationType.CONQUISTADOR]: [46, 24],   // Caribbean coast
 };
 
 export type GameStatus = 'PLAYING' | 'VICTORY' | 'DEFEAT';
@@ -45,6 +47,7 @@ export class Game {
   status: GameStatus = 'PLAYING';
   humanPlayerId = 0;
   gameTime = 0;
+  private _autoAttackTimer = 0;
 
   constructor(humanCiv: CivilizationType = CivilizationType.AZTEC) {
     this.map = new GameMap(12345);
@@ -209,7 +212,30 @@ export class Game {
 
     this.aiSystem.update(dt, this);
 
+    this._autoAttackTimer += dt;
+    if (this._autoAttackTimer >= 0.3) {
+      this._autoAttackTimer = 0;
+      this.runAutoAttack();
+    }
+
     this.checkEndConditions();
+  }
+
+  private runAutoAttack() {
+    for (const unit of this.allUnits) {
+      if (!unit.isAlive()) continue;
+      if (unit.state !== UnitState.IDLE) continue;
+      if (unit.attackTarget !== null) continue;
+
+      let best: Unit | null = null;
+      let bestDist = unit.sight;
+      for (const enemy of this.allUnits) {
+        if (!enemy.isAlive() || enemy.playerId === unit.playerId) continue;
+        const d = unit.distanceTo(enemy);
+        if (d < bestDist) { bestDist = d; best = enemy; }
+      }
+      if (best) unit.attackUnit(best);
+    }
   }
 
   private checkEndConditions() {

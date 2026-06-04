@@ -212,6 +212,10 @@
           <span class="res"><span class="res-icon">⚜️</span><span id="res-gold">100</span></span>
           <span class="res"><span class="res-icon">🪨</span><span id="res-stone">150</span></span>
         </div>
+        <div id="hud-extras">
+          <span id="hud-pop" title="Unidades vivas">👥 <span id="pop-count">0</span></span>
+          <span id="hud-timer">⏱ <span id="game-timer">0:00</span></span>
+        </div>
         <div id="hud-actions">
           <button id="settings-btn" class="hud-icon-btn" title="Configuración">⚙️</button>
         </div>
@@ -265,6 +269,22 @@
           <p id="loading-msg">Generando el mundo...</p>
           <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
           <div id="loading-fact"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═════════════════════════════════════════════ END GAME SCREEN ══ -->
+    <div id="endgame-screen" class="hidden">
+      <div class="endgame-bg"></div>
+      <div class="endgame-particles" id="endgame-particles"></div>
+      <div class="endgame-content">
+        <div id="endgame-icon" class="endgame-icon"></div>
+        <div id="endgame-title" class="endgame-title"></div>
+        <div id="endgame-subtitle" class="endgame-subtitle"></div>
+        <div class="endgame-stats" id="endgame-stats"></div>
+        <div class="endgame-actions">
+          <button id="endgame-replay" class="auth-btn primary lg">⚔️ Jugar de Nuevo</button>
+          <button id="endgame-menu"   class="auth-btn secondary">🌎 Menú Principal</button>
         </div>
       </div>
     </div>
