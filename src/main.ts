@@ -4,6 +4,7 @@ import { CivilizationType } from './game/types';
 import { SaveSystem } from './game/SaveSystem';
 import { AuthScreen } from './ui/AuthScreen';
 import { CivSelectScreen } from './ui/CivSelect';
+import { NarrativeScreen } from './ui/Narrative';
 import { SettingsPanel } from './ui/SettingsPanel';
 import { Game } from './game/Game';
 import { Renderer } from './engine/Renderer';
@@ -28,6 +29,7 @@ const LOADING_FACTS = [
 
 // ── App state ──────────────────────────────────────────────────────────────────
 const saveSystem = new SaveSystem();
+const narrative  = new NarrativeScreen();
 let activeGame: GameInstance | null = null;
 
 // ── Boot ───────────────────────────────────────────────────────────────────────
@@ -50,7 +52,7 @@ async function boot() {
 
   civSelect.setOnStart(async (civ) => {
     civSelect.hide();
-    await startGame(civ);
+    narrative.play(civ, () => { void startGame(civ); });
   });
 }
 

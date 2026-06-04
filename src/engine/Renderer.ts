@@ -191,11 +191,18 @@ export class Renderer {
       }
     }
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    // Scale UVs so the detail texture repeats across the terrain (fine grain)
+    const uv = geo.attributes.uv as THREE.BufferAttribute;
+    for (let k = 0; k < uv.count; k++) {
+      uv.setXY(k, uv.getX(k) * cols * 0.7, uv.getY(k) * rows * 0.7);
+    }
     geo.computeVertexNormals();
 
+    const detailTex = this.makeGroundTexture();
     const terrainMat = new THREE.MeshStandardMaterial({
       vertexColors: true,
-      roughness: 0.96,
+      map: detailTex,
+      roughness: 0.98,
       metalness: 0.0,
       flatShading: false,
     });
@@ -207,6 +214,42 @@ export class Renderer {
 
     this.buildWater(W, D);
     this.scatterVegetation(map);
+  }
+
+  // ── Procedural grayscale detail texture (modulates vertex colors) ───────────
+  private makeGroundTexture(): THREE.Texture {
+    const S = 256;
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = S;
+    const ctx = cv.getContext('2d')!;
+    // Base mid-tone so it multiplies the vertex color without shifting hue much
+    ctx.fillStyle = '#b8b8b8';
+    ctx.fillRect(0, 0, S, S);
+    // Mottled clumps (darker + lighter) for organic variation
+    for (let i = 0; i < 1600; i++) {
+      const x = Math.random() * S, y = Math.random() * S;
+      const r = 2 + Math.random() * 9;
+      const v = 130 + Math.floor(Math.random() * 110); // 130..240 grey
+      ctx.fillStyle = `rgba(${v},${v},${v},0.5)`;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    }
+    // Fine grass-blade strokes for texture
+    for (let i = 0; i < 2600; i++) {
+      const x = Math.random() * S, y = Math.random() * S;
+      const len = 2 + Math.random() * 4;
+      const v = Math.random() < 0.5 ? 95 + Math.random() * 40 : 200 + Math.random() * 50;
+      ctx.strokeStyle = `rgba(${v},${v},${v},0.35)`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + (Math.random() - 0.5) * 2, y - len);
+      ctx.stroke();
+    }
+    const tex = new THREE.CanvasTexture(cv);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
   }
 
   // ── Animated water surface ───────────────────────────────────────────────────

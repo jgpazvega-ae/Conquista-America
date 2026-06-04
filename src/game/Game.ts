@@ -78,10 +78,27 @@ export class Game {
     const [baseCol, baseRow] = START_POSITIONS[player.civType];
     const color = CIV_COLORS[player.civType];
 
+    // Tight battalion formation: grouped by unit type into ranks below the base.
+    const COLS = 6;                 // soldiers per rank
+    const formStartRow = baseRow + 3;
+    const occupied = new Set<string>();
     let placed = 0;
+
     for (const unitType of civDef.startUnits) {
-      const pos = this.findSpawnPos(baseCol + (placed % 4) * 2 - 4, baseRow + Math.floor(placed / 4) * 2 - 2);
+      const fc = placed % COLS;
+      const fr = Math.floor(placed / COLS);
+      // centered horizontally, marching downward in ranks
+      const targetCol = baseCol + fc - Math.floor(COLS / 2);
+      const targetRow = formStartRow + fr;
+      let pos = this.map.findWalkableNear(targetCol, targetRow, 4);
+      // avoid stacking two units on the same tile
+      let guard = 0;
+      while (pos && occupied.has(`${pos[0]},${pos[1]}`) && guard < 12) {
+        pos = this.map.findWalkableNear(targetCol + (guard % 3) - 1, targetRow + Math.floor(guard / 3), 4);
+        guard++;
+      }
       if (!pos) continue;
+      occupied.add(`${pos[0]},${pos[1]}`);
       const unit = new Unit(unitType, player.civType, player.id, pos[0], pos[1], color);
       player.addUnit(unit);
       this.allUnits.push(unit);
