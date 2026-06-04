@@ -8,8 +8,12 @@ import type { GameMap } from './Map';
 
 let nextId = 1;
 
-const SKIN  = 0xc28a5a;
-const DARK  = 0x241810;
+const SKIN_TONES: Record<CivilizationType, number> = {
+  [CivilizationType.AZTEC]:        0xc27848,
+  [CivilizationType.INCA]:         0xb87040,
+  [CivilizationType.MAYA]:         0xca8050,
+  [CivilizationType.CONQUISTADOR]: 0xdba870,
+};
 
 export class Unit {
   readonly id: number;
@@ -18,7 +22,6 @@ export class Unit {
   readonly playerId: number;
   readonly def: UnitDef;
 
-  // Stats
   hp: number;
   maxHp: number;
   attack: number;
@@ -28,7 +31,6 @@ export class Unit {
   sight: number;
   attackCooldown: number;
 
-  // State
   state: UnitState = UnitState.IDLE;
   col: number;
   row: number;
@@ -41,35 +43,38 @@ export class Unit {
   attackTarget: Unit | null = null;
   attackTimer: number = 0;
 
-  // Smooth movement
   moveX: number = 0;
   moveZ: number = 0;
   moveProgress: number = 1;
 
-  // Three.js
   mesh!: THREE.Group;
   private rig!: THREE.Group;
+  private leftArm:  THREE.Group | null = null;
+  private rightArm: THREE.Group | null = null;
   healthBar!: THREE.Mesh;
   selectionRing!: THREE.Mesh;
-  private selected = false;
-  private animT = Math.random() * 10;
+  private selected  = false;
+  private animT     = Math.random() * 10;
   private attackAnim = 0;
 
-  constructor(type: UnitType, civ: CivilizationType, playerId: number, col: number, row: number, civColor: number) {
-    this.id      = nextId++;
-    this.type    = type;
-    this.civType = civ;
+  constructor(
+    type: UnitType, civ: CivilizationType, playerId: number,
+    col: number, row: number, civColor: number,
+  ) {
+    this.id       = nextId++;
+    this.type     = type;
+    this.civType  = civ;
     this.playerId = playerId;
-    this.def     = getUnitDef(type);
+    this.def      = getUnitDef(type);
 
     const s = this.def.stats;
-    this.hp = this.maxHp = s.maxHp;
-    this.attack        = s.attack;
-    this.defense       = s.defense;
-    this.speed         = s.speed;
-    this.attackRange   = s.attackRange;
-    this.sight         = s.sight;
-    this.attackCooldown = s.attackCooldown;
+    this.hp = this.maxHp   = s.maxHp;
+    this.attack            = s.attack;
+    this.defense           = s.defense;
+    this.speed             = s.speed;
+    this.attackRange       = s.attackRange;
+    this.sight             = s.sight;
+    this.attackCooldown    = s.attackCooldown;
 
     this.col = this.targetCol = col;
     this.row = this.targetRow = row;
@@ -79,21 +84,25 @@ export class Unit {
     this.buildMesh(civColor);
   }
 
-  // ── Mesh construction ─────────────────────────────────────────────────────────
+  // ── Mesh construction ────────────────────────────────────────────────────────
   private buildMesh(civColor: number) {
     this.mesh = new THREE.Group();
     this.rig  = new THREE.Group();
     this.mesh.add(this.rig);
 
-    const isConq = this.civType === CivilizationType.CONQUISTADOR;
-    const accent = this.civAccent();
+    const isConq  = this.civType === CivilizationType.CONQUISTADOR;
+    const accent  = this.civAccent();
+    const skinTone = SKIN_TONES[this.civType];
 
-    const cloth  = new THREE.MeshStandardMaterial({ color: civColor, roughness: 0.85 });
-    const skin   = new THREE.MeshStandardMaterial({ color: SKIN, roughness: 0.7 });
-    const dark   = new THREE.MeshStandardMaterial({ color: DARK, roughness: 0.8 });
-    const accMat = new THREE.MeshStandardMaterial({ color: accent, roughness: 0.6, emissive: accent, emissiveIntensity: 0.05 });
-    const metal  = new THREE.MeshStandardMaterial({ color: 0xc2c6ce, roughness: 0.35, metalness: 0.85 });
-    const wood   = new THREE.MeshStandardMaterial({ color: 0x6a4a2a, roughness: 0.9 });
+    const cloth   = new THREE.MeshStandardMaterial({ color: civColor,  roughness: 0.85 });
+    const skin    = new THREE.MeshStandardMaterial({ color: skinTone,  roughness: 0.65 });
+    const dark    = new THREE.MeshStandardMaterial({ color: 0x18100a,  roughness: 0.88 });
+    const accMat  = new THREE.MeshStandardMaterial({ color: accent,    roughness: 0.50, emissive: accent, emissiveIntensity: 0.15 });
+    const metal   = new THREE.MeshStandardMaterial({ color: 0xbac1cc,  roughness: 0.22, metalness: 0.90 });
+    const wood    = new THREE.MeshStandardMaterial({ color: 0x6a4018,  roughness: 0.95 });
+    const leather = new THREE.MeshStandardMaterial({ color: 0x7a4c24,  roughness: 0.82 });
+    const jade    = new THREE.MeshStandardMaterial({ color: 0x1ea060,  roughness: 0.55, metalness: 0.05, emissive: 0x083820, emissiveIntensity: 0.08 });
+    const gold    = new THREE.MeshStandardMaterial({ color: 0xffcc18,  roughness: 0.30, metalness: 0.82 });
 
     const bodyMat = isConq ? metal : cloth;
 
@@ -102,26 +111,32 @@ export class Unit {
     } else if (this.def.isCavalry) {
       this.buildCavalry(bodyMat, skin, dark, metal, wood, accMat);
     } else {
-      this.buildFootSoldier(bodyMat, cloth, skin, dark, metal, wood, accMat, isConq);
+      this.buildFootSoldier(bodyMat, cloth, skin, dark, metal, wood, leather, jade, gold, accMat, isConq);
     }
 
-    // ── Health bar (billboarded plane above unit) ──
-    const barY = 1.95;
-    const hpBg = new THREE.Mesh(new THREE.PlaneGeometry(0.74, 0.11),
-      new THREE.MeshBasicMaterial({ color: 0x180000, transparent: true, opacity: 0.8, depthTest: false }));
-    this.healthBar = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 0.09),
-      new THREE.MeshBasicMaterial({ color: 0x33dd55, depthTest: false }));
+    // 30 % scale-up for better close-range presence
+    this.rig.scale.setScalar(1.3);
+
+    // ── Health bar ──────────────────────────────────────────────────────────────
+    const barY = 2.55;
+    const hpBg = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.80, 0.12),
+      new THREE.MeshBasicMaterial({ color: 0x180000, transparent: true, opacity: 0.8, depthTest: false }),
+    );
+    this.healthBar = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.78, 0.10),
+      new THREE.MeshBasicMaterial({ color: 0x33dd55, depthTest: false }),
+    );
     hpBg.position.set(0, barY, 0);
-    this.healthBar.position.set(0, barY, 0.002);
+    this.healthBar.position.set(0, barY, 0.001);
     hpBg.rotation.x = -Math.PI / 2;
     this.healthBar.rotation.x = -Math.PI / 2;
     hpBg.renderOrder = 10; this.healthBar.renderOrder = 11;
     this.mesh.add(hpBg, this.healthBar);
 
-    // ── Selection ring ──
-    const ringGeo = new THREE.RingGeometry(0.42, 0.54, 28);
+    // ── Selection ring ──────────────────────────────────────────────────────────
     const ringMat = new THREE.MeshBasicMaterial({ color: 0x66ddff, side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
-    this.selectionRing = new THREE.Mesh(ringGeo, ringMat);
+    this.selectionRing = new THREE.Mesh(new THREE.RingGeometry(0.52, 0.66, 32), ringMat);
     this.selectionRing.rotation.x = -Math.PI / 2;
     this.selectionRing.position.y = 0.06;
     this.selectionRing.visible = false;
@@ -141,208 +156,448 @@ export class Unit {
     }
   }
 
-  private addLimb(mat: THREE.Material, w: number, h: number, d: number, x: number, y: number, z: number) {
-    const limb = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-    limb.position.set(x, y, z);
-    limb.castShadow = true;
-    this.rig.add(limb);
-    return limb;
+  private addTo(parent: THREE.Group | null, mat: THREE.Material, w: number, h: number, d: number, x: number, y: number, z: number) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    m.position.set(x, y, z);
+    m.castShadow = true;
+    (parent ?? this.rig).add(m);
+    return m;
   }
 
+  // shorthand that always adds to rig
+  private addLimb(mat: THREE.Material, w: number, h: number, d: number, x: number, y: number, z: number) {
+    return this.addTo(null, mat, w, h, d, x, y, z);
+  }
+
+  // ── Foot soldier ────────────────────────────────────────────────────────────
   private buildFootSoldier(
-    bodyMat: THREE.Material, cloth: THREE.Material, skin: THREE.Material, dark: THREE.Material,
-    metal: THREE.Material, wood: THREE.Material, accMat: THREE.Material, isConq: boolean,
+    bodyMat: THREE.Material, cloth: THREE.Material, skin: THREE.Material,
+    dark: THREE.Material, metal: THREE.Material, wood: THREE.Material,
+    leather: THREE.Material, jade: THREE.Material, gold: THREE.Material,
+    accMat: THREE.Material, isConq: boolean,
   ) {
-    // Legs
-    this.addLimb(dark, 0.16, 0.5, 0.18, -0.12, 0.27, 0);
-    this.addLimb(dark, 0.16, 0.5, 0.18,  0.12, 0.27, 0);
+    const isHeavy = this.maxHp >= 120;
+    const accent  = this.civAccent();
+
+    // Boots / feet
+    this.addLimb(dark,    0.14, 0.11, 0.22, -0.11, 0.055, 0.02);
+    this.addLimb(dark,    0.14, 0.11, 0.22,  0.11, 0.055, 0.02);
+
+    // Lower legs
+    const legMat = isConq ? leather : cloth;
+    this.addLimb(legMat,  0.13, 0.36, 0.15, -0.11, 0.30, 0);
+    this.addLimb(legMat,  0.13, 0.36, 0.15,  0.11, 0.30, 0);
+
+    // Upper legs
+    this.addLimb(dark,    0.15, 0.34, 0.16, -0.11, 0.60, 0);
+    this.addLimb(dark,    0.15, 0.34, 0.16,  0.11, 0.60, 0);
+
+    // Loincloth/skirt (natives) or trousers trim (conquistador)
+    if (!isConq) {
+      const skirt = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.22, 0.28), cloth);
+      skirt.position.y = 0.74; this.rig.add(skirt);
+    }
 
     // Torso
-    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.6, 0.26), bodyMat);
-    torso.position.y = 0.82; torso.castShadow = true; this.rig.add(torso);
-    // Sash / belt accent for ownership clarity
-    const sash = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.12, 0.3), accMat);
-    sash.position.y = 0.62; this.rig.add(sash);
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.44, 0.28), bodyMat);
+    torso.position.y = 0.98; torso.castShadow = true; this.rig.add(torso);
 
-    // Arms
-    const armMat = isConq ? metal : skin;
-    this.addLimb(armMat, 0.13, 0.5, 0.14, -0.32, 0.85, 0);
-    const rArm = this.addLimb(armMat, 0.13, 0.5, 0.14, 0.32, 0.85, 0);
+    // Belt / sash (accent color — marks ownership clearly)
+    const sash = new THREE.Mesh(new THREE.BoxGeometry(0.50, 0.11, 0.32), accMat);
+    sash.position.y = 0.78; this.rig.add(sash);
 
-    // Head + face
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 10), skin);
-    head.position.y = 1.28; head.castShadow = true; this.rig.add(head);
+    // Armor overlay
+    if (isConq) {
+      // Steel breastplate
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.40, 0.38, 0.06), metal);
+      plate.position.set(0, 0.98, 0.16); this.rig.add(plate);
+      const lowerPlate = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.12, 0.06), metal);
+      lowerPlate.position.set(0, 0.78, 0.16); this.rig.add(lowerPlate);
+    } else if (isHeavy) {
+      const plateMat = this.civType === CivilizationType.INCA ? gold : jade;
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.36, 0.06), plateMat);
+      plate.position.set(0, 0.98, 0.15); this.rig.add(plate);
+    }
 
-    // Headgear by civ
-    this.addHeadgear(1.28, skin, dark, metal, accMat, isConq);
-
-    // Weapon / shield by role
-    const heavy = this.maxHp >= 120; // elite/defensive => shield
-    if (this.def.isRanged) {
-      this.buildRangedWeapon(rArm, wood, dark, metal, accMat, isConq);
-    } else {
-      // Melee weapon in right hand (raised)
-      if (isConq) {
-        // Steel sword
-        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.7, 0.02), metal);
-        blade.position.set(0.46, 1.15, 0.05); this.rig.add(blade);
-        const guard = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.05, 0.05), dark);
-        guard.position.set(0.46, 0.82, 0.05); this.rig.add(guard);
-      } else {
-        // Macuahuitl / club with obsidian edges
-        const club = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.6, 0.06), wood);
-        club.position.set(0.46, 1.12, 0.05); this.rig.add(club);
-        const edge = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.4, 0.02), dark);
-        edge.position.set(0.46, 1.2, 0.07); this.rig.add(edge);
+    // War paint (natives) — emissive stripes for vivid close-range color
+    if (!isConq) {
+      const paintMat = new THREE.MeshStandardMaterial({
+        color: accent, emissive: accent, emissiveIntensity: 0.38, roughness: 0.8,
+      });
+      // Horizontal stripe across face (over eyes)
+      const faceStripe = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.04, 0.02), paintMat);
+      faceStripe.position.set(0, 1.43, 0.20); this.rig.add(faceStripe);
+      // Chest stripe
+      const bodyStripe = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.045, 0.01), paintMat);
+      bodyStripe.position.set(0, 1.02, 0.15); this.rig.add(bodyStripe);
+      // Inca diagonal sash decoration
+      if (this.civType === CivilizationType.INCA) {
+        const diag = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.52, 0.01), paintMat);
+        diag.position.set(0.10, 0.96, 0.15); diag.rotation.z = 0.35; this.rig.add(diag);
+      }
+      // Maya cheek dots
+      if (this.civType === CivilizationType.MAYA) {
+        for (const sx of [-0.11, 0.11]) {
+          const dot = new THREE.Mesh(new THREE.SphereGeometry(0.028, 5, 4), paintMat);
+          dot.position.set(sx, 1.40, 0.185); this.rig.add(dot);
+        }
       }
     }
 
-    if (heavy) {
-      // Shield on left arm
-      const shield = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.06, 16), accMat);
-      shield.rotation.z = Math.PI / 2;
-      shield.rotation.y = Math.PI / 2;
-      shield.position.set(-0.4, 0.85, 0.12);
-      shield.castShadow = true;
-      this.rig.add(shield);
-      const boss = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), isConq ? metal : dark);
-      boss.position.set(-0.46, 0.85, 0.12); this.rig.add(boss);
+    // Neck
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.10, 0.14, 8), skin);
+    neck.position.y = 1.22; this.rig.add(neck);
+
+    // Arms — stored as groups for swing animation
+    const armSkin = isConq ? metal : skin;
+    this.leftArm  = new THREE.Group(); this.leftArm.position.set(-0.30, 1.10, 0);
+    this.rightArm = new THREE.Group(); this.rightArm.position.set( 0.30, 1.10, 0);
+    this.rig.add(this.leftArm, this.rightArm);
+
+    for (const [g, sx] of [[this.leftArm, -1], [this.rightArm, 1]] as [THREE.Group, number][]) {
+      // upper arm
+      const upper = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.30, 0.14), armSkin);
+      upper.position.y = -0.08; g.add(upper);
+      // forearm
+      const fore = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.26, 0.12), isConq ? metal : skin);
+      fore.position.y = -0.32; g.add(fore);
+      void sx; // used implicitly by group position
+    }
+
+    // Head — 16 × 12 segments for smoother silhouette
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.205, 16, 12), skin);
+    head.position.y = 1.42; head.castShadow = true; this.rig.add(head);
+
+    // Eyes
+    const eyeMat = new THREE.MeshStandardMaterial({ color: 0x050202, roughness: 0.8 });
+    const eyeL   = new THREE.Mesh(new THREE.SphereGeometry(0.034, 6, 4), eyeMat);
+    const eyeR   = new THREE.Mesh(new THREE.SphereGeometry(0.034, 6, 4), eyeMat);
+    eyeL.position.set(-0.078, 1.44, 0.185); this.rig.add(eyeL);
+    eyeR.position.set( 0.078, 1.44, 0.185); this.rig.add(eyeR);
+
+    // Nose bump
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.030, 5, 4), skin);
+    nose.position.set(0, 1.37, 0.200); this.rig.add(nose);
+
+    // Headgear
+    this.addHeadgear(1.42, skin, dark, metal, accMat, jade, gold, isConq);
+
+    // Weapon
+    if (this.def.isRanged) {
+      this.buildRangedWeapon(wood, dark, metal, isConq);
+    } else {
+      if (isConq) {
+        // Steel sword — blade + guard + pommel
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.060, 0.70, 0.025), metal);
+        blade.position.set(0.44, 1.16, 0.06); this.rig.add(blade);
+        const guard = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.058, 0.06), dark);
+        guard.position.set(0.44, 0.83, 0.06); this.rig.add(guard);
+        const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.052, 6, 4), dark);
+        pommel.position.set(0.44, 0.78, 0.06); this.rig.add(pommel);
+      } else {
+        // Macuahuitl — wooden paddle with alternating obsidian blades
+        const club = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.58, 0.06), wood);
+        club.position.set(0.44, 1.12, 0.06); this.rig.add(club);
+        for (let i = 0; i < 3; i++) {
+          const y = 1.33 - i * 0.14;
+          for (const ox of [0.508, 0.372]) {
+            const blade = new THREE.Mesh(new THREE.BoxGeometry(0.065, 0.095, 0.020), dark);
+            blade.position.set(ox, y, 0.066); this.rig.add(blade);
+          }
+        }
+      }
+    }
+
+    // Shield (heavy / elite units)
+    if (isHeavy) {
+      if (isConq) {
+        const sh = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.07, 16), metal);
+        sh.rotation.z = Math.PI / 2; sh.rotation.y = Math.PI / 2;
+        sh.position.set(-0.42, 0.88, 0.14); sh.castShadow = true; this.rig.add(sh);
+        // Red cross emblem
+        const redMat = new THREE.MeshStandardMaterial({ color: 0xcc1818, roughness: 0.75 });
+        const cH = new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.044, 0.020), redMat);
+        cH.position.set(-0.47, 0.88, 0.14); this.rig.add(cH);
+        const cV = new THREE.Mesh(new THREE.BoxGeometry(0.044, 0.20, 0.020), redMat);
+        cV.position.set(-0.47, 0.88, 0.14); this.rig.add(cV);
+      } else {
+        const shMat = this.civType === CivilizationType.INCA ? gold : jade;
+        const sh = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.07, 16), shMat);
+        sh.rotation.z = Math.PI / 2; sh.rotation.y = Math.PI / 2;
+        sh.position.set(-0.40, 0.88, 0.14); sh.castShadow = true; this.rig.add(sh);
+        // Circular emblem
+        const emblem = new THREE.Mesh(new THREE.CircleGeometry(0.13, 8), accMat);
+        emblem.rotation.y = Math.PI / 2; emblem.position.set(-0.45, 0.88, 0.14); this.rig.add(emblem);
+      }
     }
   }
 
-  private addHeadgear(headY: number, skin: THREE.Material, dark: THREE.Material, metal: THREE.Material, accMat: THREE.Material, isConq: boolean) {
+  // ── Headgear ─────────────────────────────────────────────────────────────────
+  private addHeadgear(
+    headY: number,
+    _skin: THREE.Material, dark: THREE.Material, metal: THREE.Material,
+    accMat: THREE.Material, jade: THREE.Material, gold: THREE.Material,
+    isConq: boolean,
+  ) {
     if (isConq) {
-      // Morrión helmet (steel)
-      const helm = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 8, 0, Math.PI * 2, 0, Math.PI / 1.7), metal);
-      helm.position.y = headY + 0.06; this.rig.add(helm);
-      const crest = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.12, 0.34), metal);
-      crest.position.y = headY + 0.2; this.rig.add(crest);
+      // Morion helmet — rounded skull + oval brim + fore-aft crest
+      const skull = new THREE.Mesh(new THREE.SphereGeometry(0.220, 14, 10, 0, Math.PI * 2, 0, Math.PI / 1.6), metal);
+      skull.position.y = headY + 0.04; this.rig.add(skull);
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.285, 0.285, 0.034, 22), metal);
+      brim.position.y = headY + 0.06; this.rig.add(brim);
+      const crest = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.16, 0.42), metal);
+      crest.position.y = headY + 0.20; this.rig.add(crest);
       return;
     }
-    // Native feather headdress — fan of feathers behind head
-    const feathers = this.civType === CivilizationType.MAYA ? 7 : 5;
-    const palette = [0xe03030, 0x2060e0, 0x20c060, 0xffcc20, 0xe060c0];
-    for (let i = 0; i < feathers; i++) {
-      const t = (i / (feathers - 1)) - 0.5; // -0.5..0.5
-      const fmat = new THREE.MeshStandardMaterial({ color: palette[i % palette.length], roughness: 0.6 });
-      const f = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.42, 5), fmat);
-      f.position.set(t * 0.34, headY + 0.32, -0.14);
-      f.rotation.x = -0.5;
-      f.rotation.z = t * 0.6;
+
+    // Feather fan colors
+    const fanPalette = [0xe82020, 0x2065e8, 0x20c060, 0xffcc20, 0xe060c0, 0xff7020, 0xb000c0];
+
+    if (this.civType === CivilizationType.AZTEC) {
+      if (this.type === UnitType.EAGLE_WARRIOR) {
+        // Eagle head helmet — white plumage cap + yellow beak
+        const eagleCap = new THREE.Mesh(
+          new THREE.SphereGeometry(0.235, 14, 10),
+          new THREE.MeshStandardMaterial({ color: 0xf4f0e8, roughness: 0.72 }),
+        );
+        eagleCap.position.y = headY + 0.06; this.rig.add(eagleCap);
+        const beak = new THREE.Mesh(
+          new THREE.ConeGeometry(0.060, 0.28, 6),
+          new THREE.MeshStandardMaterial({ color: 0xd4a820, roughness: 0.55, metalness: 0.10 }),
+        );
+        beak.rotation.x = Math.PI / 2;
+        beak.position.set(0, headY + 0.10, 0.36); this.rig.add(beak);
+        // Black eye-ring on helmet
+        const ering = new THREE.Mesh(
+          new THREE.TorusGeometry(0.068, 0.018, 5, 10),
+          new THREE.MeshStandardMaterial({ color: 0x0a0806, roughness: 0.8 }),
+        );
+        ering.rotation.y = Math.PI / 5;
+        ering.position.set(-0.17, headY + 0.12, 0.14); this.rig.add(ering);
+        // Tail feathers fanning up from back
+        this.addFeatherFan(headY, [0xf4f0e8, 0xd4d0c8, 0xf4f0e8], 3, 0.44, 0.55);
+
+      } else if (this.type === UnitType.JAGUAR_KNIGHT) {
+        // Jaguar skull helmet — golden-ochre cap + ears + dark spots
+        const jagCap = new THREE.Mesh(
+          new THREE.SphereGeometry(0.238, 12, 10),
+          new THREE.MeshStandardMaterial({ color: 0xe2b850, roughness: 0.78 }),
+        );
+        jagCap.position.y = headY + 0.06; this.rig.add(jagCap);
+        for (const ex of [-0.16, 0.16]) {
+          const ear = new THREE.Mesh(
+            new THREE.ConeGeometry(0.060, 0.10, 4),
+            new THREE.MeshStandardMaterial({ color: 0xe2b850, roughness: 0.80 }),
+          );
+          ear.position.set(ex, headY + 0.30, -0.02); this.rig.add(ear);
+        }
+        const spotMat = new THREE.MeshStandardMaterial({ color: 0x2c1a08, roughness: 0.9 });
+        for (let i = 0; i < 5; i++) {
+          const a = (i / 5) * Math.PI * 2;
+          const sp = new THREE.Mesh(new THREE.SphereGeometry(0.030, 5, 4), spotMat);
+          sp.position.set(Math.cos(a) * 0.20, headY + 0.11, Math.sin(a) * 0.09 + 0.04);
+          this.rig.add(sp);
+        }
+        // Back feather fan
+        this.addFeatherFan(headY, fanPalette, 4, 0.44, 0.72);
+
+      } else {
+        // Generic Aztec warrior — tall colorful feather fan + jade band
+        this.addFeatherFan(headY, fanPalette, 6, 0.50, 0.90);
+        const band = new THREE.Mesh(new THREE.TorusGeometry(0.200, 0.038, 7, 18), accMat);
+        band.rotation.x = Math.PI / 2; band.position.y = headY + 0.10; this.rig.add(band);
+      }
+
+    } else if (this.civType === CivilizationType.INCA) {
+      // Woven gold headband + 4 large upright feathers + sun disc
+      const headband = new THREE.Mesh(new THREE.CylinderGeometry(0.218, 0.218, 0.10, 18), gold);
+      headband.position.y = headY + 0.08; this.rig.add(headband);
+      this.addFeatherFan(headY, [0xdd2020, 0x2040cc, 0xffcc20, 0x20aa50], 4, 0.54, 0.90);
+      // Gold sun disc on forehead
+      const disc = new THREE.Mesh(new THREE.CircleGeometry(0.10, 12), gold);
+      disc.position.set(0, headY + 0.10, 0.22); this.rig.add(disc);
+      // Turquoise studs on band
+      const studMat = new THREE.MeshStandardMaterial({ color: 0x00b8b0, roughness: 0.5, metalness: 0.1 });
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI;
+        const stud = new THREE.Mesh(new THREE.SphereGeometry(0.022, 5, 4), studMat);
+        stud.position.set(Math.cos(a) * 0.218, headY + 0.08, Math.sin(a) * 0.218);
+        this.rig.add(stud);
+      }
+
+    } else if (this.civType === CivilizationType.MAYA) {
+      // Stepped jade headdress (mini-pyramid layered tiers) + jade collar
+      const tiers: [number, number, number, number][] = [
+        [0.42, 0.12, 0.22, headY + 0.18],
+        [0.32, 0.12, 0.18, headY + 0.30],
+        [0.22, 0.11, 0.14, headY + 0.42],
+        [0.14, 0.10, 0.10, headY + 0.52],
+      ];
+      for (const [w, h, d, y] of tiers) {
+        const tier = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), jade);
+        tier.position.y = y; this.rig.add(tier);
+      }
+      // Jade collar
+      const collar = new THREE.Mesh(new THREE.TorusGeometry(0.215, 0.052, 7, 18), jade);
+      collar.rotation.x = Math.PI / 2; collar.position.y = headY - 0.05; this.rig.add(collar);
+      // Gold capping stone on top tier
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.058, 7, 5), gold);
+      cap.position.set(0, headY + 0.59, 0); this.rig.add(cap);
+    }
+
+    void dark; // available for future detail
+  }
+
+  private addFeatherFan(headY: number, palette: number[], count: number, height: number, spread: number) {
+    for (let i = 0; i < count; i++) {
+      const t  = count > 1 ? (i / (count - 1)) - 0.5 : 0;
+      const fc = palette[i % palette.length];
+      const fmat = new THREE.MeshStandardMaterial({
+        color: fc, roughness: 0.65, emissive: fc, emissiveIntensity: 0.05,
+      });
+      const f = new THREE.Mesh(new THREE.ConeGeometry(0.056, height, 5), fmat);
+      f.position.set(t * spread * 0.52, headY + 0.32 + Math.abs(t) * 0.06, -0.14 - Math.abs(t) * 0.04);
+      f.rotation.x = -0.56 - Math.abs(t) * 0.10;
+      f.rotation.z =  t * 0.66;
       f.castShadow = true;
       this.rig.add(f);
     }
-    // Band around head
-    const band = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.035, 6, 16), accMat);
-    band.rotation.x = Math.PI / 2;
-    band.position.y = headY + 0.1;
-    this.rig.add(band);
   }
 
-  private buildRangedWeapon(_rArm: THREE.Mesh, wood: THREE.Material, dark: THREE.Material, metal: THREE.Material, accMat: THREE.Material, isConq: boolean) {
+  // ── Ranged weapons ───────────────────────────────────────────────────────────
+  private buildRangedWeapon(wood: THREE.Material, dark: THREE.Material, metal: THREE.Material, isConq: boolean) {
     if (isConq) {
-      // Arquebus — long barrel
-      const stock = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.1, 0.7), wood);
-      stock.position.set(0.3, 0.95, 0.1); this.rig.add(stock);
-      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.6, 8), dark);
-      barrel.rotation.x = Math.PI / 2;
-      barrel.position.set(0.3, 1.02, 0.25); this.rig.add(barrel);
+      // Arquebus — stock + barrel + trigger guard
+      const stock = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.10, 0.72), wood);
+      stock.position.set(0.30, 0.96, 0.12); this.rig.add(stock);
+      const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.68, 8), dark);
+      barrel.rotation.x = Math.PI / 2; barrel.position.set(0.30, 1.04, 0.28); this.rig.add(barrel);
+      const guard = new THREE.Mesh(new THREE.TorusGeometry(0.060, 0.012, 4, 8, Math.PI), metal);
+      guard.rotation.x = -Math.PI / 2; guard.position.set(0.30, 0.92, -0.06); this.rig.add(guard);
       return;
     }
     if (this.type === UnitType.SLINGER) {
-      // Sling — small pouch on a cord
-      const cord = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.012, 5, 12), dark);
-      cord.position.set(0.42, 1.0, 0.1); cord.rotation.y = Math.PI / 2; this.rig.add(cord);
+      const cord = new THREE.Mesh(new THREE.TorusGeometry(0.115, 0.013, 5, 12), dark);
+      cord.position.set(0.42, 1.02, 0.10); cord.rotation.y = Math.PI / 2; this.rig.add(cord);
+      const pouch = new THREE.Mesh(new THREE.SphereGeometry(0.060, 6, 4), wood);
+      pouch.position.set(0.53, 1.02, 0.10); this.rig.add(pouch);
       return;
     }
     if (this.type === UnitType.ATLATL) {
-      // Spear-thrower with javelin
-      const jav = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.0, 6), wood);
-      jav.rotation.z = Math.PI / 2.2;
-      jav.position.set(0.4, 1.05, 0.0); this.rig.add(jav);
-      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.12, 6), dark);
-      tip.rotation.z = -Math.PI / 2.2;
-      tip.position.set(0.86, 1.18, 0.0); this.rig.add(tip);
+      // Javelin + atlatl board
+      const jav = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 1.05, 6), wood);
+      jav.rotation.z = Math.PI / 2.2; jav.position.set(0.40, 1.06, 0.0); this.rig.add(jav);
+      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.044, 0.14, 6), dark);
+      tip.rotation.z = -Math.PI / 2.2; tip.position.set(0.88, 1.19, 0.0); this.rig.add(tip);
+      const board = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.06, 0.34), wood);
+      board.rotation.z = Math.PI / 2.2; board.position.set(0.16, 1.02, 0.05); this.rig.add(board);
       return;
     }
-    // Bow (archers)
-    const bow = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.025, 6, 14, Math.PI * 1.1), wood);
-    bow.position.set(0.4, 0.95, 0.05);
-    bow.rotation.y = Math.PI / 2;
-    this.rig.add(bow);
-    const string = new THREE.Mesh(new THREE.BoxGeometry(0.005, 0.52, 0.005), dark);
-    string.position.set(0.4, 0.95, 0.05); this.rig.add(string);
+    // Bow + string + nocked arrow
+    const bow = new THREE.Mesh(new THREE.TorusGeometry(0.30, 0.026, 6, 16, Math.PI * 1.05), wood);
+    bow.position.set(0.40, 0.96, 0.06); bow.rotation.y = Math.PI / 2; this.rig.add(bow);
+    const str = new THREE.Mesh(new THREE.BoxGeometry(0.005, 0.56, 0.005), dark);
+    str.position.set(0.40, 0.96, 0.06); this.rig.add(str);
+    const arrow = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.52, 5), wood);
+    arrow.rotation.z = Math.PI / 2; arrow.position.set(0.40, 1.00, 0.08); this.rig.add(arrow);
   }
 
-  private buildCavalry(bodyMat: THREE.Material, skin: THREE.Material, dark: THREE.Material, metal: THREE.Material, wood: THREE.Material, accMat: THREE.Material) {
-    const horseMat = new THREE.MeshStandardMaterial({ color: 0x5a3a22, roughness: 0.85 });
+  // ── Cavalry ──────────────────────────────────────────────────────────────────
+  private buildCavalry(
+    bodyMat: THREE.Material, skin: THREE.Material, dark: THREE.Material,
+    metal: THREE.Material, wood: THREE.Material, accMat: THREE.Material,
+  ) {
+    const horseMat = new THREE.MeshStandardMaterial({ color: 0x4e3018, roughness: 0.88 });
+    const maneMat  = new THREE.MeshStandardMaterial({ color: 0x2a1808, roughness: 0.90 });
+
     // Horse body
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.55, 1.1), horseMat);
-    body.position.set(0, 0.78, 0); body.castShadow = true; this.rig.add(body);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.58, 1.15), horseMat);
+    body.position.set(0, 0.80, 0); body.castShadow = true; this.rig.add(body);
     // Neck + head
-    const neck = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.5, 0.3), horseMat);
-    neck.position.set(0, 1.05, 0.55); neck.rotation.x = -0.5; this.rig.add(neck);
-    const hhead = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.24, 0.42), horseMat);
-    hhead.position.set(0, 1.28, 0.78); this.rig.add(hhead);
-    // Legs
-    for (const [x, z] of [[-0.18, 0.42], [0.18, 0.42], [-0.18, -0.42], [0.18, -0.42]] as const) {
-      this.addLimb(dark, 0.12, 0.55, 0.12, x, 0.28, z);
+    const neck  = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.52, 0.30), horseMat);
+    neck.position.set(0, 1.07, 0.57); neck.rotation.x = -0.50; this.rig.add(neck);
+    const hhead = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.25, 0.44), horseMat);
+    hhead.position.set(0, 1.30, 0.80); this.rig.add(hhead);
+    const snout = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.12, 0.10), horseMat);
+    snout.position.set(0, 1.24, 1.00); this.rig.add(snout);
+    // Mane
+    const mane = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.30, 0.80), maneMat);
+    mane.position.set(0, 1.30, 0.36); this.rig.add(mane);
+    // Legs + hooves
+    for (const [lx, lz] of [[-0.19, 0.44], [0.19, 0.44], [-0.19, -0.44], [0.19, -0.44]] as const) {
+      this.addLimb(horseMat, 0.13, 0.58, 0.13, lx, 0.30, lz);
+      this.addLimb(dark,     0.14, 0.11, 0.14, lx, 0.04, lz);
     }
     // Tail
-    const tail = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.5, 6), dark);
-    tail.position.set(0, 0.9, -0.62); tail.rotation.x = 0.7; this.rig.add(tail);
+    const tail = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.52, 6), maneMat);
+    tail.position.set(0, 0.90, -0.64); tail.rotation.x = 0.72; this.rig.add(tail);
+    // Saddlecloth
+    const saddle = new THREE.Mesh(new THREE.BoxGeometry(0.40, 0.07, 0.58), accMat);
+    saddle.position.set(0, 1.10, -0.08); this.rig.add(saddle);
 
-    // Rider torso + head (steel for conquistador)
-    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.5, 0.24), bodyMat);
-    torso.position.set(0, 1.45, -0.05); torso.castShadow = true; this.rig.add(torso);
-    const rhead = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 10), skin);
-    rhead.position.set(0, 1.82, -0.05); this.rig.add(rhead);
-    const helm = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 8, 0, Math.PI * 2, 0, Math.PI / 1.7), metal);
-    helm.position.set(0, 1.88, -0.05); this.rig.add(helm);
-    // Banner accent
-    const banner = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.4, 0.28), accMat);
-    banner.position.set(-0.2, 1.7, -0.1); this.rig.add(banner);
+    // Rider — torso + breastplate
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.50, 0.26), bodyMat);
+    torso.position.set(0, 1.50, -0.06); torso.castShadow = true; this.rig.add(torso);
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.40, 0.06), metal);
+    plate.position.set(0, 1.50, 0.08); this.rig.add(plate);
+    // Head + morion
+    const rhead = new THREE.Mesh(new THREE.SphereGeometry(0.165, 14, 10), skin);
+    rhead.position.set(0, 1.86, -0.06); this.rig.add(rhead);
+    const helm = new THREE.Mesh(new THREE.SphereGeometry(0.185, 12, 8, 0, Math.PI * 2, 0, Math.PI / 1.6), metal);
+    helm.position.set(0, 1.92, -0.06); this.rig.add(helm);
+    const crest = new THREE.Mesh(new THREE.BoxGeometry(0.038, 0.14, 0.40), metal);
+    crest.position.set(0, 2.04, -0.06); this.rig.add(crest);
 
-    // Lance
-    const lance = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.5, 6), wood);
-    lance.rotation.x = Math.PI / 2.3;
-    lance.position.set(0.26, 1.4, 0.2); this.rig.add(lance);
-    const ltip = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.16, 6), metal);
-    ltip.rotation.x = Math.PI / 2.3;
-    ltip.position.set(0.26, 1.95, 0.78); this.rig.add(ltip);
+    // Banner pole + flag
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.60, 5), wood);
+    pole.position.set(-0.22, 1.65, -0.14); this.rig.add(pole);
+    const banner = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.36, 0.30), accMat);
+    banner.position.set(-0.22, 1.80, -0.06); this.rig.add(banner);
+
+    // Lance + tip
+    const lance = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.026, 1.55, 6), wood);
+    lance.rotation.x = Math.PI / 2.3; lance.position.set(0.26, 1.44, 0.22); this.rig.add(lance);
+    const ltip = new THREE.Mesh(new THREE.ConeGeometry(0.050, 0.18, 6), metal);
+    ltip.rotation.x = Math.PI / 2.3; ltip.position.set(0.26, 2.00, 0.80); this.rig.add(ltip);
   }
 
+  // ── Cannon ───────────────────────────────────────────────────────────────────
   private buildCannon(metal: THREE.Material, wood: THREE.Material, accMat: THREE.Material) {
-    // Wooden carriage
-    const carriage = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.22, 0.8), wood);
-    carriage.position.y = 0.4; carriage.castShadow = true; this.rig.add(carriage);
+    // Carriage
+    const carriage = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.24, 0.84), wood);
+    carriage.position.y = 0.42; carriage.castShadow = true; this.rig.add(carriage);
+    this.addLimb(wood, 0.07, 0.20, 0.84, -0.31, 0.44, 0);
+    this.addLimb(wood, 0.07, 0.20, 0.84,  0.31, 0.44, 0);
     // Barrel
-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.9, 14), metal);
-    barrel.rotation.x = Math.PI / 2.6;
-    barrel.position.set(0, 0.6, 0.1); barrel.castShadow = true; this.rig.add(barrel);
-    const muzzle = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.04, 8, 16), metal);
-    muzzle.rotation.x = Math.PI / 2.6 + Math.PI / 2;
-    muzzle.position.set(0, 0.78, 0.48); this.rig.add(muzzle);
-    // Wheels
-    for (const x of [-0.3, 0.3]) {
-      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.08, 16), wood);
-      wheel.rotation.z = Math.PI / 2;
-      wheel.position.set(x, 0.28, -0.1); wheel.castShadow = true; this.rig.add(wheel);
-      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.1, 8), metal);
-      hub.rotation.z = Math.PI / 2; hub.position.set(x, 0.28, -0.1); this.rig.add(hub);
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.21, 0.92, 14), metal);
+    barrel.rotation.x = Math.PI / 2.7; barrel.position.set(0, 0.62, 0.12); barrel.castShadow = true; this.rig.add(barrel);
+    const muzzle = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.044, 8, 16), metal);
+    muzzle.rotation.x = Math.PI / 2.7 + Math.PI / 2; muzzle.position.set(0, 0.80, 0.50); this.rig.add(muzzle);
+    // Wheels with spokes
+    for (const wx of [-0.32, 0.32]) {
+      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.30, 0.30, 0.09, 18), wood);
+      wheel.rotation.z = Math.PI / 2; wheel.position.set(wx, 0.30, -0.10); wheel.castShadow = true; this.rig.add(wheel);
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.11, 8), metal);
+      hub.rotation.z = Math.PI / 2; hub.position.set(wx, 0.30, -0.10); this.rig.add(hub);
+      for (let s = 0; s < 6; s++) {
+        const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.030, 0.50, 0.030), wood);
+        spoke.position.set(wx, 0.30, -0.10);
+        spoke.rotation.z = (s / 6) * Math.PI * 2;
+        this.rig.add(spoke);
+      }
     }
-    // Ownership flag
-    const flag = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.3, 0.22), accMat);
-    flag.position.set(-0.2, 0.95, -0.3); this.rig.add(flag);
+    // Flag
+    const flag = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.32, 0.24), accMat);
+    flag.position.set(-0.22, 0.98, -0.32); this.rig.add(flag);
   }
 
+  // ── Public API ────────────────────────────────────────────────────────────────
   setSelected(sel: boolean) {
     this.selected = sel;
     this.selectionRing.visible = sel;
   }
-
   isSelected() { return this.selected; }
-  isAlive() { return this.state !== UnitState.DEAD; }
+  isAlive()    { return this.state !== UnitState.DEAD; }
   gridPos(): GridPos { return { col: this.col, row: this.row }; }
 
   distanceTo(other: Unit): number {
@@ -367,7 +622,7 @@ export class Unit {
 
   takeDamage(amount: number): number {
     const dmg = Math.max(1, amount - this.defense);
-    this.hp  = Math.max(0, this.hp - dmg);
+    this.hp   = Math.max(0, this.hp - dmg);
     this.updateHealthBar();
     if (this.hp <= 0) this.die();
     return dmg;
@@ -382,23 +637,23 @@ export class Unit {
   private updateHealthBar() {
     const pct = this.hp / this.maxHp;
     this.healthBar.scale.x = pct;
-    this.healthBar.position.x = (pct - 1) * 0.36;
-    const mat = this.healthBar.material as THREE.MeshBasicMaterial;
-    mat.color.setHex(pct > 0.5 ? 0x33dd55 : pct > 0.25 ? 0xddaa00 : 0xdd2222);
+    this.healthBar.position.x = (pct - 1) * 0.39;
+    (this.healthBar.material as THREE.MeshBasicMaterial).color.setHex(
+      pct > 0.5 ? 0x33dd55 : pct > 0.25 ? 0xddaa00 : 0xdd2222,
+    );
   }
 
+  // ── Per-frame update ──────────────────────────────────────────────────────────
   update(dt: number, map: GameMap) {
     if (this.state === UnitState.DEAD) return;
 
     this.attackTimer = Math.max(0, this.attackTimer - dt);
     this.animT += dt;
 
-    if (this.state === UnitState.MOVING) {
-      this.updateMovement(dt, map);
-    }
+    if (this.state === UnitState.MOVING) this.updateMovement(dt, map);
 
-    // ── Procedural animation on the rig (mesh.y is owned by the renderer) ──
     if (this.rig) {
+      // Bob / lean while moving, gentle breath at idle
       if (this.state === UnitState.MOVING) {
         this.rig.position.y = Math.abs(Math.sin(this.animT * 11)) * 0.07;
         this.rig.rotation.z = Math.sin(this.animT * 11) * 0.04;
@@ -406,25 +661,34 @@ export class Unit {
         this.rig.position.y = Math.sin(this.animT * 2.2) * 0.015;
         this.rig.rotation.z = 0;
       }
-      // Attack lunge
+      // Attack lunge forward
       if (this.attackAnim > 0) {
-        this.attackAnim = Math.max(0, this.attackAnim - dt * 3);
+        this.attackAnim   = Math.max(0, this.attackAnim - dt * 3);
         this.rig.position.z = Math.sin((1 - this.attackAnim) * Math.PI) * 0.18;
       } else {
         this.rig.position.z = 0;
       }
     }
 
-    // Sync planar position (Y set by Renderer.syncHeights)
+    // Arm swing when walking
+    if (this.leftArm && this.rightArm) {
+      if (this.state === UnitState.MOVING) {
+        const swing = Math.sin(this.animT * 11) * 0.42;
+        this.leftArm.rotation.x  =  swing;
+        this.rightArm.rotation.x = -swing;
+      } else {
+        this.leftArm.rotation.x  *= 0.88;
+        this.rightArm.rotation.x *= 0.88;
+      }
+    }
+
+    // Planar position — Y is owned by Renderer.syncHeights
     this.mesh.position.x = this.worldX;
     this.mesh.position.z = this.worldZ;
   }
 
   private updateMovement(dt: number, _map: GameMap) {
-    if (this.pathIndex >= this.path.length) {
-      this.state = UnitState.IDLE;
-      return;
-    }
+    if (this.pathIndex >= this.path.length) { this.state = UnitState.IDLE; return; }
 
     const target = this.path[this.pathIndex];
     const tx = target.col * TILE_SIZE;
@@ -435,14 +699,10 @@ export class Unit {
     const step = this.speed * TILE_SIZE * dt;
 
     if (dist <= step) {
-      this.worldX = tx;
-      this.worldZ = tz;
-      this.col    = target.col;
-      this.row    = target.row;
+      this.worldX = tx; this.worldZ = tz;
+      this.col = target.col; this.row = target.row;
       this.pathIndex++;
-      if (this.pathIndex >= this.path.length) {
-        this.state = UnitState.IDLE;
-      }
+      if (this.pathIndex >= this.path.length) this.state = UnitState.IDLE;
     } else {
       this.worldX += (dx / dist) * step;
       this.worldZ += (dz / dist) * step;
