@@ -787,6 +787,21 @@ input.toggle { width: 22px; height: 22px; accent-color: #d4880a; }
 }
 #minimap-container { cursor: crosshair; }
 
+/* ═══════════════════════════════════════ TOAST NOTIFICATIONS ══ */
+.hud-toast {
+  position: fixed; top: 72px; left: 50%; transform: translateX(-50%) translateY(-10px);
+  background: rgba(12,8,2,0.92); border-radius: 10px; padding: 8px 18px;
+  font-size: 14px; font-weight: 600; letter-spacing: 0.3px;
+  pointer-events: none; z-index: 900;
+  opacity: 0; transition: opacity 0.3s ease, transform 0.3s ease;
+  white-space: nowrap;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.5);
+}
+.hud-toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+.hud-toast-info    { border: 1px solid rgba(100,200,255,0.35); color: #a8d8ff; }
+.hud-toast-warning { border: 1px solid rgba(255,180,50,0.4);  color: #f0c060; }
+.hud-toast-success { border: 1px solid rgba(60,220,100,0.4);  color: #44ee88; }
+
 /* ═══════════════════════════════════════ MOBILE RESPONSIVE ══ */
 @media (max-width: 640px) {
   /* Auth */

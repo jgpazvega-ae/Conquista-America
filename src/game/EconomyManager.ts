@@ -25,13 +25,11 @@ export class EconomyManager {
       const stats = this.calculateStats(player, game);
       this.stats.set(player.id, stats);
 
-      // Auto-apply resource generation
-      if (!player.isHuman) {
-        // AI gets slight resource bonus
-        player.resources.food += stats.netProduction.food * 0.1;
-        player.resources.gold += stats.netProduction.gold * 0.1;
-        player.resources.stone += stats.netProduction.stone * 0.1;
-      }
+      // Apply passive income to all players each tick
+      const rate = player.isHuman ? 0.25 : 0.35; // AI slight advantage for difficulty
+      player.resources.food  = Math.max(0, player.resources.food  + stats.netProduction.food  * rate);
+      player.resources.gold  = Math.max(0, player.resources.gold  + stats.netProduction.gold  * rate);
+      player.resources.stone = Math.max(0, player.resources.stone + stats.netProduction.stone * rate);
     }
   }
 

@@ -65,9 +65,9 @@ export const CIV_EMOJIS: Record<string, string> = {
 };
 
 export const STARTING_RESOURCES = {
-  food:  200,
-  gold:  100,
-  stone: 150,
+  food:  400,
+  gold:  200,
+  stone: 250,
 };
 
 export const CAMERA_PAN_SPEED = 24;

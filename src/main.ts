@@ -220,6 +220,7 @@ class GameInstance {
       this.renderer.addUnit(unit);
       if (unit.playerId === this.game.humanPlayerId) {
         this.audio.playBuild();
+        this.hud.notify(`✅ ${unit.def.name} listo para combate`, 'success');
       }
     }
 
@@ -234,6 +235,7 @@ class GameInstance {
     // Visual + audio effects on damage
     if (this.game.damageEvents.length > 0) {
       this.hud.showDamageNumbers(this.game.damageEvents);
+      let humanUnderAttack = false;
       for (const evt of this.game.damageEvents) {
         this.renderer.effects.createHitEffect(evt.worldX, 0.5, evt.worldZ);
         if (evt.damage > 20) this.renderer.effects.createExplosion(evt.worldX, 0.5, evt.worldZ, evt.damage / 40);
@@ -242,7 +244,11 @@ class GameInstance {
           if (evt.target.playerId !== this.game.humanPlayerId) this.killCount++;
         } else {
           this.audio.playHit(evt.damage / 30);
+          if (evt.target.playerId === this.game.humanPlayerId) humanUnderAttack = true;
         }
+      }
+      if (humanUnderAttack && Math.random() < 0.05) {
+        this.hud.notify('⚔️ ¡Tus tropas están bajo ataque!', 'warning');
       }
     }
 
