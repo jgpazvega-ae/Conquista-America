@@ -44,6 +44,7 @@ export class Game {
   readonly fog: FogOfWarManager;
 
   damageEvents: DamageEvent[] = [];
+  newlySpawnedUnits: Unit[] = [];
   status: GameStatus = 'PLAYING';
   humanPlayerId = 0;
   gameTime = 0;
@@ -190,8 +191,16 @@ export class Game {
       unit.update(dt, this.map);
     }
 
+    this.newlySpawnedUnits = [];
     for (const building of this.allBuildings) {
-      if (!building.isComplete()) building.updateBuild(dt);
+      if (!building.isComplete()) {
+        building.updateBuild(dt);
+      } else {
+        building.updateProduction(dt);
+        if (building.finishedUnit !== null) {
+          this.spawnProducedUnit(building);
+        }
+      }
     }
 
     for (const worker of this.allWorkers) {
@@ -219,6 +228,19 @@ export class Game {
     }
 
     this.checkEndConditions();
+  }
+
+  private spawnProducedUnit(building: Building) {
+    const unitType = building.finishedUnit!;
+    building.finishedUnit = null;
+    const player = this.players[building.playerId];
+    if (!player) return;
+    const pos = this.map.findWalkableNear(building.col, building.row + 3, 6);
+    if (!pos) return;
+    const unit = new Unit(unitType, player.civType, player.id, pos[0], pos[1], CIV_COLORS[player.civType]);
+    player.addUnit(unit);
+    this.allUnits.push(unit);
+    this.newlySpawnedUnits.push(unit);
   }
 
   private runAutoAttack() {

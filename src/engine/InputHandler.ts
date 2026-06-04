@@ -24,6 +24,7 @@ export class InputHandler {
 
   onSelectionChange: (() => void) | null = null;
   onMoveOrder:       (() => void) | null = null;
+  onBuildingClick:   ((buildingId: number) => void) | null = null;
 
   constructor(renderer: Renderer, game: Game, camera: RTSCamera) {
     this.renderer     = renderer;
@@ -146,6 +147,14 @@ export class InputHandler {
         const canSee = this.game.fog.canSeeUnit(unit, this.game.humanPlayerId);
         if (canSee) unit.setSelected(true);
       }
+      this.onSelectionChange?.();
+      return;
+    }
+
+    if (hit?.type === 'building') {
+      this.onBuildingClick?.(hit.buildingId);
+      this.onSelectionChange?.();
+      return;
     }
 
     this.onSelectionChange?.();

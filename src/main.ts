@@ -13,6 +13,8 @@ import { InputHandler } from './engine/InputHandler';
 import { TouchHandler } from './engine/TouchHandler';
 import { HUD } from './ui/HUD';
 import { AudioManager } from './engine/AudioManager';
+import { ProductionPanel } from './ui/ProductionPanel';
+import { TRAIN_COSTS } from './game/unitProduction';
 import { BuildingType } from './game/buildings';
 import { TILE_SIZE } from './game/constants';
 
@@ -90,6 +92,7 @@ class GameInstance {
   private touch!:     TouchHandler;
   private hud!:       HUD;
   private audio!:     AudioManager;
+  private prodPanel!: ProductionPanel;
   private settings!:  SettingsPanel;
   private animId:     number = 0;
   private clock       = new THREE.Clock();
@@ -113,16 +116,39 @@ class GameInstance {
     this.camera   = new RTSCamera(this.renderer.camera);
     this.input    = new InputHandler(this.renderer, this.game, this.camera);
     this.touch    = new TouchHandler(this.camera, this.renderer, this.game);
-    this.audio    = new AudioManager();
-    this.settings = new SettingsPanel(this.saveSystem);
+    this.audio     = new AudioManager();
+    this.prodPanel = new ProductionPanel();
+    this.settings  = new SettingsPanel(this.saveSystem);
 
     this.input.onSelectionChange = () => {
       this.hud.update(this.input.getSelectedUnits());
       this.audio.playClick();
+      this.prodPanel.hide();
     };
     this.touch.onSelectionChange = () => this.hud.update(this.touch ? [] : []);
     this.input.onMoveOrder = () => this.audio.playMove();
     this.hud.onMinimapClick = (wx, wz) => this.camera.panTo(wx, wz);
+
+    this.input.onBuildingClick = (buildingId) => {
+      const building = this.game.getBuildingById(buildingId);
+      if (!building || !building.isComplete()) return;
+      if (building.playerId !== this.game.humanPlayerId) return;
+      this.prodPanel.show(building, this.game.humanPlayer);
+      this.prodPanel.onTrain = (unitType) => {
+        const cost = TRAIN_COSTS[unitType];
+        if (!cost) return;
+        const player = this.game.humanPlayer;
+        if (player.resources.food  < cost.food)          return;
+        if (player.resources.gold  < cost.gold)          return;
+        if (player.resources.stone < (cost.stone ?? 0))  return;
+        if (!building.trainUnit(unitType))                return;
+        player.resources.food  -= cost.food;
+        player.resources.gold  -= cost.gold;
+        player.resources.stone -= cost.stone ?? 0;
+        this.audio.playBuild();
+        this.prodPanel.refresh();
+      };
+    };
 
     this.settings.onVolumeChange = (fx, mu) => {
       this.audio.setEffectsVolume(fx);
@@ -131,6 +157,7 @@ class GameInstance {
 
     this.bindHUDButtons();
     this.bindMobileButtons();
+    this.bindKeyboardShortcuts();
 
     // Loading sequence
     this.showRandomFact();
@@ -187,6 +214,16 @@ class GameInstance {
     const dt = Math.min(this.clock.getDelta(), 0.1);
 
     this.game.update(dt);
+
+    // Register any units produced this frame
+    for (const unit of this.game.newlySpawnedUnits) {
+      this.renderer.addUnit(unit);
+      if (unit.playerId === this.game.humanPlayerId) {
+        this.audio.playBuild();
+      }
+    }
+
+    this.prodPanel.renderQueue();
     this.renderer.syncHeights(this.game.allUnits, this.game.allWorkers);
     this.camera.update(dt);
     this.renderer.updateEffects(dt);
@@ -344,6 +381,49 @@ class GameInstance {
     document.getElementById('mob-desel')?.addEventListener('click', () => {
       for (const u of this.game.getAllUnits()) u.setSelected(false);
       this.hud.update([]);
+    });
+  }
+
+  private bindKeyboardShortcuts() {
+    window.addEventListener('keydown', (e) => {
+      if (this.destroyed) return;
+      // Escape: deselect all, close panels
+      if (e.code === 'Escape') {
+        for (const u of this.game.getAllUnits()) u.setSelected(false);
+        this.prodPanel.hide();
+        this.hud.update([]);
+        return;
+      }
+      // Space: stop all selected units
+      if (e.code === 'Space') {
+        e.preventDefault();
+        for (const u of this.input.getSelectedUnits()) {
+          u.state = 'IDLE' as any;
+          u.path = [];
+          u.attackTarget = null;
+        }
+        return;
+      }
+      // F: focus camera on selected units (or all human units)
+      if (e.code === 'KeyF') {
+        const sel = this.input.getSelectedUnits();
+        const army = sel.length > 0 ? sel : this.game.humanPlayer.aliveUnits;
+        if (army.length > 0) {
+          let sx = 0, sz = 0;
+          for (const u of army) { sx += u.worldX; sz += u.worldZ; }
+          this.camera.panTo(sx / army.length, sz / army.length);
+        }
+        return;
+      }
+      // Ctrl+A: select all human units
+      if (e.code === 'KeyA' && e.ctrlKey) {
+        e.preventDefault();
+        for (const u of this.game.getAllUnits()) {
+          u.setSelected(u.isAlive() && u.playerId === this.game.humanPlayerId);
+        }
+        this.hud.update(this.input.getSelectedUnits());
+        return;
+      }
     });
   }
 
