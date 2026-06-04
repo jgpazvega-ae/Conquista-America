@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#0a0502" />
+    <title>🌎 Conquista América</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌎</text></svg>" />
+  </head>
+  <body>
+    <!-- ═══════════════════════════════════════════════════════ AUTH SCREEN ══ -->
+    <div id="auth-screen">
+      <!-- Animated background -->
+      <div class="auth-bg">
+        <div class="auth-orb orb1"></div>
+        <div class="auth-orb orb2"></div>
+        <div class="auth-orb orb3"></div>
+        <div class="auth-grid"></div>
+      </div>
+
+      <div class="auth-container">
+        <!-- Logo -->
+        <div class="auth-logo">
+          <div class="auth-logo-globe">🌎</div>
+          <div class="auth-logo-title">CONQUISTA<br><span>AMÉRICA</span></div>
+          <div class="auth-logo-sub">Estrategia · Historia · Conquista</div>
+        </div>
+
+        <!-- Auth card -->
+        <div class="auth-card">
+          <!-- Tabs -->
+          <div class="auth-tabs">
+            <button class="auth-tab active" data-tab="login">Iniciar Sesión</button>
+            <button class="auth-tab"        data-tab="register">Registrarse</button>
+          </div>
+
+          <!-- Login form -->
+          <form id="login-form" class="auth-form">
+            <div class="field-group">
+              <label>👤 Usuario</label>
+              <input id="login-user" type="text" placeholder="Tu nombre de usuario" autocomplete="username" required />
+            </div>
+            <div class="field-group">
+              <label>🔒 Contraseña</label>
+              <input id="login-pass" type="password" placeholder="Tu contraseña" autocomplete="current-password" required />
+            </div>
+            <div class="field-group checkbox-row">
+              <label class="checkbox-label">
+                <input id="login-remember" type="checkbox" />
+                <span class="checkbox-custom"></span>
+                Recordarme 24 horas
+              </label>
+            </div>
+            <button type="submit" class="auth-btn primary">⚔️ Entrar al Mundo</button>
+          </form>
+
+          <!-- Register form -->
+          <form id="register-form" class="auth-form hidden">
+            <div class="field-group">
+              <label>👤 Nombre de usuario</label>
+              <input id="reg-user" type="text" placeholder="Elige un nombre único" autocomplete="username" required />
+              <div class="field-hint">3–20 caracteres, letras y números</div>
+            </div>
+            <div class="field-group">
+              <label>🔒 Contraseña</label>
+              <input id="reg-password" type="password" placeholder="Mínimo 4 caracteres" autocomplete="new-password" required />
+              <div class="strength-wrap">
+                <div id="strength-bar"></div>
+              </div>
+              <div id="strength-text" class="field-hint"></div>
+            </div>
+            <div class="field-group">
+              <label>🔒 Confirmar contraseña</label>
+              <input id="reg-password2" type="password" placeholder="Repite tu contraseña" autocomplete="new-password" required />
+            </div>
+            <button type="submit" class="auth-btn primary">🌎 Crear Cuenta</button>
+          </form>
+
+          <!-- Message / error -->
+          <div class="auth-message hidden"></div>
+
+          <!-- Divider -->
+          <div class="auth-divider"><span>o</span></div>
+
+          <!-- Guest -->
+          <button id="guest-btn" class="auth-btn secondary">🎭 Jugar como Invitado</button>
+        </div>
+
+        <!-- Feature highlights -->
+        <div class="auth-features">
+          <div class="auth-feat">🗺️<span>Mapa generado</span></div>
+          <div class="auth-feat">⚔️<span>4 civilizaciones</span></div>
+          <div class="auth-feat">📱<span>Soporte móvil</span></div>
+          <div class="auth-feat">🌫️<span>Niebla de guerra</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════ CIV SELECT SCREEN ══ -->
+    <div id="civ-select-screen" class="hidden">
+      <div class="civ-select-bg"></div>
+      <div class="civ-select-container">
+        <div class="civ-select-header">
+          <div class="civ-select-title">Elige tu Civilización</div>
+          <div class="civ-select-sub">Cada civilización tiene ventajas únicas. Elige sabiamente.</div>
+        </div>
+
+        <div class="civ-select-main">
+          <!-- Grid of civ cards -->
+          <div id="civ-grid" class="civ-grid"></div>
+
+          <!-- Detail panel -->
+          <div id="civ-detail" class="civ-detail">
+            <div id="detail-emoji" class="detail-emoji"></div>
+            <div id="detail-name" class="detail-name"></div>
+            <div class="detail-meta">
+              <span class="detail-label">Estilo:</span>
+              <span id="detail-style" class="detail-value"></span>
+              &nbsp;·&nbsp;
+              <span class="detail-label">Dificultad:</span>
+              <span id="detail-diff" class="detail-value"></span>
+            </div>
+            <p id="detail-desc" class="detail-desc"></p>
+
+            <div class="detail-section-title">✨ Ventajas</div>
+            <ul id="detail-bonuses" class="detail-bonuses"></ul>
+
+            <div class="detail-section-title">⚔️ Unidades</div>
+            <div id="detail-units" class="detail-units"></div>
+          </div>
+        </div>
+
+        <div class="civ-select-footer">
+          <button id="civ-back-btn" class="auth-btn secondary sm">← Volver</button>
+          <button id="start-game-btn" class="auth-btn primary lg">🌎 ¡Iniciar Conquista!</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ SETTINGS PANEL ══ -->
+    <div id="settings-panel" class="hidden panel-overlay">
+      <div class="panel-card">
+        <div class="panel-header">
+          <span class="panel-title">⚙️ Configuración</span>
+          <button id="settings-close" class="panel-close">✕</button>
+        </div>
+
+        <!-- Profile section -->
+        <div id="profile-section" class="settings-section"></div>
+
+        <!-- Game settings -->
+        <div class="settings-section">
+          <div class="settings-section-title">🎮 Ajustes del Juego</div>
+          <div class="setting-row">
+            <label>🔊 Efectos de sonido</label>
+            <div class="range-wrap">
+              <input id="effects-vol" type="range" min="0" max="1" step="0.05" />
+              <span id="effects-vol-val" class="range-val">70%</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <label>🎵 Música</label>
+            <div class="range-wrap">
+              <input id="music-vol" type="range" min="0" max="1" step="0.05" />
+              <span id="music-vol-val" class="range-val">40%</span>
+            </div>
+          </div>
+          <div class="setting-row">
+            <label>📊 Mostrar FPS</label>
+            <input id="show-fps" type="checkbox" class="toggle" />
+          </div>
+          <div class="setting-row">
+            <label>🖱️ Edge Scroll</label>
+            <input id="edge-scroll" type="checkbox" class="toggle" />
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <button id="logout-btn" class="auth-btn danger full">🚪 Cerrar Sesión</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════ GAME CANVAS ══ -->
+    <div id="app" class="hidden">
+      <canvas id="game-canvas"></canvas>
+
+      <!-- HUD Top Bar -->
+      <div id="hud-top">
+        <div id="civ-badge"></div>
+        <div id="resources">
+          <span class="res"><span class="res-icon">🌽</span><span id="res-food">200</span></span>
+          <span class="res"><span class="res-icon">⚜️</span><span id="res-gold">100</span></span>
+          <span class="res"><span class="res-icon">🪨</span><span id="res-stone">150</span></span>
+        </div>
+        <div id="hud-actions">
+          <button id="settings-btn" class="hud-icon-btn" title="Configuración">⚙️</button>
+        </div>
+        <div id="game-status"></div>
+      </div>
+
+      <!-- Minimap -->
+      <div id="minimap-container">
+        <canvas id="minimap"></canvas>
+        <div id="minimap-label">Mapa</div>
+      </div>
+
+      <!-- Unit info panel -->
+      <div id="unit-panel" class="hidden">
+        <div id="unit-portrait"></div>
+        <div id="unit-info">
+          <div id="unit-name"></div>
+          <div id="unit-civ"></div>
+          <div class="stat-row">
+            <span class="stat-label">❤️</span>
+            <div class="hp-bar-wrap"><div id="hp-bar"></div></div>
+            <span id="hp-text"></span>
+          </div>
+          <div id="unit-stats"></div>
+        </div>
+      </div>
+
+      <!-- Selection count -->
+      <div id="selection-count" class="hidden"></div>
+
+      <!-- Mobile action bar -->
+      <div id="mobile-actions" class="hidden">
+        <button class="mob-btn" id="mob-stop"   title="Detener">⏹</button>
+        <button class="mob-btn" id="mob-attack" title="Atacar al más cercano">🗡️</button>
+        <button class="mob-btn" id="mob-desel"  title="Deseleccionar">✕</button>
+      </div>
+
+      <!-- Controls hint -->
+      <div id="controls-hint">
+        📱 <b>Móvil:</b> Toca para seleccionar · Doble toque / mantén para mover/atacar · Pellizca para zoom &nbsp;|&nbsp;
+        🖥️ <b>PC:</b> WASD mover · Rueda zoom · Clic seleccionar · Clic derecho mover
+      </div>
+
+      <!-- Selection box overlay -->
+      <div id="selection-box"></div>
+
+      <!-- Loading screen -->
+      <div id="loading-screen">
+        <div id="loading-content">
+          <h1>🌎 Conquista América</h1>
+          <p id="loading-msg">Generando el mundo...</p>
+          <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
+          <div id="loading-fact"></div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

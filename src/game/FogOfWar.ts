@@ -1,0 +1,132 @@
+import { MAP_COLS, MAP_ROWS } from './constants';
+import type { Unit } from './Unit';
+import type { Building } from './Building';
+import type { Game } from './Game';
+
+export enum TileVisibility {
+  UNEXPLORED = 0,
+  FOGGED = 1,
+  VISIBLE = 2,
+}
+
+export class FogOfWar {
+  private playerVisibility: TileVisibility[][] = [];
+  private playerMemory: number[][] = []; // For storing last known terrain
+
+  constructor(playerId: number) {
+    for (let r = 0; r < MAP_ROWS; r++) {
+      this.playerVisibility[r] = [];
+      this.playerMemory[r] = [];
+      for (let c = 0; c < MAP_COLS; c++) {
+        this.playerVisibility[r][c] = TileVisibility.UNEXPLORED;
+        this.playerMemory[r][c] = 0;
+      }
+    }
+  }
+
+  update(game: Game, playerId: number) {
+    // Reset visibility each frame
+    for (let r = 0; r < MAP_ROWS; r++) {
+      for (let c = 0; c < MAP_COLS; c++) {
+        if (this.playerVisibility[r][c] === TileVisibility.VISIBLE) {
+          this.playerVisibility[r][c] = TileVisibility.FOGGED;
+        }
+      }
+    }
+
+    // Units reveal terrain
+    const myUnits = game.allUnits.filter(u => u.playerId === playerId && u.isAlive());
+    for (const unit of myUnits) {
+      this.revealAroundPoint(Math.round(unit.col), Math.round(unit.row), Math.ceil(unit.sight));
+    }
+
+    // Buildings reveal terrain
+    const myBuildings = game.allBuildings.filter(b => b.playerId === playerId && b.isAlive());
+    for (const building of myBuildings) {
+      const sightRange = building.isComplete() ? 4 : 2;
+      this.revealAroundPoint(building.col, building.row, sightRange);
+    }
+
+    // Store memory of visible tiles
+    for (let r = 0; r < MAP_ROWS; r++) {
+      for (let c = 0; c < MAP_COLS; c++) {
+        if (this.playerVisibility[r][c] === TileVisibility.VISIBLE) {
+          const tile = game.map.getTile(c, r);
+          if (tile) {
+            this.playerMemory[r][c] = 1; // Mark as explored
+          }
+        }
+      }
+    }
+  }
+
+  private revealAroundPoint(col: number, row: number, sight: number) {
+    for (let r = Math.max(0, row - sight); r <= Math.min(MAP_ROWS - 1, row + sight); r++) {
+      for (let c = Math.max(0, col - sight); c <= Math.min(MAP_COLS - 1, col + sight); c++) {
+        const dx = c - col;
+        const dy = r - row;
+        if (dx * dx + dy * dy <= sight * sight) {
+          this.playerVisibility[r][c] = TileVisibility.VISIBLE;
+        }
+      }
+    }
+  }
+
+  getVisibility(col: number, row: number): TileVisibility {
+    if (col < 0 || col >= MAP_COLS || row < 0 || row >= MAP_ROWS) return TileVisibility.UNEXPLORED;
+    return this.playerVisibility[row][col];
+  }
+
+  isVisible(col: number, row: number): boolean {
+    return this.getVisibility(col, row) === TileVisibility.VISIBLE;
+  }
+
+  isExplored(col: number, row: number): boolean {
+    return this.playerMemory[row]?.[col] > 0;
+  }
+
+  canSeeUnit(unit: Unit, playerId: number): boolean {
+    if (unit.playerId === playerId) return true;
+    return this.isVisible(Math.round(unit.col), Math.round(unit.row));
+  }
+
+  canSeeBuilding(building: Building, playerId: number): boolean {
+    if (building.playerId === playerId) return true;
+    return this.isVisible(building.col, building.row);
+  }
+}
+
+export class FogOfWarManager {
+  private fogMaps = new Map<number, FogOfWar>();
+
+  constructor(playerCount: number) {
+    for (let i = 0; i < playerCount; i++) {
+      this.fogMaps.set(i, new FogOfWar(i));
+    }
+  }
+
+  update(game: Game) {
+    for (const [playerId, fog] of this.fogMaps) {
+      fog.update(game, playerId);
+    }
+  }
+
+  getFog(playerId: number): FogOfWar | undefined {
+    return this.fogMaps.get(playerId);
+  }
+
+  canSeeUnit(unit: Unit, playerId: number): boolean {
+    const fog = this.fogMaps.get(playerId);
+    return fog ? fog.canSeeUnit(unit, playerId) : true;
+  }
+
+  canSeeBuilding(building: Building, playerId: number): boolean {
+    const fog = this.fogMaps.get(playerId);
+    return fog ? fog.canSeeBuilding(building, playerId) : true;
+  }
+
+  isVisible(col: number, row: number, playerId: number): boolean {
+    const fog = this.fogMaps.get(playerId);
+    return fog ? fog.isVisible(col, row) : true;
+  }
+}
