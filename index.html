@@ -268,12 +268,23 @@
           <span id="prod-building-name">Asentamiento</span>
           <button id="prod-close" class="prod-close-btn">✕</button>
         </div>
-        <div class="prod-section-label">Entrenar unidad</div>
-        <div id="prod-unit-list" class="prod-unit-list"></div>
-        <div class="prod-section-label">Cola de producción</div>
-        <div id="prod-queue" class="prod-queue"></div>
-        <div id="prod-progress-wrap" class="prod-progress-wrap hidden">
-          <div id="prod-progress" class="prod-progress-bar"></div>
+        <div class="prod-tabs">
+          <button id="prod-tab-train" class="prod-tab active">⚔️ Entrenar</button>
+          <button id="prod-tab-build" class="prod-tab">🏗️ Construir</button>
+        </div>
+        <div id="prod-train-section">
+          <div class="prod-section-label">Selecciona unidad</div>
+          <div id="prod-unit-list" class="prod-unit-list"></div>
+          <div class="prod-section-label">Cola de producción</div>
+          <div id="prod-queue" class="prod-queue"></div>
+          <div id="prod-progress-wrap" class="prod-progress-wrap hidden">
+            <div id="prod-progress" class="prod-progress-bar"></div>
+          </div>
+        </div>
+        <div id="prod-build-section" class="hidden">
+          <div class="prod-section-label">Selecciona edificio</div>
+          <div id="prod-build-list" class="prod-unit-list"></div>
+          <div class="prod-section-label" style="font-size:10px;color:#a09070">Clic en el mapa para colocar</div>
         </div>
       </div>
 

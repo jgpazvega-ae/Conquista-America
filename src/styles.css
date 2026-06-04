@@ -705,8 +705,25 @@ input.toggle { width: 22px; height: 22px; accent-color: #d4880a; }
 }
 .prod-header {
   display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
+.prod-tabs {
+  display: flex; gap: 4px; margin-bottom: 10px;
+}
+.prod-tab {
+  flex: 1; padding: 5px 0;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(200,160,80,0.15);
+  border-radius: 6px; cursor: pointer;
+  color: rgba(200,160,80,0.55); font-size: 11px;
+  transition: all 0.15s;
+}
+.prod-tab.active {
+  background: rgba(200,160,80,0.15);
+  border-color: rgba(200,160,80,0.45);
+  color: #f0c060;
+}
+.prod-tab:hover:not(.active) { color: #e8d5a0; }
 .prod-header span {
   font-size: 13px; font-weight: 700; color: #f0c060;
   letter-spacing: 0.5px;

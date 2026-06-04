@@ -5,7 +5,7 @@ import { findPath } from './Pathfinding';
 import { getDamageMultiplier } from './UnitBalancing';
 
 export interface DamageEvent {
-  attacker: Unit;
+  attacker: Unit | null;
   target:   Unit;
   damage:   number;
   worldX:   number;

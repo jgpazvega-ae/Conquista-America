@@ -16,6 +16,7 @@ import { AudioManager } from './engine/AudioManager';
 import { ProductionPanel } from './ui/ProductionPanel';
 import { TRAIN_COSTS } from './game/unitProduction';
 import { BuildingType } from './game/buildings';
+import { BUILDING_DEFS } from './game/buildingDefs';
 import { TILE_SIZE } from './game/constants';
 
 // ── Historical facts shown during loading ─────────────────────────────────────
@@ -100,7 +101,8 @@ class GameInstance {
   private killCount   = 0;
   private builtCount  = 0;
   private endHandled  = false;
-  private unitGroups  = new Map<number, number[]>(); // hotkey → unit id array
+  private unitGroups  = new Map<number, number[]>();
+  private _placingType: BuildingType | null = null;
 
   constructor(civ: CivilizationType, saveSystem: SaveSystem) {
     this.civ        = civ;
@@ -134,6 +136,7 @@ class GameInstance {
       const building = this.game.getBuildingById(buildingId);
       if (!building || !building.isComplete()) return;
       if (building.playerId !== this.game.humanPlayerId) return;
+      this._cancelPlacing();
       this.prodPanel.show(building, this.game.humanPlayer);
       this.prodPanel.onTrain = (unitType) => {
         const cost = TRAIN_COSTS[unitType];
@@ -149,6 +152,30 @@ class GameInstance {
         this.audio.playBuild();
         this.prodPanel.refresh();
       };
+      this.prodPanel.onBuild = (btype) => {
+        const def = BUILDING_DEFS[btype];
+        this._placingType = btype;
+        this.input.setPlacingMode(true);
+        this.hud.notify(`🏗️ Coloca el ${def.name} — clic derecho para cancelar`, 'info');
+      };
+    };
+
+    this.input.onTerrainClick = (col, row) => {
+      if (!this._placingType) return;
+      const btype = this._placingType;
+      this._cancelPlacing();
+      if (isNaN(col)) return; // right-click cancel
+      const ok = this.game.placeBuilding(btype, col, row, this.game.humanPlayerId);
+      if (ok) {
+        const newB = this.game.allBuildings[this.game.allBuildings.length - 1];
+        this.renderer.addBuilding(newB);
+        this.builtCount++;
+        this.audio.playBuild();
+        const def = BUILDING_DEFS[btype];
+        this.hud.notify(`✅ ${def.name} en construcción`, 'success');
+      } else {
+        this.hud.notify('❌ No puedes construir ahí', 'warning');
+      }
     };
 
     this.settings.onVolumeChange = (fx, mu) => {
@@ -411,6 +438,7 @@ class GameInstance {
       if (this.destroyed) return;
       // Escape: deselect all, close panels
       if (e.code === 'Escape') {
+        if (this._placingType) { this._cancelPlacing(); return; }
         for (const u of this.game.getAllUnits()) u.setSelected(false);
         this.prodPanel.hide();
         this.hud.update([]);
@@ -475,6 +503,11 @@ class GameInstance {
         return;
       }
     });
+  }
+
+  private _cancelPlacing() {
+    this._placingType = null;
+    this.input.setPlacingMode(false);
   }
 
   private showRandomFact() {

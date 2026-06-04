@@ -213,6 +213,8 @@ export class Game {
 
     this.damageEvents = this.combat.update(this.allUnits, this.map);
 
+    this.updateTowerAttacks(dt);
+
     this.resourceSys.update(this);
 
     this.economy.update(dt, this);
@@ -258,6 +260,57 @@ export class Game {
       }
       if (best) unit.attackUnit(best);
     }
+  }
+
+  private updateTowerAttacks(dt: number) {
+    const TOWER_RANGE    = 5.5;
+    const TOWER_DAMAGE   = 12;
+    const TOWER_COOLDOWN = 2.5;
+
+    for (const b of this.allBuildings) {
+      if (!b.isComplete() || !b.isAlive()) continue;
+      if (b.type !== BuildingType.WATCHTOWER) continue;
+
+      b.attackTimer -= dt;
+      if (b.attackTimer > 0) continue;
+
+      let nearest: Unit | null = null;
+      let nearestDist = TOWER_RANGE;
+      for (const u of this.allUnits) {
+        if (!u.isAlive() || u.playerId === b.playerId) continue;
+        const d = Math.sqrt((u.col - b.col) ** 2 + (u.row - b.row) ** 2);
+        if (d < nearestDist) { nearestDist = d; nearest = u; }
+      }
+
+      if (nearest) {
+        const actual = nearest.takeDamage(TOWER_DAMAGE + Math.floor(Math.random() * 4) - 2);
+        this.damageEvents.push({
+          attacker: null as any,
+          target: nearest,
+          damage: actual,
+          worldX: nearest.worldX,
+          worldZ: nearest.worldZ,
+        });
+        b.attackTimer = TOWER_COOLDOWN;
+      }
+    }
+  }
+
+  placeBuilding(type: BuildingType, col: number, row: number, playerId: number): boolean {
+    const def    = BUILDING_DEFS[type];
+    const player = this.players[playerId];
+    if (!player) return false;
+    if (player.resources.food  < def.cost.food)  return false;
+    if (player.resources.gold  < def.cost.gold)  return false;
+    if (player.resources.stone < def.cost.stone) return false;
+    if (!this.map.isWalkable(col, row)) return false;
+
+    const building = new Building(type, def, playerId, col, row, CIV_COLORS[player.civType], player.civType);
+    this.allBuildings.push(building);
+    player.resources.food  -= def.cost.food;
+    player.resources.gold  -= def.cost.gold;
+    player.resources.stone -= def.cost.stone;
+    return true;
   }
 
   private checkEndConditions() {
