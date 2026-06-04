@@ -255,12 +255,27 @@
 
       <!-- Controls hint -->
       <div id="controls-hint">
-        📱 <b>Móvil:</b> Toca para seleccionar · Doble toque / mantén para mover/atacar · Pellizca para zoom &nbsp;|&nbsp;
-        🖥️ <b>PC:</b> <b>Clic derecho + arrastrar</b> para mover cámara · WASD · Rueda zoom · Clic izquierdo seleccionar · Clic derecho (sin arrastrar) mover/atacar
+        📱 <b>Móvil:</b> Toca para seleccionar · Doble toque/mantén para mover/atacar · Pellizca zoom &nbsp;|&nbsp;
+        🖥️ <b>PC:</b> Clic izq. seleccionar · Arrastra selección múltiple · Clic der. mover/atacar · Arrastrar der. cámara · WASD/flechas cámara · Rueda zoom · <b>Esc</b> deseleccionar · <b>Espacio</b> parar · <b>F</b> centrar · <b>Ctrl+A</b> todo · Clic edificio = producción
       </div>
 
       <!-- Selection box overlay -->
       <div id="selection-box"></div>
+
+      <!-- Production panel -->
+      <div id="production-panel" class="hidden">
+        <div class="prod-header">
+          <span id="prod-building-name">Asentamiento</span>
+          <button id="prod-close" class="prod-close-btn">✕</button>
+        </div>
+        <div class="prod-section-label">Entrenar unidad</div>
+        <div id="prod-unit-list" class="prod-unit-list"></div>
+        <div class="prod-section-label">Cola de producción</div>
+        <div id="prod-queue" class="prod-queue"></div>
+        <div id="prod-progress-wrap" class="prod-progress-wrap hidden">
+          <div id="prod-progress" class="prod-progress-bar"></div>
+        </div>
+      </div>
 
       <!-- Loading screen -->
       <div id="loading-screen">

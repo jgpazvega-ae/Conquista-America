@@ -1,8 +1,15 @@
 import * as THREE from 'three';
 import { BuildingType } from './buildings';
 import type { BuildingDef } from './buildings';
-import { CivilizationType } from './types';
+import { CivilizationType, UnitType } from './types';
 import { TILE_SIZE } from './constants';
+import { TRAIN_TIMES } from './unitProduction';
+
+export interface ProdQueueItem {
+  unitType:  UnitType;
+  elapsed:   number;
+  totalTime: number;
+}
 
 let nextBuildingId = 1;
 
@@ -32,6 +39,10 @@ export class Building {
   state: BuildingState = BuildingState.CONSTRUCTING;
   buildProgress: number = 0; // 0..1
   buildTime: number;
+
+  private _prodQueue: ProdQueueItem[] = [];
+  finishedUnit: UnitType | null = null;
+  readonly MAX_QUEUE = 5;
 
   mesh!: THREE.Group;
   private structure!: THREE.Group;
@@ -281,6 +292,40 @@ export class Building {
 
   isComplete(): boolean { return this.state === BuildingState.COMPLETE; }
   isAlive(): boolean { return this.state !== BuildingState.DESTROYED; }
+
+  trainUnit(unitType: UnitType): boolean {
+    if (!this.isComplete()) return false;
+    if (this._prodQueue.length >= this.MAX_QUEUE) return false;
+    const totalTime = TRAIN_TIMES[unitType] ?? 15;
+    this._prodQueue.push({ unitType, elapsed: 0, totalTime });
+    return true;
+  }
+
+  cancelLastQueued(): UnitType | null {
+    if (this._prodQueue.length === 0) return null;
+    const last = this._prodQueue[this._prodQueue.length - 1];
+    if (last.elapsed === 0) {
+      this._prodQueue.pop();
+      return last.unitType;
+    }
+    return null;
+  }
+
+  updateProduction(dt: number) {
+    if (this._prodQueue.length === 0) return;
+    const item = this._prodQueue[0];
+    item.elapsed += dt;
+    if (item.elapsed >= item.totalTime) {
+      this.finishedUnit = item.unitType;
+      this._prodQueue.shift();
+    }
+  }
+
+  get productionQueue(): readonly ProdQueueItem[] { return this._prodQueue; }
+  get productionProgress(): number {
+    if (this._prodQueue.length === 0) return 0;
+    return this._prodQueue[0].elapsed / this._prodQueue[0].totalTime;
+  }
 
   takeDamage(amount: number) {
     if (this.state === BuildingState.DESTROYED) return;

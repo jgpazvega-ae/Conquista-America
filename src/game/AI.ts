@@ -10,15 +10,18 @@ import type { Worker } from './Worker';
 import { WorkerTask } from './Worker';
 import { ResourceType } from './ResourceNode';
 import { CIV_COLORS } from './constants';
+import { TRAIN_COSTS } from './unitProduction';
 
-const AI_THINK_INTERVAL = 4.0;
-const AI_BUILD_INTERVAL = 12.0;
+const AI_THINK_INTERVAL  = 4.0;
+const AI_BUILD_INTERVAL  = 12.0;
 const AI_WORKER_INTERVAL = 5.0;
+const AI_TRAIN_INTERVAL  = 10.0;
 
 interface AIState {
-  thinkTimer: number;
-  buildTimer: number;
+  thinkTimer:  number;
+  buildTimer:  number;
   workerTimer: number;
+  trainTimer:  number;
 }
 
 export class AISystem {
@@ -30,13 +33,14 @@ export class AISystem {
 
       let state = this.aiStates.get(player.id);
       if (!state) {
-        state = { thinkTimer: 0, buildTimer: 0, workerTimer: 0 };
+        state = { thinkTimer: 0, buildTimer: 0, workerTimer: 0, trainTimer: Math.random() * 8 };
         this.aiStates.set(player.id, state);
       }
 
-      state.thinkTimer += dt;
-      state.buildTimer += dt;
+      state.thinkTimer  += dt;
+      state.buildTimer  += dt;
       state.workerTimer += dt;
+      state.trainTimer  += dt;
 
       if (state.thinkTimer >= AI_THINK_INTERVAL) {
         state.thinkTimer = 0;
@@ -51,6 +55,11 @@ export class AISystem {
       if (state.workerTimer >= AI_WORKER_INTERVAL) {
         state.workerTimer = 0;
         this.commandWorkers(player, game);
+      }
+
+      if (state.trainTimer >= AI_TRAIN_INTERVAL) {
+        state.trainTimer = 0;
+        this.orderTraining(player, game);
       }
     }
   }
@@ -147,6 +156,33 @@ export class AISystem {
     player.resources.food -= def.cost.food;
     player.resources.gold -= def.cost.gold;
     player.resources.stone -= def.cost.stone;
+  }
+
+  private orderTraining(player: Player, game: Game) {
+    const civDef = player.civDef;
+    const settlement = game.allBuildings.find(
+      b => b.playerId === player.id && b.type === BuildingType.SETTLEMENT && b.isComplete(),
+    );
+    if (!settlement) return;
+    if (settlement.productionQueue.length >= 3) return; // don't over-queue
+
+    // Pick a random unit type from civ's roster that we can afford
+    const affordable = civDef.units.filter(u => {
+      const cost = TRAIN_COSTS[u.type];
+      if (!cost) return false;
+      return player.resources.food >= cost.food &&
+             player.resources.gold >= cost.gold &&
+             player.resources.stone >= (cost.stone ?? 0);
+    });
+    if (affordable.length === 0) return;
+
+    const pick = affordable[Math.floor(Math.random() * affordable.length)];
+    const cost = TRAIN_COSTS[pick.type]!;
+    if (settlement.trainUnit(pick.type)) {
+      player.resources.food  -= cost.food;
+      player.resources.gold  -= cost.gold;
+      player.resources.stone -= cost.stone ?? 0;
+    }
   }
 
   private commandWorkers(player: Player, game: Game) {

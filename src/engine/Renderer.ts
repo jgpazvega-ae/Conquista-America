@@ -611,20 +611,27 @@ export class Renderer {
     this.renderer.setSize(w, h);
   }
 
-  /** Returns {tileCol, tileRow} or {unitId} depending on what was hit */
-  pickFromScreen(screenX: number, screenY: number): { type: 'tile'; col: number; row: number } | { type: 'unit'; unitId: number } | null {
+  /** Returns the closest unit, building, or terrain tile hit by a screen-space ray. */
+  pickFromScreen(screenX: number, screenY: number):
+    | { type: 'tile';     col: number; row: number }
+    | { type: 'unit';     unitId: number }
+    | { type: 'building'; buildingId: number }
+    | null
+  {
     this.mouse.x =  (screenX / window.innerWidth)  * 2 - 1;
     this.mouse.y = -(screenY / window.innerHeight) * 2 + 1;
     this.raycaster.setFromCamera(this.mouse, this.camera);
 
-    // Check units first
-    const unitHits = this.raycaster.intersectObjects(this.unitGroup.children, true);
-    for (const hit of unitHits) {
-      const uid = hit.object.userData.unitId ?? hit.object.parent?.userData.unitId;
-      if (uid !== undefined) return { type: 'unit', unitId: uid };
+    const hits = this.raycaster.intersectObjects(this.unitGroup.children, true);
+    for (const hit of hits) {
+      let obj: THREE.Object3D | null = hit.object;
+      while (obj) {
+        if (obj.userData.unitId     !== undefined) return { type: 'unit',     unitId:     obj.userData.unitId };
+        if (obj.userData.buildingId !== undefined) return { type: 'building', buildingId: obj.userData.buildingId };
+        obj = obj.parent;
+      }
     }
 
-    // Then terrain — convert hit point back to grid coords
     if (this.terrainMesh) {
       const tileHits = this.raycaster.intersectObject(this.terrainMesh, false);
       if (tileHits.length > 0) {
