@@ -25,6 +25,9 @@ export class InputHandler {
   onSelectionChange: (() => void) | null = null;
   onMoveOrder:       (() => void) | null = null;
   onBuildingClick:   ((buildingId: number) => void) | null = null;
+  onTerrainClick:    ((col: number, row: number) => void) | null = null;
+
+  private _placingMode = false;
 
   constructor(renderer: Renderer, game: Game, camera: RTSCamera) {
     this.renderer     = renderer;
@@ -79,7 +82,13 @@ export class InputHandler {
   // Right-click fires AFTER Camera has had a chance to accumulate drag distance
   private onRightUp(e: MouseEvent) {
     e.preventDefault();
-    // If the right mouse was dragged to pan the camera, don't issue a game order
+    // Cancel placement mode on right-click
+    if (this._placingMode) {
+      this._placingMode = false;
+      this.renderer.renderer.domElement.style.cursor = '';
+      this.onTerrainClick?.(NaN, NaN); // signal cancellation
+      return;
+    }
     if (this.camera.rightClickWasDrag()) return;
 
     const selected = this.getSelectedUnits();
@@ -136,8 +145,22 @@ export class InputHandler {
     return [c, r];
   }
 
+  setPlacingMode(on: boolean) {
+    this._placingMode = on;
+    const canvas = this.renderer.renderer.domElement;
+    canvas.style.cursor = on ? 'crosshair' : '';
+  }
+
   private handleClick(screenX: number, screenY: number) {
     const hit = this.renderer.pickFromScreen(screenX, screenY);
+
+    // Placement mode intercepts terrain clicks
+    if (this._placingMode) {
+      if (hit?.type === 'tile') {
+        this.onTerrainClick?.(hit.col, hit.row);
+      }
+      return;
+    }
 
     for (const unit of this.game.getAllUnits()) unit.setSelected(false);
 

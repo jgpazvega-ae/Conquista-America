@@ -44,6 +44,9 @@ export class Building {
   finishedUnit: UnitType | null = null;
   readonly MAX_QUEUE = 5;
 
+  // Attack capability (watchtower)
+  attackTimer: number = 0;
+
   mesh!: THREE.Group;
   private structure!: THREE.Group;
   progressBar!: THREE.Mesh;
