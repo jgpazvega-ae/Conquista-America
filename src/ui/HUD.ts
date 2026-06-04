@@ -78,10 +78,10 @@ export class HUD {
   update(selectedUnits: Unit[]) {
     const player = this.game.humanPlayer;
 
-    // Resources
-    this.elFood.textContent  = String(player.resources.food);
-    this.elGold.textContent  = String(player.resources.gold);
-    this.elStone.textContent = String(player.resources.stone);
+    // Resources (floor to integer)
+    this.elFood.textContent  = String(Math.floor(player.resources.food));
+    this.elGold.textContent  = String(Math.floor(player.resources.gold));
+    this.elStone.textContent = String(Math.floor(player.resources.stone));
 
     // Timer
     const secs = Math.floor(this.game.gameTime);
@@ -221,5 +221,18 @@ export class HUD {
   setLoadingProgress(pct: number) {
     const bar = document.getElementById('loading-bar')!;
     bar.style.width = `${pct}%`;
+  }
+
+  notify(msg: string, type: 'info' | 'warning' | 'success' = 'info') {
+    const el = document.createElement('div');
+    el.className = `hud-toast hud-toast-${type}`;
+    el.textContent = msg;
+    document.body.appendChild(el);
+    // Animate in then out
+    requestAnimationFrame(() => el.classList.add('visible'));
+    setTimeout(() => {
+      el.classList.remove('visible');
+      setTimeout(() => el.remove(), 400);
+    }, 3200);
   }
 }

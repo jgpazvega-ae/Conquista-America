@@ -98,7 +98,7 @@ export class Worker {
     this.animT += dt;
     const gathering = this.task === WorkerTask.GATHERING_FOOD || this.task === WorkerTask.GATHERING_GOLD || this.task === WorkerTask.GATHERING_STONE;
 
-    if (this.task === WorkerTask.MOVING) {
+    if (this.task === WorkerTask.MOVING || this.task === WorkerTask.RETURNING) {
       this.updateMovement(dt);
     } else if (gathering) {
       this.taskProgress += dt;
@@ -114,7 +114,7 @@ export class Worker {
 
     // Animation on the rig (mesh.y owned by renderer)
     if (this.rig) {
-      if (this.task === WorkerTask.MOVING) {
+      if (this.task === WorkerTask.MOVING || this.task === WorkerTask.RETURNING) {
         this.rig.position.y = Math.abs(Math.sin(this.animT * 10)) * 0.05;
       } else if (gathering) {
         this.rig.rotation.x = Math.sin(this.animT * 8) * 0.25; // swinging tool
