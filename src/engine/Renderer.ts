@@ -10,6 +10,8 @@ import {
   WATER_LEVEL,
 } from '../game/constants';
 import { TerrainType } from '../game/types';
+import type { FogOfWarManager } from '../game/FogOfWar';
+import { TileVisibility } from '../game/FogOfWar';
 
 export class Renderer {
   readonly renderer: THREE.WebGLRenderer;
@@ -34,6 +36,13 @@ export class Renderer {
   // For click picking
   readonly raycaster = new THREE.Raycaster();
   readonly mouse     = new THREE.Vector2();
+
+  // ── Fog of war overlay ──────────────────────────────────────────────────────
+  private fogCanvas:  HTMLCanvasElement | null = null;
+  private fogTexture: THREE.CanvasTexture | null = null;
+  private fogImgData: ImageData | null = null;
+  private fogCols = 0; private fogRows = 0;
+  private fogFrameSkip = 0;
 
   // ── Markers ────────────────────────────────────────────────────────────────
   private moveMarkers: { mesh: THREE.Mesh; age: number }[] = [];
@@ -218,6 +227,36 @@ export class Renderer {
 
     this.buildWater(W, D);
     this.scatterVegetation(map);
+    this.buildFogPlane(map, W, D);
+  }
+
+  private buildFogPlane(map: GameMap, W: number, D: number) {
+    this.fogCols = map.cols;
+    this.fogRows = map.rows;
+    this.fogCanvas = document.createElement('canvas');
+    this.fogCanvas.width  = map.cols;
+    this.fogCanvas.height = map.rows;
+    const ctx = this.fogCanvas.getContext('2d')!;
+    // Start fully dark (all unexplored)
+    ctx.fillStyle = 'rgba(0,0,0,1)';
+    ctx.fillRect(0, 0, map.cols, map.rows);
+    this.fogImgData = ctx.createImageData(map.cols, map.rows);
+    this.fogTexture = new THREE.CanvasTexture(this.fogCanvas);
+    this.fogTexture.magFilter = THREE.LinearFilter;
+    this.fogTexture.minFilter = THREE.LinearFilter;
+
+    const fogGeo = new THREE.PlaneGeometry(W, D);
+    fogGeo.rotateX(-Math.PI / 2);
+    const fogMat = new THREE.MeshBasicMaterial({
+      map: this.fogTexture,
+      transparent: true,
+      depthWrite: false,
+      depthTest: false,
+    });
+    const fogMesh = new THREE.Mesh(fogGeo, fogMat);
+    fogMesh.position.set(W / 2 - TILE_SIZE / 2, 15, D / 2 - TILE_SIZE / 2);
+    fogMesh.renderOrder = 5;
+    this.scene.add(fogMesh);
   }
 
   // ── Procedural grayscale detail texture (modulates vertex colors) ───────────
@@ -591,6 +630,33 @@ export class Renderer {
       const ps = 1 + Math.sin(m.phase * 2) * 0.12;
       ring.scale.set(ps, ps, ps);
     }
+  }
+
+  updateFog(fog: FogOfWarManager, humanPlayerId: number) {
+    this.fogFrameSkip++;
+    if (this.fogFrameSkip < 2) return; // update every 2 frames
+    this.fogFrameSkip = 0;
+
+    if (!this.fogCanvas || !this.fogTexture || !this.fogImgData) return;
+    const humanFog = fog.getFog(humanPlayerId);
+    if (!humanFog) return;
+
+    const data = this.fogImgData.data;
+    for (let r = 0; r < this.fogRows; r++) {
+      for (let c = 0; c < this.fogCols; c++) {
+        const idx = (r * this.fogCols + c) * 4;
+        const vis = humanFog.getVisibility(c, r);
+        data[idx]   = 0;
+        data[idx+1] = 0;
+        data[idx+2] = 0;
+        data[idx+3] = vis === TileVisibility.VISIBLE    ? 0   :
+                      vis === TileVisibility.FOGGED      ? 120 :
+                                                           210;
+      }
+    }
+    const ctx = this.fogCanvas.getContext('2d')!;
+    ctx.putImageData(this.fogImgData, 0, 0);
+    this.fogTexture.needsUpdate = true;
   }
 
   updateEffects(dt: number) {

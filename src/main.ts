@@ -226,7 +226,22 @@ class GameInstance {
     }
 
     this.prodPanel.renderQueue();
+
+    // Apply fog of war: hide enemy units/buildings outside vision
+    const humanFog = this.game.fog.getFog(this.game.humanPlayerId);
+    if (humanFog) {
+      for (const unit of this.game.getAllUnits()) {
+        if (unit.playerId === this.game.humanPlayerId) continue;
+        unit.mesh.visible = unit.isAlive() && humanFog.canSeeUnit(unit, this.game.humanPlayerId);
+      }
+      for (const building of this.game.allBuildings) {
+        if (building.playerId === this.game.humanPlayerId) continue;
+        building.mesh.visible = building.isAlive() && humanFog.canSeeBuilding(building, this.game.humanPlayerId);
+      }
+    }
+
     this.renderer.syncHeights(this.game.allUnits, this.game.allWorkers);
+    this.renderer.updateFog(this.game.fog, this.game.humanPlayerId);
     this.camera.update(dt);
     this.renderer.updateEffects(dt);
 
