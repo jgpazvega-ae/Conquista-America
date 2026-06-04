@@ -132,9 +132,13 @@ class GameInstance {
     this.hud.buildMinimap(this.game.map);
     await loadingStep(95, 'Iniciando partida...');
 
-    // Pan to human player's starting position
-    const first = this.game.humanPlayer.aliveUnits[0];
-    if (first) this.camera.panTo(first.worldX, first.worldZ);
+    // Frame the human army: center on the centroid of all starting units
+    const army = this.game.humanPlayer.aliveUnits;
+    if (army.length > 0) {
+      let sx = 0, sz = 0;
+      for (const u of army) { sx += u.worldX; sz += u.worldZ; }
+      this.camera.panTo(sx / army.length, sz / army.length);
+    }
 
     await loadingStep(100, '¡Que comience la conquista!');
     await sleep(400);
