@@ -3,6 +3,7 @@ import type { Unit } from '../game/Unit';
 import type { GameMap } from '../game/Map';
 import { TERRAIN_COLORS, CIV_COLORS, CIV_NAMES, CIV_EMOJIS, TILE_SIZE } from '../game/constants';
 import type { DamageEvent } from '../game/CombatSystem';
+import { TileVisibility } from '../game/FogOfWar';
 
 function hex(n: number): string {
   return '#' + n.toString(16).padStart(6, '0');
@@ -170,11 +171,16 @@ export class HUD {
     }
     ctx.globalAlpha = 1.0;
 
-    // Draw units
+    const humanFog = this.game.fog.getFog(this.game.humanPlayerId);
+
+    // Draw units (only show enemy units if visible in fog)
     for (const player of this.game.players) {
       const col = CIV_COLORS[player.civType];
       ctx.fillStyle = hex(col);
       for (const unit of player.aliveUnits) {
+        if (player.id !== this.game.humanPlayerId && humanFog) {
+          if (!humanFog.canSeeUnit(unit, this.game.humanPlayerId)) continue;
+        }
         ctx.beginPath();
         ctx.arc(unit.col * tw + tw / 2, unit.row * th + th / 2, unitSize / 2, 0, Math.PI * 2);
         ctx.fill();
@@ -192,6 +198,22 @@ export class HUD {
       ctx.fill();
     }
     ctx.globalAlpha = 1.0;
+
+    // Fog of war overlay on minimap
+    if (humanFog) {
+      for (let r = 0; r < map.rows; r++) {
+        for (let c = 0; c < map.cols; c++) {
+          const vis = humanFog.getVisibility(c, r);
+          if (vis === TileVisibility.UNEXPLORED) {
+            ctx.fillStyle = 'rgba(0,0,0,0.82)';
+            ctx.fillRect(c * tw, r * th, Math.ceil(tw), Math.ceil(th));
+          } else if (vis === TileVisibility.FOGGED) {
+            ctx.fillStyle = 'rgba(0,0,0,0.45)';
+            ctx.fillRect(c * tw, r * th, Math.ceil(tw), Math.ceil(th));
+          }
+        }
+      }
+    }
   }
 
   showDamageNumbers(events: DamageEvent[]) {
