@@ -105,8 +105,11 @@ class GameInstance {
   private unitGroups    = new Map<number, number[]>();
   private _placingType: BuildingType | null = null;
   private _panelBuilding: import('./game/Building').Building | null = null;
-  private _unitLevels   = new Map<number, number>(); // track XP level-ups for audio
-  private _lastIdleWarnAt = 0;
+  private _unitLevels           = new Map<number, number>();
+  private _lastIdleWarnAt       = 0;
+  private _lastSettlementWarnAt = 0;
+  private _lastSettlementHp     = -1;
+  private _enemyBuildingsDestroyed = 0;
 
   constructor(civ: CivilizationType, saveSystem: SaveSystem) {
     this.civ        = civ;
@@ -289,6 +292,30 @@ class GameInstance {
       }
     }
 
+    // Register AI-placed buildings with renderer
+    for (const b of this.game.newlyPlacedBuildings) {
+      this.renderer.addBuilding(b);
+    }
+
+    // Notify when human buildings finish construction
+    for (const b of this.game.newlyCompletedBuildings) {
+      if (b.playerId === this.game.humanPlayerId) {
+        this.audio.playBuild();
+        const def = BUILDING_DEFS[b.type];
+        this.hud.notify(`🏛️ ${def.name} completado`, 'success');
+      }
+    }
+
+    // Track destroyed enemy buildings
+    for (const b of this.game.newlyDestroyedBuildings) {
+      if (b.playerId !== this.game.humanPlayerId) {
+        this._enemyBuildingsDestroyed++;
+        if (b.type === BuildingType.SETTLEMENT) {
+          this.hud.notify('🏚️ ¡Asentamiento enemigo destruido!', 'success');
+        }
+      }
+    }
+
     this.prodPanel.renderQueue();
 
     // Apply fog of war: hide enemy units/buildings outside vision
@@ -359,6 +386,20 @@ class GameInstance {
       this.hud.notify(`⚠️ ${idleCount} trabajador${idleCount > 1 ? 'es' : ''} sin tarea`, 'warning');
     }
 
+    // Settlement under attack warning
+    const humanSettlement = this.game.allBuildings.find(
+      b => b.playerId === this.game.humanPlayerId && b.type === BuildingType.SETTLEMENT,
+    );
+    if (humanSettlement) {
+      if (this._lastSettlementHp >= 0 && humanSettlement.hp < this._lastSettlementHp &&
+          this.game.gameTime - this._lastSettlementWarnAt >= 12) {
+        this._lastSettlementWarnAt = this.game.gameTime;
+        this.hud.notify('🔥 ¡Tu asentamiento está bajo ataque!', 'warning');
+        this.audio.playHit(0.9);
+      }
+      this._lastSettlementHp = humanSettlement.hp;
+    }
+
     this.hud.update(this.input.getSelectedUnits());
     this.renderer.render();
 
@@ -412,7 +453,15 @@ class GameInstance {
       </div>
       <div class="endgame-stat">
         <div class="endgame-stat-val">${this.killCount}</div>
-        <div class="endgame-stat-lbl">Bajas</div>
+        <div class="endgame-stat-lbl">Bajas enemigas</div>
+      </div>
+      <div class="endgame-stat">
+        <div class="endgame-stat-val">${this._enemyBuildingsDestroyed}</div>
+        <div class="endgame-stat-lbl">Edificios destruidos</div>
+      </div>
+      <div class="endgame-stat">
+        <div class="endgame-stat-val">${this.builtCount}</div>
+        <div class="endgame-stat-lbl">Edificios construidos</div>
       </div>
     `;
 

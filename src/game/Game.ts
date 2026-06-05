@@ -46,6 +46,9 @@ export class Game {
 
   damageEvents: DamageEvent[] = [];
   newlySpawnedUnits: Unit[] = [];
+  newlyPlacedBuildings: Building[] = [];
+  newlyCompletedBuildings: Building[] = [];
+  newlyDestroyedBuildings: Building[] = [];
   status: GameStatus = 'PLAYING';
   paused = false;
   humanPlayerId = 0;
@@ -195,9 +198,16 @@ export class Game {
     }
 
     this.newlySpawnedUnits = [];
+    this.newlyPlacedBuildings = [];
+    this.newlyCompletedBuildings = [];
+    this.newlyDestroyedBuildings = [];
     for (const building of this.allBuildings) {
       if (!building.isComplete()) {
+        const wasIncomplete = true;
         building.updateBuild(dt);
+        if (building.isComplete() && wasIncomplete) {
+          this.newlyCompletedBuildings.push(building);
+        }
       } else {
         building.updateProduction(dt);
         if (building.finishedUnit !== null) {
@@ -344,6 +354,7 @@ export class Game {
 
       const rawDmg = Math.max(1, unit.attack - 5); // buildings have some armor
       bldg.takeDamage(rawDmg);
+      if (!bldg.isAlive()) this.newlyDestroyedBuildings.push(bldg);
       this.damageEvents.push({
         attacker: unit,
         target: unit as any,

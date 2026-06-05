@@ -190,6 +190,7 @@ export class AISystem {
 
     const building = new Building(buildType, def, player.id, pos[0], pos[1], CIV_COLORS[player.civType], player.civType);
     game.allBuildings.push(building);
+    game.newlyPlacedBuildings.push(building);
     player.resources.food -= def.cost.food;
     player.resources.gold -= def.cost.gold;
     player.resources.stone -= def.cost.stone;
