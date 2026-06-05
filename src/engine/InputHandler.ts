@@ -22,13 +22,21 @@ export class InputHandler {
   private drag: DragState = { active: false, startX: 0, startY: 0, currentX: 0, currentY: 0 };
   private mouseDownPos: { x: number; y: number } | null = null;
 
-  onSelectionChange: (() => void) | null = null;
-  onMoveOrder:       (() => void) | null = null;
-  onBuildingClick:   ((buildingId: number) => void) | null = null;
-  onTerrainClick:    ((col: number, row: number) => void) | null = null;
-  onTerrainHover:    ((col: number, row: number) => void) | null = null;
+  onSelectionChange:  (() => void) | null = null;
+  onMoveOrder:        (() => void) | null = null;
+  onBuildingClick:    ((buildingId: number) => void) | null = null;
+  onTerrainClick:     ((col: number, row: number) => void) | null = null;
+  onTerrainHover:     ((col: number, row: number) => void) | null = null;
+  onAttackMove:       ((units: import('../game/Unit').Unit[], col: number, row: number) => void) | null = null;
+  onRallySet:         ((col: number, row: number) => void) | null = null;
 
-  private _placingMode = false;
+  private _placingMode    = false;
+  private _attackMoveMode = false;
+
+  setAttackMoveMode(on: boolean) {
+    this._attackMoveMode = on;
+    this.renderer.renderer.domElement.style.cursor = on ? 'crosshair' : '';
+  }
 
   constructor(renderer: Renderer, game: Game, camera: RTSCamera) {
     this.renderer     = renderer;
@@ -99,7 +107,12 @@ export class InputHandler {
     if (this.camera.rightClickWasDrag()) return;
 
     const selected = this.getSelectedUnits();
-    if (selected.length === 0) return;
+    if (selected.length === 0) {
+      // No units selected: right-click on terrain → set rally point
+      const hit = this.renderer.pickFromScreen(e.clientX, e.clientY);
+      if (hit?.type === 'tile') this.onRallySet?.(hit.col, hit.row);
+      return;
+    }
 
     const myUnits = selected.filter(u => u.playerId === this.game.humanPlayerId);
     if (myUnits.length === 0) return;
@@ -163,8 +176,17 @@ export class InputHandler {
 
     // Placement mode intercepts terrain clicks
     if (this._placingMode) {
+      if (hit?.type === 'tile') this.onTerrainClick?.(hit.col, hit.row);
+      return;
+    }
+
+    // Attack-move mode: issue attack-move order to selected units
+    if (this._attackMoveMode) {
+      this._attackMoveMode = false;
+      this.renderer.renderer.domElement.style.cursor = '';
       if (hit?.type === 'tile') {
-        this.onTerrainClick?.(hit.col, hit.row);
+        const myUnits = this.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId);
+        if (myUnits.length > 0) this.onAttackMove?.(myUnits, hit.col, hit.row);
       }
       return;
     }

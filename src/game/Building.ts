@@ -47,6 +47,15 @@ export class Building {
   // Attack capability (watchtower)
   attackTimer: number = 0;
 
+  // Rally point for spawned units
+  rallyCol: number | null = null;
+  rallyRow: number | null = null;
+
+  setRally(col: number, row: number) {
+    this.rallyCol = col;
+    this.rallyRow = row;
+  }
+
   mesh!: THREE.Group;
   private structure!: THREE.Group;
   progressBar!: THREE.Mesh;

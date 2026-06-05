@@ -21,10 +21,12 @@ export class CombatSystem {
     for (const unit of allUnits) {
       if (!unit.isAlive()) continue;
 
-      // If attacking, process combat
+      // Process active combat
       if (unit.state === UnitState.ATTACKING && unit.attackTarget) {
         const target = unit.attackTarget;
         if (!target.isAlive()) {
+          // Grant XP for the kill
+          unit.gainXP(25 + Math.floor(Math.random() * 15));
           unit.state        = UnitState.IDLE;
           unit.attackTarget = null;
           continue;
@@ -32,7 +34,6 @@ export class CombatSystem {
 
         const dist = unit.distanceTo(target);
         if (dist > unit.attackRange + 1.5) {
-          // Too far – move closer
           const path = findPath(map, unit.gridPos(), target.gridPos(), 200);
           if (path.length > 0) {
             unit.state     = UnitState.MOVING;
@@ -52,8 +53,8 @@ export class CombatSystem {
         }
       }
 
-      // Auto-aggro: find nearest enemy if idle
-      if (unit.state === UnitState.IDLE) {
+      // Auto-aggro for IDLE and ATTACK_MOVE units
+      if (unit.state === UnitState.IDLE || unit.state === UnitState.ATTACK_MOVE) {
         this.tryAutoAggro(unit, allUnits, map);
       }
     }
@@ -62,7 +63,9 @@ export class CombatSystem {
   }
 
   private tryAutoAggro(unit: Unit, allUnits: Unit[], map: GameMap) {
-    let nearestDist = unit.attackRange * 1.2;
+    // ATTACK_MOVE has wider scan range; IDLE only reacts to attack range
+    const scanRange = unit.state === UnitState.ATTACK_MOVE ? unit.sight : unit.attackRange * 1.2;
+    let nearestDist = scanRange;
     let nearest: Unit | null = null;
 
     for (const other of allUnits) {
