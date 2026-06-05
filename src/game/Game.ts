@@ -241,6 +241,7 @@ export class Game {
     building.finishedUnit = null;
     const player = this.players[building.playerId];
     if (!player) return;
+    if (player.aliveUnits.length >= this.getPopCap(player.id)) return; // pop cap
     const pos = this.map.findWalkableNear(building.col, building.row + 3, 6);
     if (!pos) return;
     const unit = new Unit(unitType, player.civType, player.id, pos[0], pos[1], CIV_COLORS[player.civType]);
@@ -330,6 +331,13 @@ export class Game {
         }
       }
     }
+  }
+
+  getPopCap(playerId: number): number {
+    const storehouses = this.allBuildings.filter(
+      b => b.playerId === playerId && b.type === BuildingType.STOREHOUSE && b.isComplete(),
+    ).length;
+    return 25 + storehouses * 5;
   }
 
   placeBuilding(type: BuildingType, col: number, row: number, playerId: number): boolean {
