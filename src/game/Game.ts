@@ -54,6 +54,8 @@ export class Game {
   humanPlayerId = 0;
   gameTime = 0;
   difficulty: 'easy' | 'normal' | 'hard' = 'normal';
+  pendingEventMessages: string[] = [];
+  private _eventTimer = 60 + Math.random() * 60;
   private _autoAttackTimer = 0;
   private _bonusTimer = 0;
 
@@ -247,6 +249,14 @@ export class Game {
       this.updatePatrol();
     }
 
+    // Random events
+    this.pendingEventMessages = [];
+    this._eventTimer -= dt;
+    if (this._eventTimer <= 0) {
+      this._eventTimer = 60 + Math.random() * 60;
+      this.fireRandomEvent();
+    }
+
     this.checkEndConditions();
   }
 
@@ -422,6 +432,67 @@ export class Game {
     return this.allBuildings.some(
       b => b.playerId === playerId && b.type === BuildingType.SETTLEMENT && b.isAlive(),
     );
+  }
+
+  private fireRandomEvent() {
+    const cap = 2000;
+    const human = this.humanPlayer;
+    const enemies = this.players.filter(p => p.id !== this.humanPlayerId);
+    const enemyBuildings = this.allBuildings.filter(b => b.playerId !== this.humanPlayerId && b.isAlive() && b.isComplete());
+
+    const events: Array<() => string | null> = [
+      // Positive resource events
+      () => { human.resources.food  = Math.min(cap, human.resources.food  + 100); return '🌿 ¡Cosecha abundante! +100 🌽 alimentos'; },
+      () => { human.resources.gold  = Math.min(cap, human.resources.gold  + 75);  return '⛏️ Veta de oro descubierta: +75 ⚜️ oro'; },
+      () => { human.resources.stone = Math.min(cap, human.resources.stone + 80);  return '🪨 Cantera hallada: +80 🪨 piedra'; },
+      // Reinforcements
+      () => {
+        if (human.aliveUnits.length >= this.getPopCap(this.humanPlayerId)) return null;
+        const settle = this.allBuildings.find(b => b.playerId === this.humanPlayerId && b.type === BuildingType.SETTLEMENT);
+        if (!settle) return null;
+        const pos = this.map.findWalkableNear(settle.col, settle.row + 3, 6);
+        if (!pos) return null;
+        const civDef = CIVILIZATIONS[human.civType];
+        const unitDef = civDef.units[0];
+        const unit = new Unit(unitDef.type, human.civType, this.humanPlayerId, pos[0], pos[1], CIV_COLORS[human.civType]);
+        human.addUnit(unit);
+        this.allUnits.push(unit);
+        this.newlySpawnedUnits.push(unit);
+        return `📣 ¡Refuerzos! Nuevo ${unitDef.name} se ha unido`;
+      },
+      // Lightning on enemy building
+      () => {
+        if (enemyBuildings.length === 0) return null;
+        const target = enemyBuildings[Math.floor(Math.random() * enemyBuildings.length)];
+        target.takeDamage(35);
+        if (!target.isAlive()) this.newlyDestroyedBuildings.push(target);
+        return '⚡ ¡Rayo divino alcanzó un edificio enemigo! -35 HP';
+      },
+      // Trade route
+      () => {
+        if (human.resources.food < 60) return null;
+        human.resources.food -= 60;
+        human.resources.gold  = Math.min(cap, human.resources.gold + 50);
+        return '🛶 Ruta comercial: -60 🌽 → +50 ⚜️ oro';
+      },
+      // Enemy desertion
+      () => {
+        if (enemies.length === 0) return null;
+        const enemy = enemies[Math.floor(Math.random() * enemies.length)];
+        if (enemy.aliveUnits.length === 0) return null;
+        const unit = enemy.aliveUnits[Math.floor(Math.random() * enemy.aliveUnits.length)];
+        unit.hp = 0;
+        unit['die']?.();
+        return '🏃 ¡Un guerrero enemigo desertó!';
+      },
+    ];
+
+    // Shuffle and try events until one succeeds
+    const shuffled = events.sort(() => Math.random() - 0.5);
+    for (const fn of shuffled) {
+      const msg = fn();
+      if (msg) { this.pendingEventMessages.push(msg); return; }
+    }
   }
 
   private updatePatrol() {
