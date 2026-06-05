@@ -422,6 +422,12 @@ class GameInstance {
       this._lastSettlementHp = humanSettlement.hp;
     }
 
+    // Random events
+    for (const msg of this.game.pendingEventMessages) {
+      this.hud.notify(msg, 'info');
+      this.audio.playBuild(); // light chime for events
+    }
+
     this.hud.update(this.input.getSelectedUnits());
     this.renderer.render();
 
