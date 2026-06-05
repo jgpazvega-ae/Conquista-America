@@ -50,10 +50,15 @@ export class AISystem {
       state.trainTimer  += dt;
       state.phaseTimer  += dt;
 
-      // Phase-based attack logic
+      // Difficulty scaling: intervals shrink and rally cap grows with game time
+      const elapsed  = game.gameTime;
+      const scale    = Math.max(0.5, 1.0 - elapsed / 600); // down to 50% at 10 min
+      const rallyCap = 15 + Math.floor(elapsed / 60) * 2;  // +2 units per minute
+
+      // Phase-based attack logic (thresholds use scale factor)
       if (state.phase === 'gathering') {
         this.rallyTroops(player, game);
-        if (state.phaseTimer >= GATHER_DURATION || player.aliveUnits.length >= 15) {
+        if (state.phaseTimer >= GATHER_DURATION * scale || player.aliveUnits.length >= rallyCap) {
           state.phase = 'attacking';
           state.phaseTimer = 0;
         }
@@ -66,7 +71,7 @@ export class AISystem {
         }
       }
 
-      if (state.buildTimer >= AI_BUILD_INTERVAL && player.resources.stone >= 50) {
+      if (state.buildTimer >= AI_BUILD_INTERVAL * scale && player.resources.stone >= 50) {
         state.buildTimer = 0;
         this.orderConstruction(player, game);
       }
@@ -76,7 +81,7 @@ export class AISystem {
         this.commandWorkers(player, game);
       }
 
-      if (state.trainTimer >= AI_TRAIN_INTERVAL) {
+      if (state.trainTimer >= AI_TRAIN_INTERVAL * scale) {
         state.trainTimer = 0;
         this.orderTraining(player, game);
       }

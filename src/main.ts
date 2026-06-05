@@ -102,9 +102,10 @@ class GameInstance {
   private killCount   = 0;
   private builtCount  = 0;
   private endHandled  = false;
-  private unitGroups  = new Map<number, number[]>();
+  private unitGroups    = new Map<number, number[]>();
   private _placingType: BuildingType | null = null;
   private _panelBuilding: import('./game/Building').Building | null = null;
+  private _unitLevels   = new Map<number, number>(); // track XP level-ups for audio
 
   constructor(civ: CivilizationType, saveSystem: SaveSystem) {
     this.civ        = civ;
@@ -326,6 +327,16 @@ class GameInstance {
       }
     }
 
+    // Level-up audio detection for human player units
+    for (const u of this.game.humanPlayer.aliveUnits) {
+      const prev = this._unitLevels.get(u.id) ?? 1;
+      if (u.level > prev) {
+        this.audio.playLevelUp();
+        this.hud.notify(`⭐ ${u.def.name} subió al nivel ${u.level}`, 'success');
+      }
+      this._unitLevels.set(u.id, u.level);
+    }
+
     this.hud.update(this.input.getSelectedUnits());
     this.renderer.render();
 
@@ -430,6 +441,15 @@ class GameInstance {
       document.getElementById('app')!.classList.add('hidden');
       window.location.reload();
     };
+
+    // Controls overlay (? key or close button)
+    const overlay = document.getElementById('controls-overlay');
+    document.getElementById('controls-close')?.addEventListener('click', () => {
+      overlay?.classList.add('hidden');
+    });
+    overlay?.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.classList.add('hidden');
+    });
   }
 
   private bindMobileButtons() {
@@ -514,6 +534,12 @@ class GameInstance {
           this.input.setAttackMoveMode(true);
           this.hud.notify('⚔️ Attack-move: clic en el destino', 'info');
         }
+        return;
+      }
+      // ?: toggle controls overlay
+      if (e.key === '?' || e.code === 'Slash' && e.shiftKey) {
+        const overlay = document.getElementById('controls-overlay');
+        overlay?.classList.toggle('hidden');
         return;
       }
       // B: open build panel for human settlement
