@@ -47,6 +47,7 @@ export class Game {
   damageEvents: DamageEvent[] = [];
   newlySpawnedUnits: Unit[] = [];
   status: GameStatus = 'PLAYING';
+  paused = false;
   humanPlayerId = 0;
   gameTime = 0;
   private _autoAttackTimer = 0;
@@ -185,7 +186,7 @@ export class Game {
   }
 
   update(dt: number) {
-    if (this.status !== 'PLAYING') return;
+    if (this.status !== 'PLAYING' || this.paused) return;
 
     this.gameTime += dt;
 
