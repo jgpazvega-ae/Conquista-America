@@ -158,6 +158,8 @@ export class RTSCamera {
   getZoom(): number { return this.zoom; }
   setZoom(z: number) { this.zoom = THREE.MathUtils.clamp(z, CAMERA_ZOOM_MIN, CAMERA_ZOOM_MAX); }
 
+  getPosition(): { x: number; z: number } { return { x: this.currentX, z: this.currentZ }; }
+
   /** Translate screen pixel delta → world pan (called from TouchHandler & right-drag) */
   panByPixels(dx: number, dy: number) {
     const fovH = (this.camera.fov * Math.PI / 180) * this.camera.aspect;

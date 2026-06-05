@@ -26,6 +26,7 @@ export class InputHandler {
   onMoveOrder:       (() => void) | null = null;
   onBuildingClick:   ((buildingId: number) => void) | null = null;
   onTerrainClick:    ((col: number, row: number) => void) | null = null;
+  onTerrainHover:    ((col: number, row: number) => void) | null = null;
 
   private _placingMode = false;
 
@@ -54,6 +55,12 @@ export class InputHandler {
   }
 
   private onMouseMove(e: MouseEvent) {
+    // Ghost preview hover
+    if (this._placingMode && this.onTerrainHover) {
+      const hit = this.renderer.pickFromScreen(e.clientX, e.clientY);
+      if (hit?.type === 'tile') this.onTerrainHover(hit.col, hit.row);
+    }
+
     if (!this.mouseDownPos || e.buttons !== 1) return;
     const dx = e.clientX - this.drag.startX;
     const dy = e.clientY - this.drag.startY;

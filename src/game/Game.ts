@@ -49,6 +49,7 @@ export class Game {
   humanPlayerId = 0;
   gameTime = 0;
   private _autoAttackTimer = 0;
+  private _bonusTimer = 0;
 
   constructor(humanCiv: CivilizationType = CivilizationType.AZTEC) {
     this.map = new GameMap(12345);
@@ -219,6 +220,8 @@ export class Game {
 
     this.economy.update(dt, this);
 
+    this.applyBuildingBonuses(dt);
+
     this.fog.update(this);
 
     this.aiSystem.update(dt, this);
@@ -292,6 +295,32 @@ export class Game {
           worldZ: nearest.worldZ,
         });
         b.attackTimer = TOWER_COOLDOWN;
+      }
+    }
+  }
+
+  private applyBuildingBonuses(dt: number) {
+    this._bonusTimer += dt;
+    if (this._bonusTimer < 3.0) return;
+    this._bonusTimer = 0;
+
+    for (const player of this.players) {
+      const hasTemple = this.allBuildings.some(
+        b => b.playerId === player.id && b.type === BuildingType.TEMPLE && b.isComplete()
+      );
+      const hasForge = this.allBuildings.some(
+        b => b.playerId === player.id && b.type === BuildingType.FORGE && b.isComplete()
+      );
+
+      for (const unit of player.aliveUnits) {
+        if (hasTemple && unit.hp < unit.maxHp) {
+          unit.hp = Math.min(unit.maxHp, unit.hp + 2);
+        }
+        if (hasForge) {
+          // Mark unit as forge-buffed for combat (attack up to 125% of base)
+          const cap = Math.round(unit.def.stats.attack * 1.25);
+          if (unit.attack < cap) unit.attack = Math.min(cap, unit.attack + 1);
+        }
       }
     }
   }

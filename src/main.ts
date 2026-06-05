@@ -17,7 +17,7 @@ import { ProductionPanel } from './ui/ProductionPanel';
 import { TRAIN_COSTS } from './game/unitProduction';
 import { BuildingType } from './game/buildings';
 import { BUILDING_DEFS } from './game/buildingDefs';
-import { TILE_SIZE } from './game/constants';
+import { TILE_SIZE, CIV_COLORS } from './game/constants';
 
 // ── Historical facts shown during loading ─────────────────────────────────────
 const LOADING_FACTS = [
@@ -117,6 +117,7 @@ class GameInstance {
     this.renderer = new Renderer(canvas);
     this.hud      = new HUD(this.game);
     this.camera   = new RTSCamera(this.renderer.camera);
+    this.hud.setCamera(this.camera);
     this.input    = new InputHandler(this.renderer, this.game, this.camera);
     this.touch    = new TouchHandler(this.camera, this.renderer, this.game);
     this.audio     = new AudioManager();
@@ -156,14 +157,22 @@ class GameInstance {
         const def = BUILDING_DEFS[btype];
         this._placingType = btype;
         this.input.setPlacingMode(true);
+        // Show ghost preview in civ color
+        const civColor = this.game.humanPlayer.civType;
+        this.renderer.showGhost(CIV_COLORS[civColor]);
         this.hud.notify(`🏗️ Coloca el ${def.name} — clic derecho para cancelar`, 'info');
       };
+    };
+
+    this.input.onTerrainHover = (col, row) => {
+      if (this._placingType) this.renderer.updateGhostAt(col, row);
     };
 
     this.input.onTerrainClick = (col, row) => {
       if (!this._placingType) return;
       const btype = this._placingType;
       this._cancelPlacing();
+      this.renderer.hideGhost();
       if (isNaN(col)) return; // right-click cancel
       const ok = this.game.placeBuilding(btype, col, row, this.game.humanPlayerId);
       if (ok) {
@@ -508,6 +517,7 @@ class GameInstance {
   private _cancelPlacing() {
     this._placingType = null;
     this.input.setPlacingMode(false);
+    this.renderer.hideGhost();
   }
 
   private showRandomFact() {
