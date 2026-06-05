@@ -19,6 +19,7 @@ import { BuildingType } from './game/buildings';
 import { BUILDING_DEFS } from './game/buildingDefs';
 import { TILE_SIZE, CIV_COLORS } from './game/constants';
 import { findPath } from './game/Pathfinding';
+import { WorkerTask } from './game/Worker';
 
 // ── Historical facts shown during loading ─────────────────────────────────────
 const LOADING_FACTS = [
@@ -110,6 +111,7 @@ class GameInstance {
   private _lastSettlementWarnAt = 0;
   private _lastSettlementHp     = -1;
   private _enemyBuildingsDestroyed = 0;
+  private _gameSpeed = 1.0;
 
   constructor(civ: CivilizationType, saveSystem: SaveSystem) {
     this.civ        = civ;
@@ -279,7 +281,7 @@ class GameInstance {
     if (this.destroyed) return;
     this.animId = requestAnimationFrame(() => this.loop());
 
-    const dt = Math.min(this.clock.getDelta(), 0.1);
+    const dt = Math.min(this.clock.getDelta(), 0.1) * this._gameSpeed;
 
     this.game.update(dt);
 
@@ -620,6 +622,22 @@ class GameInstance {
         overlay?.classList.toggle('hidden');
         return;
       }
+      // Q: auto-assign idle workers to nearest resource
+      if (e.code === 'KeyQ' && !e.ctrlKey && !e.altKey) {
+        this.autoAssignWorkers();
+        return;
+      }
+      // + / = : speed up;  - : slow down
+      if (e.key === '+' || e.key === '=') {
+        this._gameSpeed = Math.min(3.0, parseFloat((this._gameSpeed + 0.5).toFixed(1)));
+        this.hud.notify(`⏩ Velocidad ${this._gameSpeed}x`, 'info');
+        return;
+      }
+      if (e.key === '-' || e.key === '_') {
+        this._gameSpeed = Math.max(0.5, parseFloat((this._gameSpeed - 0.5).toFixed(1)));
+        this.hud.notify(`⏪ Velocidad ${this._gameSpeed}x`, 'info');
+        return;
+      }
       // B: open build panel for human settlement
       if (e.code === 'KeyB' && !e.ctrlKey && !e.altKey) {
         const settlement = this.game.allBuildings.find(
@@ -668,6 +686,39 @@ class GameInstance {
     this._placingType = null;
     this.input.setPlacingMode(false);
     this.renderer.hideGhost();
+  }
+
+  private autoAssignWorkers() {
+    const map = this.game.map;
+    const workers = this.game.allWorkers.filter(
+      w => w.playerId === this.game.humanPlayerId && w.task === WorkerTask.IDLE,
+    );
+    if (workers.length === 0) {
+      this.hud.notify('Todos los trabajadores están ocupados', 'info');
+      return;
+    }
+    let assigned = 0;
+    for (const worker of workers) {
+      let nearestNode = null;
+      let nearestDist = Infinity;
+      for (const node of this.game.resourceNodes) {
+        if (node.isEmpty()) continue;
+        const d = Math.sqrt((worker.col - node.col) ** 2 + (worker.row - node.row) ** 2);
+        if (d < nearestDist) { nearestDist = d; nearestNode = node; }
+      }
+      if (!nearestNode) continue;
+      const path = findPath(map, { col: worker.col, row: worker.row }, { col: nearestNode.col, row: nearestNode.row }, 200);
+      if (path.length > 0) {
+        worker.path = path;
+        worker.pathIndex = 0;
+        worker.task = WorkerTask.MOVING;
+        assigned++;
+      }
+    }
+    if (assigned > 0) {
+      this.hud.notify(`👷 ${assigned} trabajador${assigned > 1 ? 'es' : ''} enviado${assigned > 1 ? 's' : ''} a recolectar`, 'success');
+      this.audio.playMove();
+    }
   }
 
   private showRandomFact() {
