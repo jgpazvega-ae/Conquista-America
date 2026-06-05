@@ -358,16 +358,24 @@ export class Game {
     return true;
   }
 
+  private hasSettlement(playerId: number): boolean {
+    return this.allBuildings.some(
+      b => b.playerId === playerId && b.type === BuildingType.SETTLEMENT && b.isAlive(),
+    );
+  }
+
   private checkEndConditions() {
     const human = this.humanPlayer;
     const enemies = this.players.filter(p => p.id !== this.humanPlayerId);
 
-    if (human.isDefeated()) {
+    // Defeat: human settlement destroyed (units may survive but can't retrain)
+    if (!this.hasSettlement(this.humanPlayerId)) {
       this.status = 'DEFEAT';
       return;
     }
 
-    if (enemies.every(p => p.isDefeated())) {
+    // Victory: all enemy settlements destroyed
+    if (enemies.every(p => !this.hasSettlement(p.id))) {
       this.status = 'VICTORY';
     }
   }

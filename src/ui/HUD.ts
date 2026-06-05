@@ -4,6 +4,7 @@ import type { GameMap } from '../game/Map';
 import { TERRAIN_COLORS, CIV_COLORS, CIV_NAMES, CIV_EMOJIS, TILE_SIZE } from '../game/constants';
 import type { DamageEvent } from '../game/CombatSystem';
 import { TileVisibility } from '../game/FogOfWar';
+import { ResourceType } from '../game/ResourceNode';
 
 function hex(n: number): string {
   return '#' + n.toString(16).padStart(6, '0');
@@ -151,6 +152,24 @@ export class HUD {
       `<span>🛡️ ${unit.defense}</span>` +
       `<span>💨 ${unit.speed.toFixed(1)}</span>` +
       `<span>🎯 ${unit.attackRange.toFixed(1)}</span>`;
+
+    // XP bar (only if unit can still level up)
+    const xpEl = document.getElementById('unit-xp-row');
+    if (xpEl) {
+      if (unit.level < 3) {
+        const needed = unit.level === 1 ? 50 : 150;
+        const xpPct  = Math.min(100, (unit.xp / needed) * 100);
+        const stars  = unit.level === 1 ? '☆☆' : '★☆';
+        xpEl.innerHTML =
+          `<span class="xp-label">Nv.${unit.level} ${stars}</span>` +
+          `<div class="xp-track"><div class="xp-fill" style="width:${xpPct}%"></div></div>` +
+          `<span class="xp-num">${unit.xp}/${needed}</span>`;
+        xpEl.classList.remove('hidden');
+      } else {
+        xpEl.innerHTML = `<span class="xp-label">★★ Máx.</span>`;
+        xpEl.classList.remove('hidden');
+      }
+    }
   }
 
   private updateMinimap() {
@@ -206,6 +225,22 @@ export class HUD {
       ctx.fill();
     }
     ctx.globalAlpha = 1.0;
+
+    // Draw resource nodes (only visible/fogged tiles)
+    const nodeSize = Math.max(1.5, Math.min(tw, th));
+    for (const node of this.game.resourceNodes) {
+      if (node.isEmpty()) continue;
+      const vis = humanFog?.getVisibility(node.col, node.row);
+      if (vis === TileVisibility.UNEXPLORED) continue;
+      // Food=green, Gold=yellow, Stone=grey
+      const nodeColor = node.type === ResourceType.FOOD ? 'rgba(80,220,80,0.7)'
+                      : node.type === ResourceType.GOLD ? 'rgba(255,200,40,0.7)'
+                      : 'rgba(180,180,180,0.7)';
+      ctx.fillStyle = nodeColor;
+      ctx.beginPath();
+      ctx.arc(node.col * tw + tw / 2, node.row * th + th / 2, nodeSize / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     // Fog of war overlay on minimap
     if (humanFog) {
