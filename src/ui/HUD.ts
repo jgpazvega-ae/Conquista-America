@@ -121,7 +121,13 @@ export class HUD {
     } else if (selectedUnits.length > 1) {
       this.unitPanel.classList.add('hidden');
       this.elSelCount.classList.remove('hidden');
-      this.elSelCount.textContent = `${selectedUnits.length} unidades seleccionadas`;
+      const byType = new Map<string, { count: number; emoji: string }>();
+      for (const u of selectedUnits) {
+        if (!byType.has(u.def.name)) byType.set(u.def.name, { count: 0, emoji: u.def.emoji });
+        byType.get(u.def.name)!.count++;
+      }
+      const parts = [...byType.entries()].map(([, v]) => `${v.emoji}×${v.count}`).join(' ');
+      this.elSelCount.textContent = `${selectedUnits.length} unidades  ${parts}`;
     } else {
       this.unitPanel.classList.add('hidden');
       this.elSelCount.classList.add('hidden');
