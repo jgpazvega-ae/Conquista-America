@@ -154,6 +154,10 @@ class GameInstance {
       }
     };
 
+    this.input.onPatrolSet = () => {
+      this.hud.notify('🔄 Patrulla establecida — Shift+clic der.', 'info');
+    };
+
     this.input.onAttackMove = (units, col, row) => {
       const map = this.game.map;
       for (const [i, unit] of units.entries()) {
@@ -315,10 +319,19 @@ class GameInstance {
 
     // Track destroyed enemy buildings
     for (const b of this.game.newlyDestroyedBuildings) {
+      this.audio.playBuildingDestroyed();
       if (b.playerId !== this.game.humanPlayerId) {
         this._enemyBuildingsDestroyed++;
         if (b.type === BuildingType.SETTLEMENT) {
           this.hud.notify('🏚️ ¡Asentamiento enemigo destruido!', 'success');
+        } else {
+          this.hud.notify('💥 Edificio enemigo destruido', 'success');
+        }
+      } else {
+        if (b.type === BuildingType.SETTLEMENT) {
+          this.hud.notify('💀 ¡Tu asentamiento ha sido destruido!', 'warning');
+        } else {
+          this.hud.notify('🔥 Tu edificio ha sido destruido', 'warning');
         }
       }
     }

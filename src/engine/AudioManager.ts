@@ -164,6 +164,15 @@ export class AudioManager {
     scheduleChatter();
   }
 
+  playBuildingDestroyed() {
+    // Deep crumble + rumble
+    this.noise(0.60, 0.40, 350);
+    this.noise(0.35, 0.28, 800, 0.05);
+    this.osc(80,  'sawtooth', 0.50, 0.22, 0,  30);
+    this.osc(50,  'sine',     0.70, 0.18, 0.1, 25);
+    this.osc(160, 'sawtooth', 0.20, 0.10, 0.02, 60);
+  }
+
   playLevelUp() {
     // Ascending arpeggio: C4-E4-G4-C5
     [262, 330, 392, 524].forEach((f, i) => this.osc(f, 'sine',     0.22, 0.22, i * 0.09));
