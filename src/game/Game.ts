@@ -13,7 +13,7 @@ import { EconomyManager } from './EconomyManager';
 import { DiplomacyManager } from './Diplomacy';
 import { FogOfWarManager } from './FogOfWar';
 import { CIVILIZATIONS } from './civilizations';
-import { CIV_COLORS } from './constants';
+import { CIV_COLORS, TILE_SIZE } from './constants';
 import type { DamageEvent } from './CombatSystem';
 import { BuildingType } from './buildings';
 import { BUILDING_DEFS } from './buildingDefs';
@@ -217,6 +217,7 @@ export class Game {
     this.damageEvents = this.combat.update(this.allUnits, this.map);
 
     this.updateTowerAttacks(dt);
+    this.updateUnitBuildingAttacks(dt);
 
     this.resourceSys.update(this);
 
@@ -261,7 +262,7 @@ export class Game {
     for (const unit of this.allUnits) {
       if (!unit.isAlive()) continue;
       if (unit.state !== UnitState.IDLE) continue;
-      if (unit.attackTarget !== null) continue;
+      if (unit.attackTarget !== null || unit.attackBuildingTarget !== null) continue;
 
       let best: Unit | null = null;
       let bestDist = unit.sight;
@@ -270,7 +271,17 @@ export class Game {
         const d = unit.distanceTo(enemy);
         if (d < bestDist) { bestDist = d; best = enemy; }
       }
-      if (best) unit.attackUnit(best);
+      if (best) { unit.attackUnit(best); continue; }
+
+      // No enemies nearby: auto-attack enemy buildings within sight
+      let bestBldg: Building | null = null;
+      let bestBldgDist = unit.sight * 0.8; // slightly shorter range for buildings
+      for (const b of this.allBuildings) {
+        if (!b.isAlive() || b.playerId === unit.playerId) continue;
+        const d = Math.sqrt((unit.col - b.col) ** 2 + (unit.row - b.row) ** 2);
+        if (d < bestBldgDist) { bestBldgDist = d; bestBldg = b; }
+      }
+      if (bestBldg) unit.attackBuilding(bestBldg);
     }
   }
 
@@ -305,6 +316,42 @@ export class Game {
         });
         b.attackTimer = TOWER_COOLDOWN;
       }
+    }
+  }
+
+  private updateUnitBuildingAttacks(dt: number) {
+    for (const unit of this.allUnits) {
+      if (!unit.isAlive() || !unit.attackBuildingTarget) continue;
+      const bldg = unit.attackBuildingTarget;
+      if (!bldg.isAlive()) { unit.attackBuildingTarget = null; unit.state = UnitState.IDLE; continue; }
+
+      const dist = Math.sqrt((unit.col - bldg.col) ** 2 + (unit.row - bldg.row) ** 2);
+      if (dist > unit.attackRange + 0.5) {
+        // Move toward building
+        const path = findPath(this.map, unit.gridPos(), { col: bldg.col, row: bldg.row }, 400);
+        if (path.length > 0) {
+          unit.path      = path;
+          unit.pathIndex = 0;
+          unit.state     = UnitState.MOVING;
+        }
+        continue;
+      }
+
+      // In range: attack on cooldown
+      unit.attackTimer -= dt;
+      if (unit.attackTimer > 0) continue;
+      unit.attackTimer = unit.attackCooldown;
+
+      const rawDmg = Math.max(1, unit.attack - 5); // buildings have some armor
+      bldg.takeDamage(rawDmg);
+      this.damageEvents.push({
+        attacker: unit,
+        target: unit as any,
+        damage: rawDmg,
+        worldX: bldg.col * TILE_SIZE,
+        worldZ: bldg.row * TILE_SIZE,
+      });
+      unit.triggerAttackAnim();
     }
   }
 
