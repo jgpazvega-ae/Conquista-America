@@ -32,8 +32,9 @@ export class HUD {
 
   private minimapBuilt = false;
   private minimapBase: ImageData | null = null;
-  private elTimer = document.getElementById('game-timer');
-  private elPop   = document.getElementById('pop-count');
+  private elTimer     = document.getElementById('game-timer');
+  private elPop       = document.getElementById('pop-count');
+  private elScoreboard = document.getElementById('scoreboard')!
 
   onMinimapClick: ((worldX: number, worldZ: number) => void) | null = null;
   private _combatPings: { col: number; row: number; ts: number }[] = [];
@@ -137,6 +138,26 @@ export class HUD {
 
     // Minimap units
     this.updateMinimap();
+    this.updateScoreboard();
+  }
+
+  private updateScoreboard() {
+    const html = this.game.players.map(p => {
+      const settle = this.game.allBuildings.find(
+        b => b.playerId === p.id && b.type === BuildingType.SETTLEMENT,
+      );
+      const hpPct = settle?.isAlive() ? (settle.hp / settle.maxHp) * 100 : 0;
+      const hpColor = hpPct > 50 ? '#22dd55' : hpPct > 25 ? '#ddaa00' : '#dd2222';
+      const pop = p.aliveUnits.length;
+      const label = p.isHuman ? '(Tú)' : CIV_NAMES[p.civType].slice(0, 6);
+      return `<div class="sb-row">
+        <span class="sb-emoji">${CIV_EMOJIS[p.civType]}</span>
+        <span class="sb-name" style="color:${hex(CIV_COLORS[p.civType])}">${label}</span>
+        <span class="sb-pop">👥${pop}</span>
+        <div class="sb-hp-wrap"><div class="sb-hp-fill" style="width:${hpPct}%;background:${hpColor}"></div></div>
+      </div>`;
+    }).join('');
+    this.elScoreboard.innerHTML = html;
   }
 
   private showUnitInfo(unit: Unit) {

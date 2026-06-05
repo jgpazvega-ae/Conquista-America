@@ -571,6 +571,23 @@ input.toggle { width: 22px; height: 22px; accent-color: #d4880a; }
 .mob-btn:active { transform: scale(0.94); }
 
 /* Controls hint */
+/* Player scoreboard */
+#scoreboard {
+  position: absolute; top: 56px; right: 8px; z-index: 110;
+  display: flex; flex-direction: column; gap: 3px;
+  pointer-events: none;
+}
+.sb-row {
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(10,6,2,0.75); border: 1px solid rgba(200,160,80,0.15);
+  border-radius: 5px; padding: 3px 7px; font-size: 11px;
+}
+.sb-emoji { font-size: 13px; }
+.sb-name  { color: #c8a060; min-width: 48px; }
+.sb-pop   { color: #a0c0e0; min-width: 30px; font-size: 10px; }
+.sb-hp-wrap { width: 48px; height: 5px; background: rgba(255,255,255,0.12); border-radius: 3px; overflow: hidden; }
+.sb-hp-fill { height: 100%; border-radius: 3px; transition: width 0.4s; }
+
 #controls-hint {
   position: absolute; top: 56px; left: 50%; transform: translateX(-50%);
   background: rgba(20,12,4,0.8); border: 1px solid rgba(200,160,80,0.2);

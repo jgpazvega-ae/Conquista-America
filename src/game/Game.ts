@@ -244,6 +244,7 @@ export class Game {
     if (this._autoAttackTimer >= 0.3) {
       this._autoAttackTimer = 0;
       this.runAutoAttack();
+      this.updatePatrol();
     }
 
     this.checkEndConditions();
@@ -421,6 +422,25 @@ export class Game {
     return this.allBuildings.some(
       b => b.playerId === playerId && b.type === BuildingType.SETTLEMENT && b.isAlive(),
     );
+  }
+
+  private updatePatrol() {
+    for (const unit of this.allUnits) {
+      if (!unit.isAlive() || !unit.patrolA || !unit.patrolB) continue;
+      if (unit.state !== UnitState.IDLE) continue;
+      const target = unit.patrolFlip ? unit.patrolA : unit.patrolB;
+      const atTarget = Math.abs(unit.col - target.col) <= 1 && Math.abs(unit.row - target.row) <= 1;
+      if (atTarget) {
+        unit.patrolFlip = !unit.patrolFlip;
+      } else {
+        const path = findPath(this.map, unit.gridPos(), target, 200);
+        if (path.length > 0) {
+          unit.path      = path;
+          unit.pathIndex = 0;
+          unit.state     = UnitState.MOVING;
+        }
+      }
+    }
   }
 
   private checkEndConditions() {
