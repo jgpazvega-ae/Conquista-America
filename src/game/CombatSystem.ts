@@ -1,8 +1,18 @@
-import { UnitState } from './types';
+import { UnitState, TerrainType } from './types';
 import type { Unit } from './Unit';
 import type { GameMap } from './Map';
 import { findPath } from './Pathfinding';
 import { getDamageMultiplier } from './UnitBalancing';
+
+function terrainDefenseBonus(terrain: TerrainType | undefined): number {
+  switch (terrain) {
+    case TerrainType.JUNGLE:    return 4;
+    case TerrainType.HIGHLAND:  return 3;
+    case TerrainType.MOUNTAIN:  return 5;
+    case TerrainType.DESERT:    return -1;
+    default:                    return 0;
+  }
+}
 
 export interface DamageEvent {
   attacker: Unit | null;
@@ -47,6 +57,8 @@ export class CombatSystem {
           let dmg = unit.attack + Math.floor(Math.random() * 6) - 3;
           const multiplier = getDamageMultiplier(unit.type, target.type);
           dmg = Math.round(dmg * multiplier);
+          const tile = map.getTile(target.col, target.row);
+          dmg = Math.max(1, dmg - terrainDefenseBonus(tile?.terrain));
           const actual = target.takeDamage(dmg);
           unit.attackTimer = unit.attackCooldown;
           this.events.push({ attacker: unit, target, damage: actual, worldX: target.worldX, worldZ: target.worldZ });
