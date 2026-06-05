@@ -1,5 +1,6 @@
 import { CivilizationType, UnitState } from './types';
 import { GameMap } from './Map';
+import { findPath } from './Pathfinding';
 import { Unit } from './Unit';
 import { Building } from './Building';
 import { Worker } from './Worker';
@@ -246,6 +247,12 @@ export class Game {
     player.addUnit(unit);
     this.allUnits.push(unit);
     this.newlySpawnedUnits.push(unit);
+
+    // March to rally point if set
+    if (building.rallyCol !== null && building.rallyRow !== null) {
+      const path = findPath(this.map, unit.gridPos(), { col: building.rallyCol, row: building.rallyRow }, 400);
+      if (path.length > 0) unit.moveTo(path);
+    }
   }
 
   private runAutoAttack() {

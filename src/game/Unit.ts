@@ -43,6 +43,10 @@ export class Unit {
   attackTarget: Unit | null = null;
   attackTimer: number = 0;
 
+  // XP / leveling
+  xp:    number = 0;
+  level: number = 1;
+
   moveX: number = 0;
   moveZ: number = 0;
   moveProgress: number = 1;
@@ -53,10 +57,11 @@ export class Unit {
   private rightArm: THREE.Group | null = null;
   healthBar!: THREE.Mesh;
   selectionRing!: THREE.Mesh;
+  private _levelRing: THREE.Mesh | null = null;
   private selected    = false;
   private animT       = Math.random() * 10;
   private attackAnim  = 0;
-  private _deathTimer = -1; // -1 = not dying; ≥0 = falling animation
+  private _deathTimer = -1;
 
   constructor(
     type: UnitType, civ: CivilizationType, playerId: number,
@@ -667,11 +672,13 @@ export class Unit {
     this.attackTimer = Math.max(0, this.attackTimer - dt);
     this.animT += dt;
 
-    if (this.state === UnitState.MOVING) this.updateMovement(dt, map);
+    if (this.state === UnitState.MOVING || this.state === UnitState.ATTACK_MOVE) {
+      this.updateMovement(dt, map);
+    }
 
     if (this.rig) {
       // Bob / lean while moving, gentle breath at idle
-      if (this.state === UnitState.MOVING) {
+      if (this.state === UnitState.MOVING || this.state === UnitState.ATTACK_MOVE) {
         this.rig.position.y = Math.abs(Math.sin(this.animT * 11)) * 0.07;
         this.rig.rotation.z = Math.sin(this.animT * 11) * 0.04;
       } else {
@@ -689,7 +696,7 @@ export class Unit {
 
     // Arm swing when walking
     if (this.leftArm && this.rightArm) {
-      if (this.state === UnitState.MOVING) {
+      if (this.state === UnitState.MOVING || this.state === UnitState.ATTACK_MOVE) {
         const swing = Math.sin(this.animT * 11) * 0.42;
         this.leftArm.rotation.x  =  swing;
         this.rightArm.rotation.x = -swing;
@@ -705,7 +712,10 @@ export class Unit {
   }
 
   private updateMovement(dt: number, _map: GameMap) {
-    if (this.pathIndex >= this.path.length) { this.state = UnitState.IDLE; return; }
+    if (this.pathIndex >= this.path.length) {
+      this.state = UnitState.IDLE;
+      return;
+    }
 
     const target = this.path[this.pathIndex];
     const tx = target.col * TILE_SIZE;
@@ -725,5 +735,42 @@ export class Unit {
       this.worldZ += (dz / dist) * step;
       this.mesh.rotation.y = Math.atan2(dx, dz);
     }
+  }
+
+  /** Issue an attack-move command: unit moves along path, auto-attacks anything in range. */
+  attackMove(path: GridPos[]) {
+    this.path        = path;
+    this.pathIndex   = 0;
+    this.attackTarget = null;
+    this.state       = UnitState.ATTACK_MOVE;
+  }
+
+  /** Award XP and level up if threshold reached. */
+  gainXP(amount: number) {
+    if (this.level >= 3) return;
+    this.xp += amount;
+    const needed = this.level === 1 ? 50 : 150;
+    if (this.xp >= needed) this.levelUp();
+  }
+
+  private levelUp() {
+    this.level++;
+    this.attack  = Math.round(this.attack  * 1.15);
+    this.defense = Math.round(this.defense * 1.15);
+    this.maxHp   = Math.round(this.maxHp   * 1.10);
+    this.hp      = this.maxHp;
+    this.refreshLevelRing();
+  }
+
+  private refreshLevelRing() {
+    if (this._levelRing) { this.mesh.remove(this._levelRing); this._levelRing = null; }
+    if (this.level < 2) return;
+    const color = this.level >= 3 ? 0xff7700 : 0xffdd00;
+    const mat   = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.75, depthTest: false });
+    this._levelRing = new THREE.Mesh(new THREE.RingGeometry(0.68, 0.84, 32), mat);
+    this._levelRing.rotation.x = -Math.PI / 2;
+    this._levelRing.position.y = 0.04;
+    this._levelRing.renderOrder = 9;
+    this.mesh.add(this._levelRing);
   }
 }
