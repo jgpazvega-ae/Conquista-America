@@ -256,11 +256,20 @@
       <!-- Controls hint -->
       <div id="controls-hint">
         📱 <b>Móvil:</b> Toca para seleccionar · Doble toque/mantén para mover/atacar · Pellizca zoom &nbsp;|&nbsp;
-        🖥️ <b>PC:</b> Clic izq. seleccionar · Arrastra selección múltiple · Clic der. mover/atacar · Arrastrar der. cámara · WASD/flechas cámara · Rueda zoom · <b>Esc</b> deseleccionar · <b>Espacio</b> parar · <b>F</b> centrar · <b>Ctrl+A</b> todo · <b>A</b> attack-move · <b>B</b> construir · <b>?</b> ayuda completa
+        🖥️ <b>PC:</b> Clic izq. seleccionar · Arrastra selección múltiple · Clic der. mover/atacar · Arrastrar der. cámara · WASD/flechas cámara · Rueda zoom · <b>Esc</b> deseleccionar · <b>Espacio</b> parar · <b>P</b> pausar · <b>F</b> centrar · <b>Ctrl+A</b> todo · <b>A</b> attack-move · <b>B</b> construir · <b>?</b> ayuda
       </div>
 
       <!-- Selection box overlay -->
       <div id="selection-box"></div>
+
+      <!-- Pause overlay -->
+      <div id="pause-overlay" class="hidden">
+        <div class="pause-card">
+          <div class="pause-icon">⏸</div>
+          <div class="pause-title">PAUSA</div>
+          <div class="pause-hint">Pulsa <kbd>P</kbd> para continuar</div>
+        </div>
+      </div>
 
       <!-- Production panel -->
       <div id="production-panel" class="hidden">
@@ -320,6 +329,7 @@
               <div class="controls-heading">Grupos</div>
               <div class="controls-row"><kbd>Ctrl+1-5</kbd><span>Guardar grupo</span></div>
               <div class="controls-row"><kbd>1-5</kbd><span>Recuperar grupo</span></div>
+              <div class="controls-row"><kbd>P</kbd><span>Pausar / Reanudar</span></div>
               <div class="controls-row"><kbd>Escape</kbd><span>Cancelar / Deseleccionar</span></div>
             </div>
           </div>

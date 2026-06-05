@@ -106,6 +106,7 @@ class GameInstance {
   private _placingType: BuildingType | null = null;
   private _panelBuilding: import('./game/Building').Building | null = null;
   private _unitLevels   = new Map<number, number>(); // track XP level-ups for audio
+  private _lastIdleWarnAt = 0;
 
   constructor(civ: CivilizationType, saveSystem: SaveSystem) {
     this.civ        = civ;
@@ -350,6 +351,14 @@ class GameInstance {
       this._unitLevels.set(u.id, u.level);
     }
 
+    // Idle worker warning: notify every 30 s of game time while workers are idle
+    const humanWorkers = this.game.allWorkers.filter(w => w.playerId === this.game.humanPlayerId);
+    const idleCount = humanWorkers.filter(w => (w.task as string) === 'IDLE').length;
+    if (idleCount > 0 && this.game.gameTime - this._lastIdleWarnAt >= 30) {
+      this._lastIdleWarnAt = this.game.gameTime;
+      this.hud.notify(`⚠️ ${idleCount} trabajador${idleCount > 1 ? 'es' : ''} sin tarea`, 'warning');
+    }
+
     this.hud.update(this.input.getSelectedUnits());
     this.renderer.render();
 
@@ -508,6 +517,13 @@ class GameInstance {
         this._panelBuilding = null;
         this.prodPanel.hide();
         this.hud.update([]);
+        return;
+      }
+      // P: toggle pause
+      if (e.code === 'KeyP') {
+        this.game.paused = !this.game.paused;
+        const overlay = document.getElementById('pause-overlay');
+        if (overlay) overlay.classList.toggle('hidden', !this.game.paused);
         return;
       }
       // Space: stop all selected units
