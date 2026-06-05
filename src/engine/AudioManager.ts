@@ -164,6 +164,13 @@ export class AudioManager {
     scheduleChatter();
   }
 
+  playLevelUp() {
+    // Ascending arpeggio: C4-E4-G4-C5
+    [262, 330, 392, 524].forEach((f, i) => this.osc(f, 'sine',     0.22, 0.22, i * 0.09));
+    [262, 330, 392, 524].forEach((f, i) => this.osc(f, 'triangle', 0.18, 0.10, i * 0.09 + 0.03));
+    this.osc(200, 'sine', 0.15, 0.10, 0, 100);
+  }
+
   // ── Volume control ───────────────────────────────────────────────────────────
 
   setEffectsVolume(v: number) {
