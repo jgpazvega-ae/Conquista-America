@@ -41,6 +41,7 @@ export class Unit {
   path: GridPos[] = [];
   pathIndex: number = 0;
   attackTarget: Unit | null = null;
+  attackBuildingTarget: import('./Building').Building | null = null;
   attackTimer: number = 0;
 
   // XP / leveling
@@ -616,15 +617,26 @@ export class Unit {
     if (path.length === 0) return;
     this.path      = path;
     this.pathIndex = 0;
-    this.state     = UnitState.MOVING;
-    this.attackTarget = null;
+    this.state                = UnitState.MOVING;
+    this.attackTarget         = null;
+    this.attackBuildingTarget = null;
   }
 
   attackUnit(target: Unit) {
-    this.attackTarget = target;
-    this.state        = UnitState.ATTACKING;
-    this.attackAnim   = 1;
+    this.attackTarget         = target;
+    this.attackBuildingTarget = null;
+    this.state                = UnitState.ATTACKING;
+    this.attackAnim           = 1;
   }
+
+  attackBuilding(target: import('./Building').Building) {
+    this.attackBuildingTarget = target;
+    this.attackTarget         = null;
+    this.state                = UnitState.ATTACKING;
+    this.attackAnim           = 1;
+  }
+
+  triggerAttackAnim() { this.attackAnim = 1; }
 
   takeDamage(amount: number): number {
     const dmg = Math.max(1, amount - this.defense);
