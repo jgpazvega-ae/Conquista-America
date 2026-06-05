@@ -53,6 +53,7 @@ export class Game {
   paused = false;
   humanPlayerId = 0;
   gameTime = 0;
+  difficulty: 'easy' | 'normal' | 'hard' = 'normal';
   private _autoAttackTimer = 0;
   private _bonusTimer = 0;
 
