@@ -155,12 +155,17 @@ export class InputHandler {
 
     if (hit.type === 'tile') {
       const map = this.game.map;
-      // Compute centroid for move marker
+      // Formation movement: preserve unit offsets from their centroid
+      let cx = 0, cz = 0;
+      for (const u of myUnits) { cx += u.col; cz += u.row; }
+      cx /= myUnits.length; cz /= myUnits.length;
+
       let sumX = 0, sumZ = 0, moved = 0;
-      myUnits.forEach((unit, i) => {
-        const offset = this.spreadOffset(i, myUnits.length);
-        const tc = hit.col + offset[0];
-        const tr = hit.row + offset[1];
+      myUnits.forEach((unit) => {
+        const offsetC = myUnits.length > 1 ? Math.round(unit.col - cx) : 0;
+        const offsetR = myUnits.length > 1 ? Math.round(unit.row - cz) : 0;
+        const tc = hit.col + offsetC;
+        const tr = hit.row + offsetR;
         const near = map.findWalkableNear(tc, tr, 3);
         if (!near) return;
         const path = findPath(map, unit.gridPos(), { col: near[0], row: near[1] }, 400);

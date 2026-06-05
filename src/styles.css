@@ -800,6 +800,7 @@ input.toggle { width: 22px; height: 22px; accent-color: #d4880a; }
   border-color: rgba(200,160,80,0.4);
 }
 .prod-unit-btn.disabled { opacity: 0.4; cursor: not-allowed; }
+.prod-unit-btn.done { opacity: 0.6; cursor: default; border-color: rgba(80,220,80,0.3); }
 .prod-unit-icon { font-size: 22px; flex-shrink: 0; }
 .prod-unit-info { flex: 1; }
 .prod-unit-name { font-size: 12px; font-weight: 600; }
