@@ -50,10 +50,16 @@ export class AISystem {
       state.trainTimer  += dt;
       state.phaseTimer  += dt;
 
-      // Difficulty scaling: intervals shrink and rally cap grows with game time
+      // Difficulty: base scale multiplier
+      const diffMult = game.difficulty === 'easy' ? 2.2 : game.difficulty === 'hard' ? 0.6 : 1.0;
+
+      // Time-based scaling: intervals shrink with game time
       const elapsed  = game.gameTime;
-      const scale    = Math.max(0.5, 1.0 - elapsed / 600); // down to 50% at 10 min
-      const rallyCap = 15 + Math.floor(elapsed / 60) * 2;  // +2 units per minute
+      const timeMult = Math.max(0.5, 1.0 - elapsed / 600); // down to 50% at 10 min
+      const scale    = timeMult * diffMult;
+      const rallyCap = game.difficulty === 'easy'
+        ? 8
+        : 15 + Math.floor(elapsed / 60) * (game.difficulty === 'hard' ? 3 : 2);
 
       // Phase-based attack logic (thresholds use scale factor)
       if (state.phase === 'gathering') {
