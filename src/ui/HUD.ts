@@ -94,7 +94,12 @@ export class HUD {
     if (this.elTimer) this.elTimer.textContent = `${m}:${String(s).padStart(2, '0')}`;
 
     // Population (human alive units)
-    if (this.elPop) this.elPop.textContent = String(player.aliveUnits.length);
+    if (this.elPop) {
+      const pop = player.aliveUnits.length;
+      const cap = this.game.getPopCap(player.id);
+      this.elPop.textContent = `${pop}/${cap}`;
+      this.elPop.style.color = pop >= cap ? '#ff7777' : '';
+    }
 
     // Game status
     if (this.game.status === 'VICTORY') {
