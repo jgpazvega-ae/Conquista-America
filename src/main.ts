@@ -166,6 +166,10 @@ class GameInstance {
         const cost = TRAIN_COSTS[unitType];
         if (!cost) return;
         const player = this.game.humanPlayer;
+        if (player.aliveUnits.length >= this.game.getPopCap(player.id)) {
+          this.hud.notify('👥 Límite de población alcanzado — construye un Almacén', 'warning');
+          return;
+        }
         if (player.resources.food  < cost.food)          return;
         if (player.resources.gold  < cost.gold)          return;
         if (player.resources.stone < (cost.stone ?? 0))  return;
@@ -312,6 +316,15 @@ class GameInstance {
       this.hud.showDamageNumbers(this.game.damageEvents);
       let humanUnderAttack = false;
       for (const evt of this.game.damageEvents) {
+        // Projectile for ranged attacks
+        if (evt.attacker && evt.attacker.attackRange > 1.5) {
+          const projColor = evt.attacker.attackRange > 3 ? 0xffcc44 : 0xddffcc;
+          this.renderer.effects.createProjectile(
+            evt.attacker.worldX, evt.attacker.worldZ,
+            evt.worldX, evt.worldZ, projColor,
+          );
+          this.renderer.effects.createMuzzleFlash(evt.attacker.worldX, 0.6, evt.attacker.worldZ);
+        }
         this.renderer.effects.createHitEffect(evt.worldX, 0.5, evt.worldZ);
         if (evt.damage > 20) this.renderer.effects.createExplosion(evt.worldX, 0.5, evt.worldZ, evt.damage / 40);
         if (!evt.target.isAlive()) {

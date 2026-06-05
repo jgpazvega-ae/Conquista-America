@@ -183,6 +183,7 @@ export class AISystem {
     );
     if (!settlement) return;
     if (settlement.productionQueue.length >= 3) return; // don't over-queue
+    if (player.aliveUnits.length >= game.getPopCap(player.id)) return; // pop cap
 
     // Pick a random unit type from civ's roster that we can afford
     const affordable = civDef.units.filter(u => {
