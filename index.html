@@ -256,7 +256,7 @@
       <!-- Controls hint -->
       <div id="controls-hint">
         📱 <b>Móvil:</b> Toca para seleccionar · Doble toque/mantén para mover/atacar · Pellizca zoom &nbsp;|&nbsp;
-        🖥️ <b>PC:</b> Clic izq. seleccionar · Arrastra selección múltiple · Clic der. mover/atacar · Arrastrar der. cámara · WASD/flechas cámara · Rueda zoom · <b>Esc</b> deseleccionar · <b>Espacio</b> parar · <b>F</b> centrar · <b>Ctrl+A</b> todo · Clic edificio = producción
+        🖥️ <b>PC:</b> Clic izq. seleccionar · Arrastra selección múltiple · Clic der. mover/atacar · Arrastrar der. cámara · WASD/flechas cámara · Rueda zoom · <b>Esc</b> deseleccionar · <b>Espacio</b> parar · <b>F</b> centrar · <b>Ctrl+A</b> todo · <b>A</b> attack-move · <b>B</b> construir · <b>?</b> ayuda completa
       </div>
 
       <!-- Selection box overlay -->
@@ -285,6 +285,44 @@
           <div class="prod-section-label">Selecciona edificio</div>
           <div id="prod-build-list" class="prod-unit-list"></div>
           <div class="prod-section-label" style="font-size:10px;color:#a09070">Clic en el mapa para colocar</div>
+        </div>
+      </div>
+
+      <!-- Controls overlay (? key) -->
+      <div id="controls-overlay" class="hidden">
+        <div class="controls-card">
+          <div class="controls-title">⌨️ Controles</div>
+          <button id="controls-close" class="controls-close">✕</button>
+          <div class="controls-grid">
+            <div class="controls-section">
+              <div class="controls-heading">Cámara</div>
+              <div class="controls-row"><kbd>W A S D</kbd><span>Mover cámara</span></div>
+              <div class="controls-row"><kbd>Scroll</kbd><span>Zoom</span></div>
+              <div class="controls-row"><kbd>Clic derecho</kbd><span>Mover cámara (arrastrar)</span></div>
+              <div class="controls-row"><kbd>F</kbd><span>Centrar en selección</span></div>
+            </div>
+            <div class="controls-section">
+              <div class="controls-heading">Unidades</div>
+              <div class="controls-row"><kbd>Clic izq.</kbd><span>Seleccionar unidad</span></div>
+              <div class="controls-row"><kbd>Arrastrar</kbd><span>Selección por caja</span></div>
+              <div class="controls-row"><kbd>Clic der.</kbd><span>Mover / Atacar</span></div>
+              <div class="controls-row"><kbd>A</kbd><span>Attack-move</span></div>
+              <div class="controls-row"><kbd>Space</kbd><span>Detener unidades</span></div>
+              <div class="controls-row"><kbd>Ctrl+A</kbd><span>Seleccionar todo</span></div>
+            </div>
+            <div class="controls-section">
+              <div class="controls-heading">Edificios</div>
+              <div class="controls-row"><kbd>Clic izq.</kbd><span>Abrir producción</span></div>
+              <div class="controls-row"><kbd>B</kbd><span>Panel de construcción</span></div>
+              <div class="controls-row"><kbd>Clic der.</kbd><span>Rally point (sin selección)</span></div>
+            </div>
+            <div class="controls-section">
+              <div class="controls-heading">Grupos</div>
+              <div class="controls-row"><kbd>Ctrl+1-5</kbd><span>Guardar grupo</span></div>
+              <div class="controls-row"><kbd>1-5</kbd><span>Recuperar grupo</span></div>
+              <div class="controls-row"><kbd>Escape</kbd><span>Cancelar / Deseleccionar</span></div>
+            </div>
+          </div>
         </div>
       </div>
 
