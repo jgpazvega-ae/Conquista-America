@@ -51,10 +51,13 @@ const CIV_PLAYSTYLE: Record<CivilizationType, string> = {
   [CivilizationType.CONQUISTADOR]: 'Tecnológico / Control',
 };
 
+export type Difficulty = 'easy' | 'normal' | 'hard';
+
 export class CivSelectScreen {
   private el: HTMLElement;
   private saveSystem: SaveSystem;
   private selected: CivilizationType = CivilizationType.AZTEC;
+  private _difficulty: Difficulty = 'normal';
   private onStart: ((civ: CivilizationType) => void) | null = null;
 
   constructor(saveSystem: SaveSystem) {
@@ -63,6 +66,8 @@ export class CivSelectScreen {
     this.build();
     this.bind();
   }
+
+  getDifficulty(): Difficulty { return this._difficulty; }
 
   setOnStart(cb: (civ: CivilizationType) => void) { this.onStart = cb; }
 
@@ -105,6 +110,14 @@ export class CivSelectScreen {
     this.el.querySelector('#civ-grid')!.addEventListener('click', e => {
       const card = (e.target as HTMLElement).closest('.civ-card') as HTMLElement | null;
       if (card?.dataset.civ) this.selectCiv(card.dataset.civ as CivilizationType);
+    });
+
+    // Difficulty buttons
+    this.el.querySelectorAll('.diff-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this._difficulty = (btn as HTMLElement).dataset.diff as Difficulty;
+        this.el.querySelectorAll('.diff-btn').forEach(b => b.classList.toggle('diff-selected', b === btn));
+      });
     });
 
     // Start button

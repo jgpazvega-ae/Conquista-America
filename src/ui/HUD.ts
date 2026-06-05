@@ -5,6 +5,7 @@ import { TERRAIN_COLORS, CIV_COLORS, CIV_NAMES, CIV_EMOJIS, TILE_SIZE } from '..
 import type { DamageEvent } from '../game/CombatSystem';
 import { TileVisibility } from '../game/FogOfWar';
 import { ResourceType } from '../game/ResourceNode';
+import { BuildingType } from '../game/buildings';
 
 function hex(n: number): string {
   return '#' + n.toString(16).padStart(6, '0');
@@ -35,6 +36,7 @@ export class HUD {
   private elPop   = document.getElementById('pop-count');
 
   onMinimapClick: ((worldX: number, worldZ: number) => void) | null = null;
+  private _combatPings: { col: number; row: number; ts: number }[] = [];
 
   private camera: import('../engine/Camera').RTSCamera | null = null;
   setCamera(cam: import('../engine/Camera').RTSCamera) { this.camera = cam; }
@@ -264,6 +266,30 @@ export class HUD {
       }
     }
 
+    // Combat pings — flash red rings where battles are happening
+    const now = Date.now();
+    this._combatPings = this._combatPings.filter(p => now - p.ts < 2000);
+    for (const ping of this._combatPings) {
+      const age = (now - ping.ts) / 2000; // 0..1
+      const radius = (1 + age * 3) * Math.max(tw, th);
+      ctx.strokeStyle = `rgba(255,60,0,${(1 - age) * 0.85})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(ping.col * tw + tw / 2, ping.row * th + th / 2, radius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Settlement HP border pulse: red glow when human settlement is below 50%
+    const settle = this.game.allBuildings.find(
+      b => b.playerId === this.game.humanPlayerId && b.type === BuildingType.SETTLEMENT && b.isAlive(),
+    );
+    if (settle && settle.hp < settle.maxHp * 0.5) {
+      const pulse = 0.6 + 0.4 * Math.sin(Date.now() / 200);
+      ctx.strokeStyle = `rgba(255,30,0,${pulse})`;
+      ctx.lineWidth = 4;
+      ctx.strokeRect(1, 1, W - 2, H - 2);
+    }
+
     // Camera viewport rectangle
     if (this.camera) {
       const pos = this.camera.getPosition();
@@ -276,6 +302,12 @@ export class HUD {
       ctx.lineWidth = 1;
       ctx.strokeRect(nx - rectW / 2, nz - rectH / 2, rectW, rectH);
     }
+  }
+
+  addCombatPing(col: number, row: number) {
+    const now = Date.now();
+    const nearby = this._combatPings.find(p => Math.abs(p.col - col) < 4 && Math.abs(p.row - row) < 4 && now - p.ts < 800);
+    if (!nearby) this._combatPings.push({ col, row, ts: now });
   }
 
   showDamageNumbers(events: DamageEvent[]) {

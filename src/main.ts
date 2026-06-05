@@ -20,6 +20,7 @@ import { BUILDING_DEFS } from './game/buildingDefs';
 import { TILE_SIZE, CIV_COLORS } from './game/constants';
 import { findPath } from './game/Pathfinding';
 import { WorkerTask } from './game/Worker';
+import type { Difficulty } from './ui/CivSelect';
 
 // ── Historical facts shown during loading ─────────────────────────────────────
 const LOADING_FACTS = [
@@ -59,8 +60,9 @@ async function boot() {
   }
 
   civSelect.setOnStart(async (civ) => {
+    const diff = civSelect.getDifficulty();
     civSelect.hide();
-    narrative.play(civ, () => { void startGame(civ); });
+    narrative.play(civ, () => { void startGame(civ, diff); });
   });
 }
 
@@ -69,7 +71,7 @@ function showCivSelect(screen: CivSelectScreen, preferred: CivilizationType) {
 }
 
 // ── Game lifecycle ─────────────────────────────────────────────────────────────
-async function startGame(civ: CivilizationType) {
+async function startGame(civ: CivilizationType, difficulty: Difficulty = 'normal') {
   const appEl = document.getElementById('app')!;
   appEl.classList.remove('hidden');
 
@@ -78,7 +80,7 @@ async function startGame(civ: CivilizationType) {
     activeGame = null;
   }
 
-  activeGame = new GameInstance(civ, saveSystem);
+  activeGame = new GameInstance(civ, saveSystem, difficulty);
   await activeGame.init();
 }
 
@@ -86,6 +88,7 @@ async function startGame(civ: CivilizationType) {
 class GameInstance {
   private civ:        CivilizationType;
   private saveSystem: SaveSystem;
+  private difficulty: Difficulty;
   private destroyed   = false;
 
   private game!:      Game;
@@ -113,9 +116,10 @@ class GameInstance {
   private _enemyBuildingsDestroyed = 0;
   private _gameSpeed = 1.0;
 
-  constructor(civ: CivilizationType, saveSystem: SaveSystem) {
+  constructor(civ: CivilizationType, saveSystem: SaveSystem, difficulty: Difficulty = 'normal') {
     this.civ        = civ;
     this.saveSystem = saveSystem;
+    this.difficulty = difficulty;
   }
 
   async init() {
@@ -123,6 +127,7 @@ class GameInstance {
 
     // Override human player's civilization
     this.game     = new Game(this.civ);
+    this.game.difficulty = this.difficulty;
     this.renderer = new Renderer(canvas);
     this.hud      = new HUD(this.game);
     this.camera   = new RTSCamera(this.renderer.camera);
@@ -346,6 +351,8 @@ class GameInstance {
       this.hud.showDamageNumbers(this.game.damageEvents);
       let humanUnderAttack = false;
       for (const evt of this.game.damageEvents) {
+        // Minimap combat ping
+        this.hud.addCombatPing(evt.worldX / TILE_SIZE, evt.worldZ / TILE_SIZE);
         // Projectile for ranged attacks
         if (evt.attacker && evt.attacker.attackRange > 1.5) {
           const projColor = evt.attacker.attackRange > 3 ? 0xffcc44 : 0xddffcc;
@@ -736,8 +743,9 @@ function showRestartMenu() {
   document.getElementById('app')!.classList.add('hidden');
   const civSelect = new CivSelectScreen(saveSystem);
   civSelect.setOnStart(async (civ) => {
+    const diff = civSelect.getDifficulty();
     civSelect.hide();
-    await startGame(civ);
+    await startGame(civ, diff);
   });
   const sess = saveSystem.getSession();
   civSelect.show(sess?.civType ?? CivilizationType.AZTEC);
