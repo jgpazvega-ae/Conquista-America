@@ -129,6 +129,16 @@ export class InputHandler {
       return;
     }
 
+    if (hit.type === 'building') {
+      const bldg = this.game.getBuildingById(hit.buildingId);
+      if (!bldg || !bldg.isAlive()) return;
+      if (bldg.playerId !== this.game.humanPlayerId) {
+        for (const u of myUnits) u.attackBuilding(bldg);
+        this.onMoveOrder?.();
+      }
+      return;
+    }
+
     if (hit.type === 'tile') {
       const map = this.game.map;
       // Compute centroid for move marker
