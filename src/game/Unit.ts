@@ -44,6 +44,11 @@ export class Unit {
   attackBuildingTarget: import('./Building').Building | null = null;
   attackTimer: number = 0;
 
+  // Patrol
+  patrolA: GridPos | null = null;
+  patrolB: GridPos | null = null;
+  patrolFlip = false;
+
   // XP / leveling
   xp:    number = 0;
   level: number = 1;
@@ -618,6 +623,15 @@ export class Unit {
     this.path      = path;
     this.pathIndex = 0;
     this.state                = UnitState.MOVING;
+    this.attackTarget         = null;
+    this.attackBuildingTarget = null;
+    this.patrolA = null; this.patrolB = null;
+  }
+
+  setPatrol(a: GridPos, b: GridPos) {
+    this.patrolA   = a;
+    this.patrolB   = b;
+    this.patrolFlip = false;
     this.attackTarget         = null;
     this.attackBuildingTarget = null;
   }

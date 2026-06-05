@@ -29,6 +29,7 @@ export class InputHandler {
   onTerrainHover:     ((col: number, row: number) => void) | null = null;
   onAttackMove:       ((units: import('../game/Unit').Unit[], col: number, row: number) => void) | null = null;
   onRallySet:         ((col: number, row: number) => void) | null = null;
+  onPatrolSet:        (() => void) | null = null;
 
   private _placingMode     = false;
   private _attackMoveMode  = false;
@@ -118,6 +119,17 @@ export class InputHandler {
 
     const myUnits = selected.filter(u => u.playerId === this.game.humanPlayerId);
     if (myUnits.length === 0) return;
+
+    // Shift+right-click = set patrol route (current pos → clicked tile)
+    if (e.shiftKey) {
+      const hit = this.renderer.pickFromScreen(e.clientX, e.clientY);
+      if (hit?.type === 'tile') {
+        for (const u of myUnits) u.setPatrol(u.gridPos(), { col: hit.col, row: hit.row });
+        this.onMoveOrder?.();
+        this.onPatrolSet?.();
+      }
+      return;
+    }
 
     const hit = this.renderer.pickFromScreen(e.clientX, e.clientY);
     if (!hit) return;
