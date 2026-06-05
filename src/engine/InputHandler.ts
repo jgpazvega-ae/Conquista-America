@@ -30,8 +30,10 @@ export class InputHandler {
   onAttackMove:       ((units: import('../game/Unit').Unit[], col: number, row: number) => void) | null = null;
   onRallySet:         ((col: number, row: number) => void) | null = null;
 
-  private _placingMode    = false;
-  private _attackMoveMode = false;
+  private _placingMode     = false;
+  private _attackMoveMode  = false;
+  private _lastClickTime   = 0;
+  private _lastClickUnitId: number | null = null;
 
   setAttackMoveMode(on: boolean) {
     this._attackMoveMode = on;
@@ -207,7 +209,26 @@ export class InputHandler {
       const unit = this.game.getUnitById(hit.unitId);
       if (unit?.isAlive()) {
         const canSee = this.game.fog.canSeeUnit(unit, this.game.humanPlayerId);
-        if (canSee) unit.setSelected(true);
+        if (canSee) {
+          const now = Date.now();
+          const isDouble = now - this._lastClickTime < 300 && this._lastClickUnitId === hit.unitId;
+          if (isDouble && unit.playerId === this.game.humanPlayerId) {
+            // Double-click: select all visible alive same-type units
+            const targetType = unit.def.type;
+            for (const u of this.game.getAllUnits()) {
+              u.setSelected(
+                u.isAlive() &&
+                u.playerId === this.game.humanPlayerId &&
+                u.def.type === targetType &&
+                this.game.fog.canSeeUnit(u, this.game.humanPlayerId),
+              );
+            }
+          } else {
+            unit.setSelected(true);
+          }
+          this._lastClickTime   = now;
+          this._lastClickUnitId = hit.unitId;
+        }
       }
       this.onSelectionChange?.();
       return;
