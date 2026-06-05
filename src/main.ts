@@ -18,6 +18,7 @@ import { TRAIN_COSTS } from './game/unitProduction';
 import { BuildingType } from './game/buildings';
 import { BUILDING_DEFS } from './game/buildingDefs';
 import { TILE_SIZE, CIV_COLORS } from './game/constants';
+import { findPath } from './game/Pathfinding';
 
 // ── Historical facts shown during loading ─────────────────────────────────────
 const LOADING_FACTS = [
@@ -103,6 +104,7 @@ class GameInstance {
   private endHandled  = false;
   private unitGroups  = new Map<number, number[]>();
   private _placingType: BuildingType | null = null;
+  private _panelBuilding: import('./game/Building').Building | null = null;
 
   constructor(civ: CivilizationType, saveSystem: SaveSystem) {
     this.civ        = civ;
@@ -133,11 +135,31 @@ class GameInstance {
     this.input.onMoveOrder = () => this.audio.playMove();
     this.hud.onMinimapClick = (wx, wz) => this.camera.panTo(wx, wz);
 
+    this.input.onRallySet = (col, row) => {
+      if (this._panelBuilding?.isComplete()) {
+        this._panelBuilding.setRally(col, row);
+        this.hud.notify('📍 Punto de reunión establecido', 'info');
+      }
+    };
+
+    this.input.onAttackMove = (units, col, row) => {
+      const map = this.game.map;
+      for (const [i, unit] of units.entries()) {
+        const offset = [i % 3 - 1, Math.floor(i / 3)];
+        const near   = map.findWalkableNear(col + offset[0], row + offset[1], 3);
+        if (!near) continue;
+        const path = findPath(map, unit.gridPos(), { col: near[0], row: near[1] }, 400);
+        if (path.length > 0) unit.attackMove(path);
+      }
+      this.audio.playMove();
+    };
+
     this.input.onBuildingClick = (buildingId) => {
       const building = this.game.getBuildingById(buildingId);
       if (!building || !building.isComplete()) return;
       if (building.playerId !== this.game.humanPlayerId) return;
       this._cancelPlacing();
+      this._panelBuilding = building;
       this.prodPanel.show(building, this.game.humanPlayer);
       this.prodPanel.onTrain = (unitType) => {
         const cost = TRAIN_COSTS[unitType];
@@ -448,7 +470,9 @@ class GameInstance {
       // Escape: deselect all, close panels
       if (e.code === 'Escape') {
         if (this._placingType) { this._cancelPlacing(); return; }
+        this.input.setAttackMoveMode(false);
         for (const u of this.game.getAllUnits()) u.setSelected(false);
+        this._panelBuilding = null;
         this.prodPanel.hide();
         this.hud.update([]);
         return;
@@ -481,6 +505,28 @@ class GameInstance {
           u.setSelected(u.isAlive() && u.playerId === this.game.humanPlayerId);
         }
         this.hud.update(this.input.getSelectedUnits());
+        return;
+      }
+      // A (no ctrl): attack-move mode
+      if (e.code === 'KeyA' && !e.ctrlKey) {
+        const sel = this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId);
+        if (sel.length > 0) {
+          this.input.setAttackMoveMode(true);
+          this.hud.notify('⚔️ Attack-move: clic en el destino', 'info');
+        }
+        return;
+      }
+      // B: open build panel for human settlement
+      if (e.code === 'KeyB' && !e.ctrlKey && !e.altKey) {
+        const settlement = this.game.allBuildings.find(
+          b => b.playerId === this.game.humanPlayerId &&
+               b.type === BuildingType.SETTLEMENT &&
+               b.isComplete(),
+        );
+        if (settlement) {
+          this._panelBuilding = settlement;
+          this.prodPanel.show(settlement, this.game.humanPlayer);
+        }
         return;
       }
       // Ctrl+1-5: save unit group
