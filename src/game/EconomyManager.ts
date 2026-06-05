@@ -25,11 +25,12 @@ export class EconomyManager {
       const stats = this.calculateStats(player, game);
       this.stats.set(player.id, stats);
 
-      // Apply passive income to all players each tick
+      // Apply passive income; cap at 2000 to avoid runaway accumulation
       const rate = player.isHuman ? 0.25 : 0.35; // AI slight advantage for difficulty
-      player.resources.food  = Math.max(0, player.resources.food  + stats.netProduction.food  * rate);
-      player.resources.gold  = Math.max(0, player.resources.gold  + stats.netProduction.gold  * rate);
-      player.resources.stone = Math.max(0, player.resources.stone + stats.netProduction.stone * rate);
+      const cap  = 2000;
+      player.resources.food  = Math.min(cap, Math.max(0, player.resources.food  + stats.netProduction.food  * rate));
+      player.resources.gold  = Math.min(cap, Math.max(0, player.resources.gold  + stats.netProduction.gold  * rate));
+      player.resources.stone = Math.min(cap, Math.max(0, player.resources.stone + stats.netProduction.stone * rate));
     }
   }
 
