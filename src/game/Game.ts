@@ -53,6 +53,7 @@ export class Game {
   newlyPlacedBuildings: Building[] = [];
   newlyCompletedBuildings: Building[] = [];
   newlyDestroyedBuildings: Building[] = [];
+  newlyDepletedNodes: ResourceNode[] = [];
   status: GameStatus = 'PLAYING';
   paused = false;
   humanPlayerId = 0;
@@ -209,6 +210,7 @@ export class Game {
     this.newlyPlacedBuildings = [];
     this.newlyCompletedBuildings = [];
     this.newlyDestroyedBuildings = [];
+    this.newlyDepletedNodes = [];
     for (const building of this.allBuildings) {
       if (!building.isComplete()) {
         const wasIncomplete = true;
@@ -230,7 +232,9 @@ export class Game {
 
     for (const node of this.resourceNodes) {
       node.updateVisibility();
+      const wasEmpty = node.isEmpty();
       node.updateRegen(dt);
+      if (!wasEmpty && node.isEmpty()) this.newlyDepletedNodes.push(node);
     }
 
     this.damageEvents = this.combat.update(this.allUnits, this.map);

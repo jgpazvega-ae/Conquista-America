@@ -18,6 +18,7 @@ import { TRAIN_COSTS } from './game/unitProduction';
 import { BuildingType } from './game/buildings';
 import { BUILDING_DEFS } from './game/buildingDefs';
 import { TILE_SIZE, CIV_COLORS } from './game/constants';
+import { ResourceType } from './game/ResourceNode';
 import { findPath } from './game/Pathfinding';
 import { WorkerTask } from './game/Worker';
 import type { Difficulty } from './ui/CivSelect';
@@ -350,8 +351,19 @@ class GameInstance {
     for (const unit of this.game.newlySpawnedUnits) {
       this.renderer.addUnit(unit);
       if (unit.playerId === this.game.humanPlayerId) {
-        this.audio.playBuild();
+        this.audio.playTrainingComplete();
         this.hud.notify(`✅ ${unit.def.name} listo para combate`, 'success');
+      }
+    }
+
+    // Resource node depletion alerts
+    for (const node of this.game.newlyDepletedNodes) {
+      const fog = this.game.fog.getFog(this.game.humanPlayerId);
+      const vis = fog ? fog.getVisibility(node.col, node.row) : 1;
+      if (vis !== 0 /* UNEXPLORED */) {
+        this.audio.playResourceDepleted();
+        const typeLabel = node.type === ResourceType.FOOD ? 'Alimentos' : node.type === ResourceType.GOLD ? 'Oro' : 'Piedra';
+        this.hud.notify(`⚠️ Yacimiento de ${typeLabel} agotado`, 'warning');
       }
     }
 

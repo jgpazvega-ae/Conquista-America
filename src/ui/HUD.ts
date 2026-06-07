@@ -358,13 +358,25 @@ export class HUD {
     // Draw resource nodes (only visible/fogged tiles)
     const nodeSize = Math.max(1.5, Math.min(tw, th));
     for (const node of this.game.resourceNodes) {
-      if (node.isEmpty()) continue;
       const vis = humanFog?.getVisibility(node.col, node.row);
       if (vis === TileVisibility.UNEXPLORED) continue;
-      // Food=green, Gold=yellow, Stone=grey
-      const nodeColor = node.type === ResourceType.FOOD ? 'rgba(80,220,80,0.7)'
-                      : node.type === ResourceType.GOLD ? 'rgba(255,200,40,0.7)'
-                      : 'rgba(180,180,180,0.7)';
+      if (node.isEmpty()) {
+        // Depleted nodes render as dim grey X
+        ctx.globalAlpha = 0.35;
+        ctx.fillStyle = 'rgba(100,100,100,0.6)';
+        ctx.beginPath();
+        ctx.arc(node.col * tw + tw / 2, node.row * th + th / 2, nodeSize / 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+        continue;
+      }
+      // Tint by depletion ratio: full-color at 100%, muted at low %
+      const ratio = node.amount / node.maxAmount;
+      const nodeColor = node.type === ResourceType.FOOD
+        ? `rgba(${Math.round(80 + (1 - ratio) * 120)},${Math.round(220 * ratio + 80)},80,0.75)`
+        : node.type === ResourceType.GOLD
+        ? `rgba(255,${Math.round(200 * ratio + 55)},40,0.75)`
+        : `rgba(${Math.round(180 * ratio + 60)},${Math.round(180 * ratio + 60)},${Math.round(180 * ratio + 60)},0.75)`;
       ctx.fillStyle = nodeColor;
       ctx.beginPath();
       ctx.arc(node.col * tw + tw / 2, node.row * th + th / 2, nodeSize / 2, 0, Math.PI * 2);
