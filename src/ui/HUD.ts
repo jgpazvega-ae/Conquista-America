@@ -7,6 +7,7 @@ import { TileVisibility } from '../game/FogOfWar';
 import { ResourceType } from '../game/ResourceNode';
 import { BuildingType } from '../game/buildings';
 import type { Renderer } from '../engine/Renderer';
+import { CIV_POWER_DEFS } from '../game/CivPowers';
 
 function hex(n: number): string {
   return '#' + n.toString(16).padStart(6, '0');
@@ -38,6 +39,7 @@ export class HUD {
   private elScoreboard = document.getElementById('scoreboard')!
 
   onMinimapClick: ((worldX: number, worldZ: number) => void) | null = null;
+  onPowerActivate: (() => void) | null = null;
   private _combatPings:    { col: number; row: number; ts: number }[] = [];
   private _lastSeenUnits:  Map<number, { col: number; row: number }> = new Map();
 
@@ -56,6 +58,14 @@ export class HUD {
     const civ = game.humanPlayer.civType;
     this.elCivBadge.textContent = `${CIV_EMOJIS[civ]} ${CIV_NAMES[civ]}`;
     this.elCivBadge.style.color = hex(CIV_COLORS[civ]);
+
+    // Power button setup
+    const powerDef = CIV_POWER_DEFS[civ];
+    const powerEmoji = document.getElementById('power-emoji');
+    const powerBtn   = document.getElementById('power-btn');
+    if (powerEmoji) powerEmoji.textContent = powerDef.emoji;
+    if (powerBtn)   powerBtn.title = `${powerDef.name} — ${powerDef.description} (${powerDef.key})`;
+    powerBtn?.addEventListener('click', () => this.onPowerActivate?.());
 
     this.minimapCanvas.addEventListener('click', (e) => {
       if (!this.minimapBuilt) return;
@@ -145,6 +155,32 @@ export class HUD {
     this.updateMinimap();
     this.updateScoreboard();
     this.updateObjectives();
+    this.updatePowerButton();
+  }
+
+  private updatePowerButton() {
+    const player  = this.game.humanPlayer;
+    const def     = CIV_POWER_DEFS[player.civType];
+    const btn     = document.getElementById('power-btn');
+    const label   = document.getElementById('power-label');
+    const fill    = document.getElementById('power-cooldown-fill');
+    if (!btn || !label || !fill) return;
+
+    if (player.powerActive) {
+      btn.className = 'power-btn active';
+      const pct = (player.powerActiveTimer / def.duration) * 100;
+      label.textContent = `${Math.ceil(player.powerActiveTimer)}s`;
+      fill.style.transform = `scaleX(${pct / 100})`;
+    } else if (player.powerCooldown > 0) {
+      btn.className = 'power-btn';
+      const pct = 1 - player.powerCooldown / def.cooldown;
+      label.textContent = `${Math.ceil(player.powerCooldown)}s`;
+      fill.style.transform = `scaleX(${pct})`;
+    } else {
+      btn.className = 'power-btn ready';
+      label.textContent = 'Listo';
+      fill.style.transform = 'scaleX(1)';
+    }
   }
 
   private updateObjectives() {

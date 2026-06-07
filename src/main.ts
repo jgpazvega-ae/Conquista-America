@@ -21,6 +21,7 @@ import { TILE_SIZE, CIV_COLORS } from './game/constants';
 import { findPath } from './game/Pathfinding';
 import { WorkerTask } from './game/Worker';
 import type { Difficulty } from './ui/CivSelect';
+import { activateCivPower } from './game/CivPowers';
 
 // ── Historical facts shown during loading ─────────────────────────────────────
 const LOADING_FACTS = [
@@ -158,6 +159,8 @@ class GameInstance {
     this.input.onPatrolSet = () => {
       this.hud.notify('🔄 Patrulla establecida — Shift+clic der.', 'info');
     };
+
+    this.hud.onPowerActivate = () => this.triggerCivPower();
 
     this.input.onAttackMove = (units, col, row) => {
       const map = this.game.map;
@@ -349,15 +352,17 @@ class GameInstance {
     this.prodPanel.renderQueue();
 
     // Apply fog of war: hide enemy units/buildings outside vision
-    const humanFog = this.game.fog.getFog(this.game.humanPlayerId);
+    const humanFog   = this.game.fog.getFog(this.game.humanPlayerId);
+    const mayaReveal = this.game.humanPlayer.civType === CivilizationType.MAYA &&
+                       this.game.humanPlayer.powerActive;
     if (humanFog) {
       for (const unit of this.game.getAllUnits()) {
         if (unit.playerId === this.game.humanPlayerId) continue;
-        unit.mesh.visible = unit.isAlive() && humanFog.canSeeUnit(unit, this.game.humanPlayerId);
+        unit.mesh.visible = unit.isAlive() && (mayaReveal || humanFog.canSeeUnit(unit, this.game.humanPlayerId));
       }
       for (const building of this.game.allBuildings) {
         if (building.playerId === this.game.humanPlayerId) continue;
-        building.mesh.visible = building.isAlive() && humanFog.canSeeBuilding(building, this.game.humanPlayerId);
+        building.mesh.visible = building.isAlive() && (mayaReveal || humanFog.canSeeBuilding(building, this.game.humanPlayerId));
       }
     }
 
@@ -663,6 +668,11 @@ class GameInstance {
         this.autoAssignWorkers();
         return;
       }
+      // E: activate civilization power
+      if (e.code === 'KeyE' && !e.ctrlKey && !e.altKey) {
+        this.triggerCivPower();
+        return;
+      }
       // + / = : speed up;  - : slow down
       if (e.key === '+' || e.key === '=') {
         this._gameSpeed = Math.min(3.0, parseFloat((this._gameSpeed + 0.5).toFixed(1)));
@@ -722,6 +732,22 @@ class GameInstance {
     this._placingType = null;
     this.input.setPlacingMode(false);
     this.renderer.hideGhost();
+  }
+
+  private triggerCivPower() {
+    const sel = this.input.getSelectedUnits();
+    const selectedUnitId = sel.length > 0 ? sel[0].id : undefined;
+    const msg = activateCivPower(this.game, selectedUnitId);
+    if (msg) {
+      this.hud.notify(msg, 'success');
+      this.audio.playLevelUp();
+    } else if (this.game.humanPlayer.powerCooldown > 0) {
+      const secs = Math.ceil(this.game.humanPlayer.powerCooldown);
+      this.hud.notify(`⏳ Poder en recarga: ${secs}s`, 'warning');
+    } else {
+      // Power ready but couldn't activate (e.g. Aztec needs a selected unit)
+      this.hud.notify('⚠️ Selecciona una unidad para usar el poder', 'warning');
+    }
   }
 
   private autoAssignWorkers() {
