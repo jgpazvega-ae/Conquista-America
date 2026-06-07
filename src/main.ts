@@ -116,6 +116,9 @@ class GameInstance {
   private _lastSettlementHp     = -1;
   private _enemyBuildingsDestroyed = 0;
   private _gameSpeed = 1.0;
+  private _fpsFrames = 0;
+  private _fpsAccum  = 0;
+  private _fpsDisplay = 0;
 
   constructor(civ: CivilizationType, saveSystem: SaveSystem, difficulty: Difficulty = 'normal') {
     this.civ        = civ;
@@ -234,6 +237,10 @@ class GameInstance {
       if (this._placingType) this.renderer.updateGhostAt(col, row);
     };
 
+    this.input.onHover = (unitId, buildingId, x, y) => {
+      this.hud.showHoverTooltip(unitId, buildingId, x, y);
+    };
+
     this.input.onTerrainClick = (col, row) => {
       if (!this._placingType) return;
       const btype = this._placingType;
@@ -314,8 +321,10 @@ class GameInstance {
     if (this.destroyed) return;
     this.animId = requestAnimationFrame(() => this.loop());
 
-    const dt = Math.min(this.clock.getDelta(), 0.1) * this._gameSpeed;
+    const rawDt = Math.min(this.clock.getDelta(), 0.1);
+    const dt = rawDt * this._gameSpeed;
 
+    this.updateFpsCounter(rawDt);
     this.game.update(dt);
 
     // Register any units produced this frame
@@ -688,11 +697,13 @@ class GameInstance {
       if (e.key === '+' || e.key === '=') {
         this._gameSpeed = Math.min(3.0, parseFloat((this._gameSpeed + 0.5).toFixed(1)));
         this.hud.notify(`⏩ Velocidad ${this._gameSpeed}x`, 'info');
+        this.updateSpeedIndicator();
         return;
       }
       if (e.key === '-' || e.key === '_') {
         this._gameSpeed = Math.max(0.5, parseFloat((this._gameSpeed - 0.5).toFixed(1)));
         this.hud.notify(`⏪ Velocidad ${this._gameSpeed}x`, 'info');
+        this.updateSpeedIndicator();
         return;
       }
       // B: open build panel for human settlement
@@ -737,6 +748,33 @@ class GameInstance {
         return;
       }
     });
+  }
+
+  private updateSpeedIndicator() {
+    const el = document.getElementById('speed-indicator');
+    if (!el) return;
+    if (this._gameSpeed === 1.0) {
+      el.classList.add('hidden');
+    } else {
+      el.textContent = `⚡ ×${this._gameSpeed}`;
+      el.classList.remove('hidden');
+    }
+  }
+
+  private updateFpsCounter(rawDt: number) {
+    this._fpsFrames++;
+    this._fpsAccum += rawDt;
+    if (this._fpsAccum >= 0.5) {
+      this._fpsDisplay = Math.round(this._fpsFrames / this._fpsAccum);
+      this._fpsFrames = 0;
+      this._fpsAccum  = 0;
+      const el = document.getElementById('fps-counter');
+      if (el) {
+        const showFps = this.settings.settings.showFPS;
+        el.classList.toggle('hidden', !showFps);
+        if (showFps) el.textContent = `${this._fpsDisplay} FPS`;
+      }
+    }
   }
 
   private _cancelPlacing() {

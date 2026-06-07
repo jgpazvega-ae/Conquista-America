@@ -221,6 +221,8 @@
         <div id="hud-extras">
           <span id="hud-pop" title="Población actual / Límite (Almacenes +5 cada uno)">👥 <span id="pop-count">0/25</span></span>
           <span id="hud-timer">⏱ <span id="game-timer">0:00</span></span>
+          <span id="speed-indicator" class="hidden" title="Velocidad del juego">⚡ ×1.0</span>
+          <span id="fps-counter" class="hidden">0 FPS</span>
         </div>
         <div id="hud-actions">
           <button id="power-btn" class="power-btn" title="Poder especial (E)">
@@ -276,6 +278,9 @@
 
       <!-- Building HP bar overlays -->
       <div id="bldg-hpbar-container"></div>
+
+      <!-- Unit/building hover tooltip -->
+      <div id="hover-tooltip" class="hidden"></div>
 
       <!-- Toast notification container -->
       <div id="toast-container"></div>
