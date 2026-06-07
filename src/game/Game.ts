@@ -12,6 +12,7 @@ import { ResourceSystem } from './ResourceSystem';
 import { EconomyManager } from './EconomyManager';
 import { DiplomacyManager } from './Diplomacy';
 import { FogOfWarManager } from './FogOfWar';
+import { ObjectiveSystem } from './Objectives';
 import { CIVILIZATIONS } from './civilizations';
 import { CIV_COLORS, TILE_SIZE } from './constants';
 import type { DamageEvent } from './CombatSystem';
@@ -43,6 +44,7 @@ export class Game {
   private economy       = new EconomyManager();
   private diplomacy     = new DiplomacyManager();
   readonly fog: FogOfWarManager;
+  readonly objectives: ObjectiveSystem;
 
   damageEvents: DamageEvent[] = [];
   newlySpawnedUnits: Unit[] = [];
@@ -66,6 +68,7 @@ export class Game {
     this.spawnInitialBuildings();
     this.diplomacy.init();
     this.fog = new FogOfWarManager(this.players.length);
+    this.objectives = new ObjectiveSystem(this);
   }
 
   private spawnPlayers(humanCiv: CivilizationType) {
@@ -257,6 +260,7 @@ export class Game {
       this.fireRandomEvent();
     }
 
+    this.objectives.update(this);
     this.checkEndConditions();
   }
 
