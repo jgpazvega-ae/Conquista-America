@@ -1,6 +1,6 @@
 import './styles.css';
 import * as THREE from 'three';
-import { CivilizationType } from './game/types';
+import { CivilizationType, UnitState } from './game/types';
 import { SaveSystem } from './game/SaveSystem';
 import { AuthScreen } from './ui/AuthScreen';
 import { CivSelectScreen } from './ui/CivSelect';
@@ -144,12 +144,28 @@ class GameInstance {
     this.settings  = new SettingsPanel(this.saveSystem);
 
     this.input.onSelectionChange = () => {
-      this.hud.update(this.input.getSelectedUnits());
+      const sel = this.input.getSelectedUnits();
+      this.hud.update(sel);
       this.audio.playClick();
       this.prodPanel.hide();
+      // Path dots for single selected moving unit
+      this.renderer.clearUnitPath();
+      if (sel.length === 1 && sel[0].state === UnitState.MOVING && sel[0].path.length > sel[0].pathIndex) {
+        this.renderer.showUnitPath(sel[0].path, sel[0].pathIndex);
+      }
     };
     this.touch.onSelectionChange = () => this.hud.update(this.touch ? [] : []);
-    this.input.onMoveOrder = () => this.audio.playMove();
+    this.input.onMoveOrder = () => {
+      this.audio.playMove();
+      // Re-draw path dots shortly after move order (path is computed async)
+      setTimeout(() => {
+        const sel = this.input.getSelectedUnits();
+        this.renderer.clearUnitPath();
+        if (sel.length === 1 && sel[0].path.length > 0) {
+          this.renderer.showUnitPath(sel[0].path, sel[0].pathIndex);
+        }
+      }, 80);
+    };
     this.hud.onMinimapClick = (wx, wz) => this.camera.panTo(wx, wz);
 
     this.input.onRallySet = (col, row) => {
@@ -234,7 +250,10 @@ class GameInstance {
     };
 
     this.input.onTerrainHover = (col, row) => {
-      if (this._placingType) this.renderer.updateGhostAt(col, row);
+      if (this._placingType) {
+        const valid = this.game.map.isWalkable(col, row);
+        this.renderer.updateGhostAt(col, row, valid);
+      }
     };
 
     this.input.onHover = (unitId, buildingId, x, y) => {
