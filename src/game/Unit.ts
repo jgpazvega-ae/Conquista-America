@@ -53,6 +53,10 @@ export class Unit {
   xp:    number = 0;
   level: number = 1;
 
+  // Civilization power buffs
+  incaBuff  = false;
+  conquBuff = false;
+
   moveX: number = 0;
   moveZ: number = 0;
   moveProgress: number = 1;
