@@ -162,6 +162,27 @@ export class AudioManager {
       }, 12000 + Math.random() * 8000);
     };
     scheduleChatter();
+
+    // Pentatonic flute motif every 18–30 s (A minor pentatonic: A4-C5-D5-E5-G5)
+    const PENTA = [440, 523, 587, 659, 784];
+    const scheduleFlute = () => {
+      setTimeout(() => {
+        if (!this.ctx) return;
+        const len = 3 + Math.floor(Math.random() * 3); // 3–5 notes
+        const root = PENTA[Math.floor(Math.random() * 2)]; // A4 or C5 start
+        let t = 0;
+        for (let i = 0; i < len; i++) {
+          const f = PENTA[Math.floor(Math.random() * PENTA.length)];
+          const dur = 0.30 + Math.random() * 0.25;
+          this.osc(f, 'sine',     dur, 0.020 * this.musicVol, t);
+          this.osc(f, 'triangle', dur * 0.6, 0.008 * this.musicVol, t + 0.01);
+          t += dur * 0.65 + 0.05;
+        }
+        void root; // suppress unused warning
+        scheduleFlute();
+      }, (18 + Math.random() * 12) * 1000);
+    };
+    scheduleFlute();
   }
 
   playBuildingDestroyed() {
@@ -178,6 +199,20 @@ export class AudioManager {
     [262, 330, 392, 524].forEach((f, i) => this.osc(f, 'sine',     0.22, 0.22, i * 0.09));
     [262, 330, 392, 524].forEach((f, i) => this.osc(f, 'triangle', 0.18, 0.10, i * 0.09 + 0.03));
     this.osc(200, 'sine', 0.15, 0.10, 0, 100);
+  }
+
+  playTrainingComplete() {
+    // Short military horn: two rising notes
+    this.osc(330, 'triangle', 0.12, 0.16);
+    this.osc(440, 'triangle', 0.14, 0.18, 0.11);
+    this.osc(220, 'sine',     0.10, 0.10, 0.02);
+  }
+
+  playResourceDepleted() {
+    // Low warning thud
+    this.osc(140, 'sine',     0.20, 0.14, 0,    60);
+    this.osc(100, 'triangle', 0.18, 0.10, 0.06, 50);
+    this.noise(0.15, 0.08, 250, 0.02);
   }
 
   // ── Volume control ───────────────────────────────────────────────────────────
