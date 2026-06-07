@@ -172,6 +172,7 @@ class GameInstance {
     this.input.onRallySet = (col, row) => {
       if (this._panelBuilding?.isComplete()) {
         this._panelBuilding.setRally(col, row);
+        this.renderer.setRallyMarker(col, row);
         this.hud.notify('📍 Punto de reunión establecido', 'info');
       }
     };
@@ -384,6 +385,7 @@ class GameInstance {
     // Track destroyed enemy buildings
     for (const b of this.game.newlyDestroyedBuildings) {
       this.audio.playBuildingDestroyed();
+      this.camera.shake(b.type === BuildingType.SETTLEMENT ? 0.55 : 0.30, 0.45);
       if (b.playerId !== this.game.humanPlayerId) {
         this._enemyBuildingsDestroyed++;
         if (b.type === BuildingType.SETTLEMENT) {
@@ -658,6 +660,7 @@ class GameInstance {
         this.input.setAttackMoveMode(false);
         for (const u of this.game.getAllUnits()) u.setSelected(false);
         this._panelBuilding = null;
+        this.renderer.clearRallyMarker();
         this.prodPanel.hide();
         this.hud.update([]);
         return;
