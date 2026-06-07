@@ -202,7 +202,18 @@ class GameInstance {
       this.prodPanel.onUpgrade = (key) => {
         const ok = this.game.applyUpgrade(key, this.game.humanPlayerId);
         if (ok) {
-          const names: Record<string, string> = { metallurgy: 'Metalurgia', logistics: 'Logística', fortification: 'Fortificación' };
+          const civTechNames: Record<CivilizationType, string> = {
+            [CivilizationType.AZTEC]:        '🐆 Élite Jaguar',
+            [CivilizationType.INCA]:         '🛤️ Caminos del Inca',
+            [CivilizationType.MAYA]:         '🔭 Observatorio Maya',
+            [CivilizationType.CONQUISTADOR]: '💣 Pólvora Avanzada',
+          };
+          const names: Record<string, string> = {
+            metallurgy:    'Metalurgia',
+            logistics:     'Logística',
+            fortification: 'Fortificación',
+            civTech:       civTechNames[this.game.humanPlayer.civType],
+          };
           this.hud.notify(`🔬 ${names[key]} investigada — beneficio aplicado`, 'success');
           this.audio.playBuild();
           this.prodPanel.refresh();

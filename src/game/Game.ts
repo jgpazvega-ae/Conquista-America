@@ -230,6 +230,7 @@ export class Game {
 
     for (const node of this.resourceNodes) {
       node.updateVisibility();
+      node.updateRegen(dt);
     }
 
     this.damageEvents = this.combat.update(this.allUnits, this.map);
@@ -431,8 +432,10 @@ export class Game {
       metallurgy:    { food: 0,   gold: 150, stone: 100 },
       logistics:     { food: 100, gold: 100, stone: 0   },
       fortification: { food: 0,   gold: 80,  stone: 150 },
+      civTech:       { food: 100, gold: 200, stone: 150 },
     };
     const cost = costs[upgrade];
+    if (!cost) return false;
     if (player.resources.food  < cost.food)  return false;
     if (player.resources.gold  < cost.gold)  return false;
     if (player.resources.stone < cost.stone) return false;
@@ -448,6 +451,23 @@ export class Game {
       if (upgrade === 'metallurgy')    unit.attack   = Math.min(unit.attack + 6,   unit.def.stats.attack * 2);
       if (upgrade === 'logistics')     unit.speed    = Math.min(unit.speed  + 0.4, unit.def.stats.speed  * 2);
       if (upgrade === 'fortification') { unit.maxHp += 50; unit.hp = Math.min(unit.hp + 50, unit.maxHp); }
+      if (upgrade === 'civTech') {
+        switch (player.civType) {
+          case CivilizationType.AZTEC:
+            unit.attack = Math.min(unit.attack + 10, unit.def.stats.attack * 2);
+            unit.maxHp += 30; unit.hp = Math.min(unit.hp + 30, unit.maxHp);
+            break;
+          case CivilizationType.INCA:
+            unit.speed = Math.min(unit.speed + 0.6, unit.def.stats.speed * 2.5);
+            break;
+          case CivilizationType.MAYA:
+            unit.sight = Math.min(unit.sight + 3, 18);
+            break;
+          case CivilizationType.CONQUISTADOR:
+            unit.attack = Math.min(unit.attack + 12, unit.def.stats.attack * 2);
+            break;
+        }
+      }
     }
     return true;
   }
