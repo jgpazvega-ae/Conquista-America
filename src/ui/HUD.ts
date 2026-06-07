@@ -49,6 +49,8 @@ export class HUD {
   private camera: import('../engine/Camera').RTSCamera | null = null;
   setCamera(cam: import('../engine/Camera').RTSCamera) { this.camera = cam; }
 
+  private _bldgHpBars: Map<number, { wrap: HTMLElement; fill: HTMLElement }> = new Map();
+
   private renderer: Renderer | null = null;
   setRenderer(r: Renderer) { this.renderer = r; }
 
@@ -172,6 +174,7 @@ export class HUD {
     this.updateScoreboard();
     this.updateObjectives();
     this.updatePowerButton();
+    this.updateBuildingHpBars();
   }
 
   private updatePowerButton() {
@@ -449,6 +452,51 @@ export class HUD {
       document.body.appendChild(el);
 
       setTimeout(() => el.remove(), 1100);
+    }
+  }
+
+  private updateBuildingHpBars() {
+    if (!this.renderer) return;
+    const container = document.getElementById('bldg-hpbar-container');
+    if (!container) return;
+
+    const humanFog = this.game.fog.getFog(this.game.humanPlayerId);
+    const seen = new Set<number>();
+
+    for (const building of this.game.allBuildings) {
+      if (!building.isAlive() || building.hp >= building.maxHp) continue;
+      const vis = humanFog?.getVisibility(building.col, building.row);
+      if (vis === TileVisibility.UNEXPLORED) continue;
+
+      seen.add(building.id);
+
+      let bar = this._bldgHpBars.get(building.id);
+      if (!bar) {
+        const wrap = document.createElement('div');
+        wrap.className = 'bldg-hpbar';
+        const fill = document.createElement('div');
+        fill.className = 'bldg-hpbar-fill';
+        wrap.appendChild(fill);
+        container.appendChild(wrap);
+        bar = { wrap, fill };
+        this._bldgHpBars.set(building.id, bar);
+      }
+
+      const pos = this.renderer.worldToScreen(building.col * TILE_SIZE, 1.8, building.row * TILE_SIZE);
+      bar.wrap.style.left = `${pos.x}px`;
+      bar.wrap.style.top  = `${pos.y - 14}px`;
+
+      const pct = (building.hp / building.maxHp) * 100;
+      bar.fill.style.width = `${pct}%`;
+      bar.fill.style.background = pct > 60 ? '#44dd66' : pct > 30 ? '#ddaa22' : '#dd3333';
+      bar.wrap.style.opacity = vis === TileVisibility.FOGGED ? '0.45' : '1';
+    }
+
+    for (const [id, bar] of this._bldgHpBars) {
+      if (!seen.has(id)) {
+        bar.wrap.remove();
+        this._bldgHpBars.delete(id);
+      }
     }
   }
 
