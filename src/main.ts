@@ -120,6 +120,7 @@ class GameInstance {
   private _fpsFrames = 0;
   private _fpsAccum  = 0;
   private _fpsDisplay = 0;
+  private _idleUnitIdx = 0; // cycles through idle units on 'I' press
 
   constructor(civ: CivilizationType, saveSystem: SaveSystem, difficulty: Difficulty = 'normal') {
     this.civ        = civ;
@@ -424,6 +425,10 @@ class GameInstance {
     this.camera.update(dt);
     this.renderer.updateEffects(dt);
 
+    // Day/night cycle: one full cycle every 480 game-seconds
+    const DAY_CYCLE = 480;
+    this.renderer.setDayNight((this.game.gameTime % DAY_CYCLE) / DAY_CYCLE);
+
     // Kill tracking
     const prevAlive = this.game.getAllUnits().filter(u => !u.isAlive() && u.playerId !== this.game.humanPlayerId).length;
 
@@ -715,6 +720,20 @@ class GameInstance {
       if (e.key === '?' || e.code === 'Slash' && e.shiftKey) {
         const overlay = document.getElementById('controls-overlay');
         overlay?.classList.toggle('hidden');
+        return;
+      }
+      // I: cycle through idle military units (find next, select & center)
+      if (e.code === 'KeyI' && !e.ctrlKey && !e.altKey) {
+        const idle = this.game.humanPlayer.aliveUnits.filter(u => u.state === UnitState.IDLE);
+        if (idle.length === 0) { this.hud.notify('Sin unidades inactivas', 'info'); return; }
+        this._idleUnitIdx = this._idleUnitIdx % idle.length;
+        const u = idle[this._idleUnitIdx];
+        this._idleUnitIdx++;
+        for (const x of this.game.getAllUnits()) x.setSelected(false);
+        u.setSelected(true);
+        this.camera.panTo(u.worldX, u.worldZ);
+        this.hud.update(this.input.getSelectedUnits());
+        this.hud.notify(`🔍 Unidad inactiva seleccionada (${this._idleUnitIdx}/${idle.length})`, 'info');
         return;
       }
       // Q: auto-assign idle workers to nearest resource
