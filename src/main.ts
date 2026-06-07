@@ -132,6 +132,7 @@ class GameInstance {
     this.hud      = new HUD(this.game);
     this.camera   = new RTSCamera(this.renderer.camera);
     this.hud.setCamera(this.camera);
+    this.hud.setRenderer(this.renderer);
     this.input    = new InputHandler(this.renderer, this.game, this.camera);
     this.touch    = new TouchHandler(this.camera, this.renderer, this.game);
     this.audio     = new AudioManager();

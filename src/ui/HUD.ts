@@ -6,6 +6,7 @@ import type { DamageEvent } from '../game/CombatSystem';
 import { TileVisibility } from '../game/FogOfWar';
 import { ResourceType } from '../game/ResourceNode';
 import { BuildingType } from '../game/buildings';
+import type { Renderer } from '../engine/Renderer';
 
 function hex(n: number): string {
   return '#' + n.toString(16).padStart(6, '0');
@@ -42,6 +43,9 @@ export class HUD {
 
   private camera: import('../engine/Camera').RTSCamera | null = null;
   setCamera(cam: import('../engine/Camera').RTSCamera) { this.camera = cam; }
+
+  private renderer: Renderer | null = null;
+  setRenderer(r: Renderer) { this.renderer = r; }
 
   constructor(game: Game) {
     this.game = game;
@@ -140,6 +144,24 @@ export class HUD {
     // Minimap units
     this.updateMinimap();
     this.updateScoreboard();
+    this.updateObjectives();
+  }
+
+  private updateObjectives() {
+    const listEl = document.getElementById('obj-list');
+    if (!listEl) return;
+    const objs = this.game.objectives.objectives;
+    listEl.innerHTML = objs.map(obj => {
+      const pct = Math.min(100, (obj.progress / obj.target) * 100);
+      const done = obj.completed;
+      return `<div class="obj-row">
+        <span class="obj-check">${done ? '✅' : '⬜'}</span>
+        <div class="obj-text${done ? ' done' : ''}">
+          ${obj.title}
+          ${!done ? `<div class="obj-progress"><div class="obj-progress-fill" style="width:${pct}%"></div></div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
   }
 
   private updateScoreboard() {
@@ -360,15 +382,21 @@ export class HUD {
       el.className = 'damage-number';
       el.textContent = `-${evt.damage}`;
 
-      // Convert world position to screen
-      const screenX = (evt.worldX / (this.game.map.cols * 2)) * window.innerWidth;
-      const screenY = (evt.worldZ / (this.game.map.rows * 2)) * window.innerHeight;
+      let screenX: number, screenY: number;
+      if (this.renderer) {
+        const pos = this.renderer.worldToScreen(evt.worldX, 1.2, evt.worldZ);
+        screenX = pos.x;
+        screenY = pos.y;
+      } else {
+        screenX = (evt.worldX / (this.game.map.cols * TILE_SIZE)) * window.innerWidth;
+        screenY = (evt.worldZ / (this.game.map.rows * TILE_SIZE)) * window.innerHeight;
+      }
 
       el.style.left = `${screenX}px`;
       el.style.top  = `${screenY}px`;
       document.body.appendChild(el);
 
-      setTimeout(() => el.remove(), 1200);
+      setTimeout(() => el.remove(), 1100);
     }
   }
 
