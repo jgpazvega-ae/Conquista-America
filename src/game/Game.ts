@@ -43,6 +43,7 @@ export class Game {
   private aiSystem      = new AISystem();
   private resourceSys   = new ResourceSystem();
   private economy       = new EconomyManager();
+  getEconomyStats(playerId: number) { return this.economy.getStats(playerId); }
   private diplomacy     = new DiplomacyManager();
   readonly fog: FogOfWarManager;
   readonly objectives: ObjectiveSystem;

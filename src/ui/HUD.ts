@@ -16,9 +16,12 @@ function hex(n: number): string {
 export class HUD {
   private game: Game;
 
-  private elFood   = document.getElementById('res-food')!;
-  private elGold   = document.getElementById('res-gold')!;
-  private elStone  = document.getElementById('res-stone')!;
+  private elFood      = document.getElementById('res-food')!;
+  private elGold      = document.getElementById('res-gold')!;
+  private elStone     = document.getElementById('res-stone')!;
+  private elFoodRate  = document.getElementById('res-food-rate');
+  private elGoldRate  = document.getElementById('res-gold-rate');
+  private elStoneRate = document.getElementById('res-stone-rate');
   private elStatus = document.getElementById('game-status')!;
   private elCivBadge = document.getElementById('civ-badge')!;
   private unitPanel  = document.getElementById('unit-panel')!;
@@ -105,6 +108,19 @@ export class HUD {
     this.elFood.textContent  = String(Math.floor(player.resources.food));
     this.elGold.textContent  = String(Math.floor(player.resources.gold));
     this.elStone.textContent = String(Math.floor(player.resources.stone));
+
+    // Economy rate indicators
+    const econStats = this.game.getEconomyStats(player.id);
+    if (econStats) {
+      this.setRateEl(this.elFoodRate,  econStats.netProduction.food);
+      this.setRateEl(this.elGoldRate,  econStats.netProduction.gold);
+      this.setRateEl(this.elStoneRate, econStats.netProduction.stone);
+    }
+
+    // Low resource warnings — pulse the resource chip red
+    this.elFood.closest('.res')?.classList.toggle('res-low', player.resources.food < 50);
+    this.elGold.closest('.res')?.classList.toggle('res-low', player.resources.gold < 30);
+    this.elStone.closest('.res')?.classList.toggle('res-low', player.resources.stone < 30);
 
     // Timer
     const secs = Math.floor(this.game.gameTime);
@@ -415,8 +431,8 @@ export class HUD {
   showDamageNumbers(events: DamageEvent[]) {
     for (const evt of events) {
       const el = document.createElement('div');
-      el.className = 'damage-number';
-      el.textContent = `-${evt.damage}`;
+      el.className = evt.critical ? 'damage-number damage-crit' : 'damage-number';
+      el.textContent = evt.critical ? `💥${evt.damage}` : `-${evt.damage}`;
 
       let screenX: number, screenY: number;
       if (this.renderer) {
@@ -433,6 +449,21 @@ export class HUD {
       document.body.appendChild(el);
 
       setTimeout(() => el.remove(), 1100);
+    }
+  }
+
+  private setRateEl(el: HTMLElement | null, net: number) {
+    if (!el) return;
+    const rounded = Math.round(net);
+    if (rounded > 0) {
+      el.textContent = `+${rounded}`;
+      el.className = 'res-rate res-rate-pos';
+    } else if (rounded < 0) {
+      el.textContent = `${rounded}`;
+      el.className = 'res-rate res-rate-neg';
+    } else {
+      el.textContent = '';
+      el.className = 'res-rate';
     }
   }
 
