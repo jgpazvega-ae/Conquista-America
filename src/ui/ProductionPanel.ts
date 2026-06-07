@@ -3,13 +3,21 @@ import type { Player, PlayerUpgrades } from '../game/Player';
 import { CIVILIZATIONS } from '../game/civilizations';
 import { TRAIN_COSTS } from '../game/unitProduction';
 import type { UnitType } from '../game/types';
+import { CivilizationType } from '../game/types';
 import { BuildingType } from '../game/buildings';
 import { BUILDING_DEFS } from '../game/buildingDefs';
 
-const UPGRADE_DEFS: Array<{ key: keyof PlayerUpgrades; name: string; emoji: string; desc: string; food: number; gold: number; stone: number }> = [
+type UpgradeDef = { key: keyof PlayerUpgrades; name: string; emoji: string; desc: string; food: number; gold: number; stone: number; civ?: CivilizationType };
+
+const UPGRADE_DEFS: UpgradeDef[] = [
   { key: 'metallurgy',    name: 'Metalurgia',    emoji: '⚔️', desc: 'Todas las unidades +6 ataque permanentemente', food: 0, gold: 150, stone: 100 },
   { key: 'logistics',     name: 'Logística',     emoji: '👟', desc: 'Todas las unidades +0.4 velocidad permanentemente', food: 100, gold: 100, stone: 0 },
   { key: 'fortification', name: 'Fortificación', emoji: '🛡️', desc: 'Todas las unidades +50 HP máx permanentemente', food: 0, gold: 80, stone: 150 },
+  // Civ-specific elite techs
+  { key: 'civTech', name: 'Élite Jaguar',         emoji: '🐆', desc: 'Guerreros +10 ataque y +30 HP máx', food: 100, gold: 200, stone: 150, civ: CivilizationType.AZTEC },
+  { key: 'civTech', name: 'Caminos del Inca',     emoji: '🛤️', desc: 'Todas las unidades +0.6 velocidad', food: 100, gold: 200, stone: 150, civ: CivilizationType.INCA },
+  { key: 'civTech', name: 'Observatorio Maya',    emoji: '🔭', desc: 'Todas las unidades +3 tiles de visión', food: 100, gold: 200, stone: 150, civ: CivilizationType.MAYA },
+  { key: 'civTech', name: 'Pólvora Avanzada',     emoji: '💣', desc: 'Todas las unidades +12 ataque', food: 100, gold: 200, stone: 150, civ: CivilizationType.CONQUISTADOR },
 ];
 
 const BUILDABLE: BuildingType[] = [
@@ -155,6 +163,7 @@ export class ProductionPanel {
     listEl.innerHTML = '';
 
     for (const upg of UPGRADE_DEFS) {
+      if (upg.civ !== undefined && upg.civ !== p.civType) continue;
       const done = p.upgrades[upg.key];
       const canAfford = !done && p.resources.food >= upg.food && p.resources.gold >= upg.gold && p.resources.stone >= upg.stone;
 
