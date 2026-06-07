@@ -12,20 +12,22 @@ import { ResourceType } from './ResourceNode';
 import { CIV_COLORS } from './constants';
 import { TRAIN_COSTS } from './unitProduction';
 
-const AI_BUILD_INTERVAL  = 14.0;
-const AI_WORKER_INTERVAL = 5.0;
-const AI_TRAIN_INTERVAL  = 10.0;
+const AI_BUILD_INTERVAL    = 14.0;
+const AI_WORKER_INTERVAL   = 5.0;
+const AI_TRAIN_INTERVAL    = 10.0;
+const AI_UPGRADE_INTERVAL  = 45.0;
 
 // Wave-attack phases: gather forces then launch coordinated assault
 const GATHER_DURATION  = 40.0; // seconds to mass forces before attacking
 const ATTACK_DURATION  = 25.0; // seconds of active assault before regrouping
 
 interface AIState {
-  buildTimer:  number;
-  workerTimer: number;
-  trainTimer:  number;
-  phase:       'gathering' | 'attacking';
-  phaseTimer:  number;
+  buildTimer:   number;
+  workerTimer:  number;
+  trainTimer:   number;
+  upgradeTimer: number;
+  phase:        'gathering' | 'attacking';
+  phaseTimer:   number;
 }
 
 export class AISystem {
@@ -40,15 +42,17 @@ export class AISystem {
         state = {
           buildTimer: 0, workerTimer: 0,
           trainTimer: Math.random() * 8,
+          upgradeTimer: Math.random() * 20,
           phase: 'gathering', phaseTimer: Math.random() * 15,
         };
         this.aiStates.set(player.id, state);
       }
 
-      state.buildTimer  += dt;
-      state.workerTimer += dt;
-      state.trainTimer  += dt;
-      state.phaseTimer  += dt;
+      state.buildTimer   += dt;
+      state.workerTimer  += dt;
+      state.trainTimer   += dt;
+      state.upgradeTimer += dt;
+      state.phaseTimer   += dt;
 
       // Difficulty: base scale multiplier
       const diffMult = game.difficulty === 'easy' ? 2.2 : game.difficulty === 'hard' ? 0.6 : 1.0;
@@ -90,6 +94,11 @@ export class AISystem {
       if (state.trainTimer >= AI_TRAIN_INTERVAL * scale) {
         state.trainTimer = 0;
         this.orderTraining(player, game);
+      }
+
+      if (state.upgradeTimer >= AI_UPGRADE_INTERVAL * diffMult) {
+        state.upgradeTimer = 0;
+        this.applyAIUpgrades(player, game);
       }
     }
   }
@@ -227,6 +236,16 @@ export class AISystem {
       player.resources.food  -= cost.food;
       player.resources.gold  -= cost.gold;
       player.resources.stone -= cost.stone ?? 0;
+    }
+  }
+
+  private applyAIUpgrades(player: Player, game: Game) {
+    const order: Array<keyof import('./Player').PlayerUpgrades> = ['metallurgy', 'logistics', 'fortification', 'civTech'];
+    for (const upg of order) {
+      if (!player.upgrades[upg]) {
+        game.applyUpgrade(upg, player.id);
+        return; // one at a time
+      }
     }
   }
 
