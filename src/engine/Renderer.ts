@@ -50,6 +50,10 @@ export class Renderer {
 
   // ── Ghost building preview ─────────────────────────────────────────────────
   private _ghostMesh: THREE.Group | null = null;
+  private _ghostMat: THREE.MeshStandardMaterial | null = null;
+
+  // ── Unit path visualization ────────────────────────────────────────────────
+  private _pathDots: THREE.Mesh[] = [];
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -735,16 +739,44 @@ export class Renderer {
     group.add(new THREE.Mesh(geo, mat));
     this.scene.add(group);
     this._ghostMesh = group;
+    this._ghostMat  = mat;
   }
 
-  updateGhostAt(col: number, row: number) {
+  updateGhostAt(col: number, row: number, valid = true) {
     if (!this._ghostMesh) return;
     this._ghostMesh.position.set(col * TILE_SIZE, 1, row * TILE_SIZE);
+    if (this._ghostMat) {
+      this._ghostMat.color.setHex(valid ? 0x44dd88 : 0xdd3333);
+      this._ghostMat.opacity = valid ? 0.38 : 0.45;
+    }
   }
 
   hideGhost() {
     if (!this._ghostMesh) return;
     this.scene.remove(this._ghostMesh);
     this._ghostMesh = null;
+    this._ghostMat  = null;
+  }
+
+  showUnitPath(path: import('../game/types').GridPos[], fromIndex = 0) {
+    this.clearUnitPath();
+    const geo = new THREE.CircleGeometry(0.18, 8);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x44aaff, transparent: true, opacity: 0.65, depthTest: false,
+    });
+    const step = Math.max(1, Math.ceil((path.length - fromIndex) / 24)); // max 24 dots
+    for (let i = fromIndex; i < path.length; i += step) {
+      const dot = new THREE.Mesh(geo, mat);
+      dot.rotation.x = -Math.PI / 2;
+      dot.position.set(path[i].col * TILE_SIZE, 0.06, path[i].row * TILE_SIZE);
+      dot.renderOrder = 5;
+      this.scene.add(dot);
+      this._pathDots.push(dot);
+    }
+  }
+
+  clearUnitPath() {
+    for (const dot of this._pathDots) this.scene.remove(dot);
+    this._pathDots = [];
   }
 }
