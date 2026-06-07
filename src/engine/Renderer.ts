@@ -55,6 +55,10 @@ export class Renderer {
   // ── Unit path visualization ────────────────────────────────────────────────
   private _pathDots: THREE.Mesh[] = [];
 
+  // ── Rally point marker ─────────────────────────────────────────────────────
+  private _rallyMarker: THREE.Group | null = null;
+  private _rallyPhase  = 0;
+
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -666,10 +670,63 @@ export class Renderer {
     this.fogTexture.needsUpdate = true;
   }
 
+  /** Place a pulsing flag at the rally point grid position. Replaces any existing rally marker. */
+  setRallyMarker(col: number, row: number) {
+    this.clearRallyMarker();
+    const wx = col * TILE_SIZE + TILE_SIZE / 2;
+    const wz = row * TILE_SIZE + TILE_SIZE / 2;
+    const y  = this.getHeightAt(wx, wz);
+    const group = new THREE.Group();
+    group.position.set(wx, y, wz);
+    group.userData.baseY = y;
+
+    // Flagpole
+    const poleMat = new THREE.MeshBasicMaterial({ color: 0xddddcc });
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.2, 6), poleMat);
+    pole.position.y = 1.1;
+    group.add(pole);
+
+    // Flag (flat box)
+    const flagMat = new THREE.MeshBasicMaterial({ color: 0x44ccff, transparent: true, opacity: 0.92, side: THREE.DoubleSide });
+    const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.45), flagMat);
+    flag.position.set(0.4, 2.15, 0);
+    flag.rotation.y = Math.PI / 2;
+    group.add(flag);
+
+    // Ground ring
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0x44ccff, transparent: true, opacity: 0.65, side: THREE.DoubleSide, depthWrite: false });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.55, 20), ringMat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.06;
+    ring.renderOrder = 4;
+    group.add(ring);
+
+    group.renderOrder = 6;
+    this.scene.add(group);
+    this._rallyMarker = group;
+    this._rallyPhase  = 0;
+  }
+
+  clearRallyMarker() {
+    if (this._rallyMarker) {
+      this.scene.remove(this._rallyMarker);
+      this._rallyMarker = null;
+    }
+  }
+
   updateEffects(dt: number) {
     this.effects.update(dt);
     if (this.waterMat) this.waterMat.uniforms.time.value += dt;
     this.updateMarkers(dt);
+    // Animate rally marker: gentle bob + ring pulse
+    if (this._rallyMarker) {
+      this._rallyPhase += dt * 2.2;
+      this._rallyMarker.position.y = this._rallyMarker.userData.baseY + Math.sin(this._rallyPhase) * 0.12;
+      const ring = this._rallyMarker.children[2] as THREE.Mesh;
+      const ps = 1 + Math.sin(this._rallyPhase * 1.5) * 0.15;
+      ring.scale.set(ps, ps, ps);
+      (ring.material as THREE.MeshBasicMaterial).opacity = 0.5 + Math.sin(this._rallyPhase) * 0.2;
+    }
   }
 
   render() {
