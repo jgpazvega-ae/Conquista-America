@@ -500,6 +500,68 @@ export class HUD {
     }
   }
 
+  showHoverTooltip(unitId: number | null, buildingId: number | null, screenX: number, screenY: number) {
+    const el = document.getElementById('hover-tooltip');
+    if (!el) return;
+
+    if (unitId === null && buildingId === null) {
+      el.classList.add('hidden');
+      return;
+    }
+
+    let html = '';
+    if (unitId !== null) {
+      const unit = this.game.allUnits.find(u => u.id === unitId);
+      if (!unit || !unit.isAlive()) { el.classList.add('hidden'); return; }
+      const pct = (unit.hp / unit.maxHp) * 100;
+      const hpColor = pct > 60 ? '#44dd66' : pct > 30 ? '#ddaa22' : '#dd3333';
+      const owner = this.game.players[unit.playerId];
+      const ownerLabel = owner?.isHuman ? '(Tú)' : CIV_NAMES[unit.civType];
+      html = `
+        <span class="ht-portrait">${unit.def.emoji}</span>
+        <div class="ht-name">${unit.def.name}</div>
+        <div class="ht-civ">${ownerLabel} · Nv.${unit.level}</div>
+        <div class="ht-hp-wrap"><div class="ht-hp-fill" style="width:${pct}%;background:${hpColor}"></div></div>
+        <div class="ht-stats">
+          <span>⚔️${unit.attack}</span>
+          <span>🛡️${unit.defense}</span>
+          <span>💨${unit.speed.toFixed(1)}</span>
+          <span>❤️${unit.hp}/${unit.maxHp}</span>
+        </div>`;
+    } else if (buildingId !== null) {
+      const building = this.game.allBuildings.find(b => b.id === buildingId);
+      if (!building || !building.isAlive()) { el.classList.add('hidden'); return; }
+      const pct = (building.hp / building.maxHp) * 100;
+      const hpColor = pct > 60 ? '#44dd66' : pct > 30 ? '#ddaa22' : '#dd3333';
+      const owner = this.game.players[building.playerId];
+      const ownerLabel = owner?.isHuman ? '(Tú)' : CIV_NAMES[owner?.civType ?? 0];
+      const status = !building.isComplete()
+        ? `🔨 ${Math.round(building.buildProgress * 100)}% construido`
+        : building.productionQueue?.length > 0
+          ? `⚙️ Produciendo (${building.productionQueue.length} en cola)`
+          : '✅ Inactivo';
+      html = `
+        <div class="ht-name">${building.def?.name ?? building.type}</div>
+        <div class="ht-civ">${ownerLabel}</div>
+        <div class="ht-hp-wrap"><div class="ht-hp-fill" style="width:${pct}%;background:${hpColor}"></div></div>
+        <div class="ht-stats"><span>❤️${building.hp}/${building.maxHp}</span></div>
+        <div class="ht-status">${status}</div>`;
+    }
+
+    el.innerHTML = html;
+    el.classList.remove('hidden');
+
+    // Position near cursor, keep inside viewport
+    const margin = 12;
+    const tipW = 220, tipH = 120;
+    let left = screenX + margin;
+    let top  = screenY + margin;
+    if (left + tipW > window.innerWidth)  left = screenX - tipW - margin;
+    if (top  + tipH > window.innerHeight) top  = screenY - tipH - margin;
+    el.style.left = `${left}px`;
+    el.style.top  = `${top}px`;
+  }
+
   private setRateEl(el: HTMLElement | null, net: number) {
     if (!el) return;
     const rounded = Math.round(net);
