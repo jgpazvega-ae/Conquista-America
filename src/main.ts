@@ -121,6 +121,9 @@ class GameInstance {
   private _fpsAccum  = 0;
   private _fpsDisplay = 0;
   private _idleUnitIdx = 0; // cycles through idle units on 'I' press
+  private _unitsTrainedCount = 0;
+  private _totalResourcesSpent = 0; // food+gold+stone combined
+  private _buildingSmokeTimers = new Map<number, number>(); // building.id → seconds since last puff
 
   constructor(civ: CivilizationType, saveSystem: SaveSystem, difficulty: Difficulty = 'normal') {
     this.civ        = civ;
@@ -218,6 +221,7 @@ class GameInstance {
         player.resources.food  -= cost.food;
         player.resources.gold  -= cost.gold;
         player.resources.stone -= cost.stone ?? 0;
+        this._totalResourcesSpent += cost.food + cost.gold + (cost.stone ?? 0);
         this.audio.playBuild();
         this.prodPanel.refresh();
       };
@@ -354,6 +358,7 @@ class GameInstance {
       this.renderer.addUnit(unit);
       if (unit.playerId === this.game.humanPlayerId) {
         this.audio.playTrainingComplete();
+        this._unitsTrainedCount++;
         this.hud.notify(`✅ ${unit.def.name} listo para combate`, 'success');
       }
     }
@@ -428,6 +433,31 @@ class GameInstance {
     // Day/night cycle: one full cycle every 480 game-seconds
     const DAY_CYCLE = 480;
     this.renderer.setDayNight((this.game.gameTime % DAY_CYCLE) / DAY_CYCLE);
+
+    // Persistent smoke/fire for damaged buildings
+    for (const b of this.game.allBuildings) {
+      if (!b.isAlive() || !b.isComplete()) continue;
+      const ratio = b.hp / b.maxHp;
+      if (ratio >= 0.5) { this._buildingSmokeTimers.delete(b.id); continue; }
+      // Check visibility
+      const vis = humanFog ? humanFog.getVisibility(b.col, b.row) : 1;
+      if (vis === 0 /* UNEXPLORED */) continue;
+      const prev = this._buildingSmokeTimers.get(b.id) ?? 0;
+      const interval = ratio < 0.25 ? 0.35 : 0.90; // fire interval vs smoke
+      if (prev + dt >= interval) {
+        this._buildingSmokeTimers.set(b.id, 0);
+        const wx = b.col * TILE_SIZE + TILE_SIZE / 2;
+        const wz = b.row * TILE_SIZE + TILE_SIZE / 2;
+        const y  = 1.2;
+        if (ratio < 0.25) {
+          this.renderer.effects.createExplosion(wx + (Math.random()-0.5)*1.5, y, wz + (Math.random()-0.5)*1.5, 0.25);
+        } else {
+          this.renderer.effects.createDustCloud(wx + (Math.random()-0.5)*1.5, wz + (Math.random()-0.5)*1.5);
+        }
+      } else {
+        this._buildingSmokeTimers.set(b.id, prev + dt);
+      }
+    }
 
     // Kill tracking
     const prevAlive = this.game.getAllUnits().filter(u => !u.isAlive() && u.playerId !== this.game.humanPlayerId).length;
@@ -547,6 +577,7 @@ class GameInstance {
 
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
+    const maxPop = this.game.getAllUnits().filter(u => u.playerId === this.game.humanPlayerId).length;
     stats.innerHTML = `
       <div class="endgame-stat">
         <div class="endgame-stat-val">${m}:${String(s).padStart(2,'0')}</div>
@@ -563,6 +594,18 @@ class GameInstance {
       <div class="endgame-stat">
         <div class="endgame-stat-val">${this.builtCount}</div>
         <div class="endgame-stat-lbl">Edificios construidos</div>
+      </div>
+      <div class="endgame-stat">
+        <div class="endgame-stat-val">${this._unitsTrainedCount}</div>
+        <div class="endgame-stat-lbl">Unidades entrenadas</div>
+      </div>
+      <div class="endgame-stat">
+        <div class="endgame-stat-val">${maxPop}</div>
+        <div class="endgame-stat-lbl">Ejército final</div>
+      </div>
+      <div class="endgame-stat">
+        <div class="endgame-stat-val">${Math.round(this._totalResourcesSpent / 100) * 100}</div>
+        <div class="endgame-stat-lbl">Recursos invertidos</div>
       </div>
     `;
 
