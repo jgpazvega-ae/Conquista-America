@@ -20,6 +20,7 @@ export interface DamageEvent {
   damage:   number;
   worldX:   number;
   worldZ:   number;
+  critical?: boolean;
 }
 
 export class CombatSystem {
@@ -61,7 +62,7 @@ export class CombatSystem {
           dmg = Math.max(1, dmg - terrainDefenseBonus(tile?.terrain));
           const actual = target.takeDamage(dmg);
           unit.attackTimer = unit.attackCooldown;
-          this.events.push({ attacker: unit, target, damage: actual, worldX: target.worldX, worldZ: target.worldZ });
+          this.events.push({ attacker: unit, target, damage: actual, worldX: target.worldX, worldZ: target.worldZ, critical: multiplier >= 1.5 });
         }
       }
 
