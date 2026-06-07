@@ -27,6 +27,12 @@ export class Renderer {
   private waterMat?: THREE.ShaderMaterial;
   private sunDir = new THREE.Vector3(0.4, 1.0, 0.3).normalize();
 
+  // Day/night cycle — references kept for runtime updates
+  private _ambientLight: THREE.AmbientLight | null = null;
+  private _sunLight:     THREE.DirectionalLight | null = null;
+  private _hemiLight:    THREE.HemisphereLight | null = null;
+  private _fillLight:    THREE.DirectionalLight | null = null;
+
   // Height field for placing entities on the terrain surface
   private heightField: Float32Array = new Float32Array(0);
   private hfCols = 0; // = map.cols
@@ -118,9 +124,11 @@ export class Renderer {
     // ── Lighting rig: warm key sun + cool sky fill + soft ambient ──────────────
     const ambient = new THREE.AmbientLight(0xffffff, 0.35);
     this.scene.add(ambient);
+    this._ambientLight = ambient;
 
     const hemi = new THREE.HemisphereLight(0xbfd8ff, 0x4a4030, 0.65);
     this.scene.add(hemi);
+    this._hemiLight = hemi;
 
     const sun = new THREE.DirectionalLight(0xfff1d4, 2.1);
     sun.position.copy(this.sunDir).multiplyScalar(120);
@@ -136,11 +144,13 @@ export class Renderer {
     sun.shadow.normalBias = 0.5;
     this.scene.add(sun);
     this.scene.add(sun.target);
+    this._sunLight = sun;
 
     // Cool rim/fill from opposite side to sculpt silhouettes
     const fill = new THREE.DirectionalLight(0x9fc0ff, 0.45);
     fill.position.set(-60, 40, -50);
     this.scene.add(fill);
+    this._fillLight = fill;
 
     this.scene.add(this.tileGroup);
     this.scene.add(this.decoGroup);
@@ -727,6 +737,57 @@ export class Renderer {
       ring.scale.set(ps, ps, ps);
       (ring.material as THREE.MeshBasicMaterial).opacity = 0.5 + Math.sin(this._rallyPhase) * 0.2;
     }
+  }
+
+  /**
+   * Update scene lighting for time-of-day.
+   * @param t Normalised time: 0 = midnight, 0.25 = dawn, 0.5 = noon, 0.75 = dusk
+   */
+  setDayNight(t: number) {
+    if (!this._ambientLight || !this._sunLight || !this._hemiLight || !this._fillLight) return;
+
+    // sun elevation: rises at t=0.25, peaks t=0.5, sets t=0.75
+    const sunElevation = Math.sin((t - 0.25) * Math.PI * 2); // -1..1, positive during day
+
+    // Daytime fraction for interpolation
+    const dayFraction = THREE.MathUtils.clamp((sunElevation + 0.1) / 1.1, 0, 1);
+
+    // Ambient: bright white at noon, deep blue at midnight
+    const ambIntensity = 0.12 + dayFraction * 0.38;
+    this._ambientLight.intensity = ambIntensity;
+
+    // Sun: warm at dawn/dusk, white at noon, off at night
+    const sunIntensity = Math.max(0, sunElevation) * 2.4;
+    this._sunLight.intensity = sunIntensity;
+    // Colour: orange at dawn/dusk, white at noon
+    const warmth = 1 - Math.abs(sunElevation - 0.5) * 0.8; // 0 at rise/set, 1 at noon
+    this._sunLight.color.setRGB(1.0, 0.85 + warmth * 0.15, 0.65 + warmth * 0.35);
+
+    // Sun position arc: rises east (−x), peaks above, sets west (+x)
+    const sunAngle = (t - 0.25) * Math.PI * 2;
+    this._sunLight.position.set(
+      Math.sin(sunAngle) * 100,
+      Math.cos(sunAngle) * 80 + 20,
+      40,
+    );
+    this._sunLight.target.position.set(0, 0, 0);
+
+    // Hemisphere: sky blue during day, deep violet at night
+    const skyR = 0.55 + dayFraction * 0.20;
+    const skyG = 0.65 + dayFraction * 0.20;
+    const skyB = 0.80 + dayFraction * 0.20;
+    this._hemiLight.color.setRGB(skyR, skyG, skyB);
+    this._hemiLight.groundColor.setRGB(0.18 + dayFraction * 0.11, 0.15 + dayFraction * 0.10, 0.09 + dayFraction * 0.06);
+    this._hemiLight.intensity = 0.25 + dayFraction * 0.55;
+
+    // Fill: only noticeable at night as cool moonlight
+    this._fillLight.intensity = THREE.MathUtils.clamp(0.35 - dayFraction * 0.28, 0.07, 0.35);
+
+    // Background sky colour
+    const bgR = 0.04 + dayFraction * 0.35;
+    const bgG = 0.05 + dayFraction * 0.45;
+    const bgB = 0.12 + dayFraction * 0.50;
+    this.scene.background = new THREE.Color(bgR, bgG, bgB);
   }
 
   render() {
