@@ -47,6 +47,11 @@ export class Building {
   // Attack capability (watchtower)
   attackTimer: number = 0;
 
+  // Passive self-repair: seconds since last hit; repair starts after 10 s
+  private _timeSinceHit = 0;
+  private static readonly REPAIR_DELAY   = 10; // s before repair kicks in
+  private static readonly REPAIR_RATE    = 3;  // HP per second
+
   // Rally point for spawned units
   rallyCol: number | null = null;
   rallyRow: number | null = null;
@@ -339,8 +344,30 @@ export class Building {
     return this._prodQueue[0].elapsed / this._prodQueue[0].totalTime;
   }
 
+  updateRepair(dt: number) {
+    if (this.state === BuildingState.DESTROYED) return;
+    if (this.hp >= this.maxHp) { this._timeSinceHit = 0; return; }
+    this._timeSinceHit += dt;
+    if (this._timeSinceHit < Building.REPAIR_DELAY) return;
+    this.hp = Math.min(this.maxHp, this.hp + Building.REPAIR_RATE * dt);
+    // Re-sync HP bar
+    const pct = this.hp / this.maxHp;
+    this.progressBar.visible = pct < 1;
+    if (pct < 1) {
+      this.progressBar.scale.x = pct;
+      this.progressBar.position.x = (pct - 1) * 0.44;
+      (this.progressBar.material as THREE.MeshBasicMaterial).color.setHex(
+        pct > 0.5 ? 0x55dd44 : pct > 0.25 ? 0xddaa00 : 0xdd2222
+      );
+    }
+    if (this.hp >= this.maxHp * 0.3 && this.state === BuildingState.DAMAGED) {
+      this.state = BuildingState.COMPLETE;
+    }
+  }
+
   takeDamage(amount: number) {
     if (this.state === BuildingState.DESTROYED) return;
+    this._timeSinceHit = 0; // reset repair timer on hit
     this.hp = Math.max(0, this.hp - amount);
     // Show HP bar when damaged
     if (this.hp > 0 && this.hp < this.maxHp) {

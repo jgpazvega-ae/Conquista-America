@@ -65,6 +65,9 @@ export class Renderer {
   private _rallyMarker: THREE.Group | null = null;
   private _rallyPhase  = 0;
 
+  // ── Attack range ring for selected unit ────────────────────────────────────
+  private _rangeRing: THREE.Mesh | null = null;
+
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -721,6 +724,30 @@ export class Renderer {
     if (this._rallyMarker) {
       this.scene.remove(this._rallyMarker);
       this._rallyMarker = null;
+    }
+  }
+
+  /** Show a dashed range ring around a world position. radius in world units. */
+  showRangeRing(worldX: number, worldZ: number, radius: number, color = 0x88ddff) {
+    this.clearRangeRing();
+    const y = this.getHeightAt(worldX, worldZ) + 0.08;
+    const mat = new THREE.MeshBasicMaterial({
+      color, transparent: true, opacity: 0.40,
+      side: THREE.DoubleSide, depthWrite: false,
+    });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(radius - 0.12, radius + 0.12, 48), mat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(worldX, y, worldZ);
+    ring.renderOrder = 4;
+    this.scene.add(ring);
+    this._rangeRing = ring;
+  }
+
+  clearRangeRing() {
+    if (this._rangeRing) {
+      this.scene.remove(this._rangeRing);
+      (this._rangeRing.material as THREE.Material).dispose();
+      this._rangeRing = null;
     }
   }
 
