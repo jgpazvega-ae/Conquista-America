@@ -158,6 +158,14 @@ class GameInstance {
       if (sel.length === 1 && sel[0].state === UnitState.MOVING && sel[0].path.length > sel[0].pathIndex) {
         this.renderer.showUnitPath(sel[0].path, sel[0].pathIndex);
       }
+      // Attack range ring for single selected unit
+      this.renderer.clearRangeRing();
+      if (sel.length === 1) {
+        const u = sel[0];
+        const rangeWorld = u.attackRange * TILE_SIZE;
+        const color = u.attackRange > 1.5 ? 0x88ccff : 0xffcc44; // blue for ranged, gold for melee
+        this.renderer.showRangeRing(u.worldX, u.worldZ, rangeWorld, color);
+      }
     };
     this.touch.onSelectionChange = () => this.hud.update(this.touch ? [] : []);
     this.input.onMoveOrder = () => {
@@ -709,6 +717,7 @@ class GameInstance {
         for (const u of this.game.getAllUnits()) u.setSelected(false);
         this._panelBuilding = null;
         this.renderer.clearRallyMarker();
+        this.renderer.clearRangeRing();
         this.prodPanel.hide();
         this.hud.update([]);
         return;

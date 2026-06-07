@@ -37,8 +37,9 @@ export class HUD {
 
   private minimapBuilt = false;
   private minimapBase: ImageData | null = null;
-  private elTimer     = document.getElementById('game-timer');
-  private elPop       = document.getElementById('pop-count');
+  private elTimer      = document.getElementById('game-timer');
+  private elPop        = document.getElementById('pop-count');
+  private elPopBarFill = document.getElementById('pop-bar-fill') as HTMLDivElement | null;
   private elScoreboard = document.getElementById('scoreboard')!
 
   onMinimapClick: ((worldX: number, worldZ: number) => void) | null = null;
@@ -136,6 +137,14 @@ export class HUD {
       const cap = this.game.getPopCap(player.id);
       this.elPop.textContent = `${pop}/${cap}`;
       this.elPop.style.color = pop >= cap ? '#ff7777' : '';
+    }
+    if (this.elPopBarFill) {
+      const pop = player.aliveUnits.length;
+      const cap = this.game.getPopCap(player.id);
+      const pct = Math.min(100, (pop / cap) * 100);
+      this.elPopBarFill.style.width = `${pct}%`;
+      this.elPopBarFill.classList.toggle('pop-near', pct >= 75 && pct < 100);
+      this.elPopBarFill.classList.toggle('pop-full',  pct >= 100);
     }
 
     // Game status
