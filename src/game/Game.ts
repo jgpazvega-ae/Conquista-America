@@ -220,6 +220,7 @@ export class Game {
         }
       } else {
         building.updateProduction(dt);
+        building.updateRepair(dt);
         if (building.finishedUnit !== null) {
           this.spawnProducedUnit(building);
         }
