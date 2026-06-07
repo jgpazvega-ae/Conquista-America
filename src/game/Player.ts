@@ -25,6 +25,11 @@ export class Player {
   units: Unit[] = [];
   upgrades: PlayerUpgrades = { metallurgy: false, logistics: false, fortification: false };
 
+  // Civilization power state
+  powerCooldown   = 0;      // seconds remaining until next use
+  powerActive     = false;  // is the buff currently active?
+  powerActiveTimer= 0;      // seconds remaining on active buff
+
   // Simple AI state
   aiTimer = 0;
   aiAttackTimer = 0;

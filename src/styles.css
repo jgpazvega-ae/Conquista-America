@@ -596,6 +596,36 @@ input.toggle { width: 22px; height: 22px; accent-color: #d4880a; }
 .sb-hp-wrap { width: 52px; height: 5px; background: rgba(255,255,255,0.12); border-radius: 3px; overflow: hidden; }
 .sb-hp-fill { height: 100%; border-radius: 3px; transition: width 0.4s; }
 
+/* ═══════════════════════════════════════ CIVILIZATION POWER BUTTON ══ */
+.power-btn {
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 58px; height: 38px;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(200,160,80,0.35);
+  border-radius: 8px; cursor: pointer;
+  padding: 0; gap: 1px;
+  transition: all 0.2s;
+}
+.power-btn:hover { border-color: rgba(200,160,80,0.7); background: rgba(200,160,80,0.1); }
+.power-btn.ready { border-color: #f0c060; box-shadow: 0 0 8px rgba(240,192,80,0.35); }
+.power-btn.ready:hover { box-shadow: 0 0 14px rgba(240,192,80,0.55); }
+.power-btn.active { border-color: #66ffaa; box-shadow: 0 0 10px rgba(100,255,170,0.4); }
+#power-emoji { font-size: 15px; line-height: 1; position: relative; z-index: 1; }
+#power-label {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.5px;
+  text-transform: uppercase; color: rgba(200,160,80,0.8);
+  position: relative; z-index: 1;
+}
+.power-btn.ready #power-label { color: #f0c060; }
+.power-btn.active #power-label { color: #66ffaa; }
+#power-cooldown-fill {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 3px; background: rgba(200,160,80,0.6);
+  transform-origin: left;
+  transition: transform 0.3s linear;
+}
+
 /* ═══════════════════════════════════════ OBJECTIVES PANEL ══ */
 #objectives-panel {
   position: absolute; top: 58px; left: 8px; z-index: 110;

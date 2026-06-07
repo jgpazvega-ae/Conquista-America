@@ -13,6 +13,7 @@ import { EconomyManager } from './EconomyManager';
 import { DiplomacyManager } from './Diplomacy';
 import { FogOfWarManager } from './FogOfWar';
 import { ObjectiveSystem } from './Objectives';
+import { updateCivPowers } from './CivPowers';
 import { CIVILIZATIONS } from './civilizations';
 import { CIV_COLORS, TILE_SIZE } from './constants';
 import type { DamageEvent } from './CombatSystem';
@@ -261,6 +262,7 @@ export class Game {
     }
 
     this.objectives.update(this);
+    updateCivPowers(this, dt);
     this.checkEndConditions();
   }
 
