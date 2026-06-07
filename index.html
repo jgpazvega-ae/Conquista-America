@@ -263,10 +263,13 @@
       <!-- Player scoreboard -->
       <div id="scoreboard"></div>
 
+      <!-- Toast notification container -->
+      <div id="toast-container"></div>
+
       <!-- Controls hint -->
       <div id="controls-hint">
-        📱 <b>Móvil:</b> Toca para seleccionar · Doble toque/mantén para mover/atacar · Pellizca zoom &nbsp;|&nbsp;
-        🖥️ <b>PC:</b> Clic izq. seleccionar · Doble-clic = mismo tipo · Arrastra = selección múltiple · Clic der. mover/atacar · WASD cámara · <b>Q</b> trabajadores · <b>+/-</b> velocidad · <b>P</b> pausar · <b>F</b> centrar · <b>Ctrl+A</b> todo · <b>A</b> attack-move · <b>B</b> construir · <b>?</b> ayuda
+        📱 <b>Móvil:</b> Toca · Doble toque para mover/atacar · Pellizca zoom &nbsp;|&nbsp;
+        🖥️ <b>PC:</b> Clic izq. seleccionar · Doble-clic = mismo tipo · Arrastra selección · Clic der. mover/atacar · WASD cámara · <b>Q</b> trabajadores · <b>+/-</b> velocidad · <b>P</b> pausar · <b>F</b> centrar · <b>Ctrl+A</b> todo · <b>A</b> attack-move · <b>B</b> construir · <b>?</b> ayuda
       </div>
 
       <!-- Selection box overlay -->
@@ -281,7 +284,7 @@
         </div>
       </div>
 
-      <!-- Production panel -->
+      <!-- Production panel (centered, above bottom bar) -->
       <div id="production-panel" class="hidden">
         <div class="prod-header">
           <span id="prod-building-name">Asentamiento</span>
@@ -304,7 +307,7 @@
         <div id="prod-build-section" class="hidden">
           <div class="prod-section-label">Selecciona edificio</div>
           <div id="prod-build-list" class="prod-unit-list"></div>
-          <div class="prod-section-label" style="font-size:10px;color:#a09070">Clic en el mapa para colocar</div>
+          <div class="prod-section-label prod-hint-label">Clic en el mapa para colocar</div>
         </div>
         <div id="prod-upgrade-section" class="hidden">
           <div class="prod-section-label">Investigaciones permanentes</div>

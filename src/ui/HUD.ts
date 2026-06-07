@@ -45,8 +45,8 @@ export class HUD {
 
   constructor(game: Game) {
     this.game = game;
-    this.minimapCanvas.width  = 180;
-    this.minimapCanvas.height = 180;
+    this.minimapCanvas.width  = 200;
+    this.minimapCanvas.height = 200;
     this.minimapCtx = this.minimapCanvas.getContext('2d')!;
 
     const civ = game.humanPlayer.civType;
@@ -384,15 +384,15 @@ export class HUD {
   }
 
   notify(msg: string, type: 'info' | 'warning' | 'success' = 'info') {
+    const container = document.getElementById('toast-container') ?? document.body;
     const el = document.createElement('div');
     el.className = `hud-toast hud-toast-${type}`;
     el.textContent = msg;
-    document.body.appendChild(el);
-    // Animate in then out
+    container.appendChild(el);
     requestAnimationFrame(() => el.classList.add('visible'));
     setTimeout(() => {
       el.classList.remove('visible');
-      setTimeout(() => el.remove(), 400);
-    }, 3200);
+      setTimeout(() => el.remove(), 300);
+    }, 3000);
   }
 }
