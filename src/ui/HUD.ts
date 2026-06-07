@@ -37,15 +37,16 @@ export class HUD {
   private elScoreboard = document.getElementById('scoreboard')!
 
   onMinimapClick: ((worldX: number, worldZ: number) => void) | null = null;
-  private _combatPings: { col: number; row: number; ts: number }[] = [];
+  private _combatPings:    { col: number; row: number; ts: number }[] = [];
+  private _lastSeenUnits:  Map<number, { col: number; row: number }> = new Map();
 
   private camera: import('../engine/Camera').RTSCamera | null = null;
   setCamera(cam: import('../engine/Camera').RTSCamera) { this.camera = cam; }
 
   constructor(game: Game) {
     this.game = game;
-    this.minimapCanvas.width  = 180;
-    this.minimapCanvas.height = 180;
+    this.minimapCanvas.width  = 200;
+    this.minimapCanvas.height = 200;
     this.minimapCtx = this.minimapCanvas.getContext('2d')!;
 
     const civ = game.humanPlayer.civType;
@@ -229,18 +230,40 @@ export class HUD {
 
     const humanFog = this.game.fog.getFog(this.game.humanPlayerId);
 
-    // Draw units (only show enemy units if visible in fog)
+    // Draw units (only show enemy units if visible in fog; track last-seen positions)
     for (const player of this.game.players) {
       const col = CIV_COLORS[player.civType];
       ctx.fillStyle = hex(col);
       for (const unit of player.aliveUnits) {
         if (player.id !== this.game.humanPlayerId && humanFog) {
-          if (!humanFog.canSeeUnit(unit, this.game.humanPlayerId)) continue;
+          const canSee = humanFog.canSeeUnit(unit, this.game.humanPlayerId);
+          if (canSee) {
+            this._lastSeenUnits.set(unit.id, { col: unit.col, row: unit.row });
+          } else {
+            continue; // don't draw in real position
+          }
         }
         ctx.beginPath();
         ctx.arc(unit.col * tw + tw / 2, unit.row * th + th / 2, unitSize / 2, 0, Math.PI * 2);
         ctx.fill();
       }
+    }
+
+    // Draw last-seen ghost dots for enemy units now in fog
+    for (const player of this.game.players) {
+      if (player.id === this.game.humanPlayerId) continue;
+      const col = CIV_COLORS[player.civType];
+      ctx.globalAlpha = 0.3;
+      ctx.fillStyle = hex(col);
+      for (const unit of player.aliveUnits) {
+        if (!humanFog || humanFog.canSeeUnit(unit, this.game.humanPlayerId)) continue;
+        const last = this._lastSeenUnits.get(unit.id);
+        if (!last) continue;
+        ctx.beginPath();
+        ctx.arc(last.col * tw + tw / 2, last.row * th + th / 2, unitSize / 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1.0;
     }
 
     // Draw workers
@@ -361,15 +384,15 @@ export class HUD {
   }
 
   notify(msg: string, type: 'info' | 'warning' | 'success' = 'info') {
+    const container = document.getElementById('toast-container') ?? document.body;
     const el = document.createElement('div');
     el.className = `hud-toast hud-toast-${type}`;
     el.textContent = msg;
-    document.body.appendChild(el);
-    // Animate in then out
+    container.appendChild(el);
     requestAnimationFrame(() => el.classList.add('visible'));
     setTimeout(() => {
       el.classList.remove('visible');
-      setTimeout(() => el.remove(), 400);
-    }, 3200);
+      setTimeout(() => el.remove(), 300);
+    }, 3000);
   }
 }

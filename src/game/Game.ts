@@ -269,6 +269,10 @@ export class Game {
     const pos = this.map.findWalkableNear(building.col, building.row + 3, 6);
     if (!pos) return;
     const unit = new Unit(unitType, player.civType, player.id, pos[0], pos[1], CIV_COLORS[player.civType]);
+    // Apply player upgrades to new unit
+    if (player.upgrades.metallurgy)    unit.attack += 6;
+    if (player.upgrades.logistics)     unit.speed  += 0.4;
+    if (player.upgrades.fortification) { unit.maxHp += 50; unit.hp += 50; }
     player.addUnit(unit);
     this.allUnits.push(unit);
     this.newlySpawnedUnits.push(unit);
@@ -409,6 +413,36 @@ export class Game {
       b => b.playerId === playerId && b.type === BuildingType.STOREHOUSE && b.isComplete(),
     ).length;
     return 25 + storehouses * 5;
+  }
+
+  applyUpgrade(upgrade: keyof import('./Player').PlayerUpgrades, playerId: number): boolean {
+    const player = this.players[playerId];
+    if (!player) return false;
+    if (player.upgrades[upgrade]) return false; // already researched
+
+    const costs: Record<string, { food: number; gold: number; stone: number }> = {
+      metallurgy:    { food: 0,   gold: 150, stone: 100 },
+      logistics:     { food: 100, gold: 100, stone: 0   },
+      fortification: { food: 0,   gold: 80,  stone: 150 },
+    };
+    const cost = costs[upgrade];
+    if (player.resources.food  < cost.food)  return false;
+    if (player.resources.gold  < cost.gold)  return false;
+    if (player.resources.stone < cost.stone) return false;
+
+    player.resources.food  -= cost.food;
+    player.resources.gold  -= cost.gold;
+    player.resources.stone -= cost.stone;
+    player.upgrades[upgrade] = true;
+
+    // Apply to all existing units immediately
+    for (const unit of this.allUnits) {
+      if (unit.playerId !== playerId || !unit.isAlive()) continue;
+      if (upgrade === 'metallurgy')    unit.attack   = Math.min(unit.attack + 6,   unit.def.stats.attack * 2);
+      if (upgrade === 'logistics')     unit.speed    = Math.min(unit.speed  + 0.4, unit.def.stats.speed  * 2);
+      if (upgrade === 'fortification') { unit.maxHp += 50; unit.hp = Math.min(unit.hp + 50, unit.maxHp); }
+    }
+    return true;
   }
 
   placeBuilding(type: BuildingType, col: number, row: number, playerId: number): boolean {

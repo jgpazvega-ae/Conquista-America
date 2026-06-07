@@ -1,10 +1,16 @@
 import type { Building } from '../game/Building';
-import type { Player } from '../game/Player';
+import type { Player, PlayerUpgrades } from '../game/Player';
 import { CIVILIZATIONS } from '../game/civilizations';
 import { TRAIN_COSTS } from '../game/unitProduction';
 import type { UnitType } from '../game/types';
 import { BuildingType } from '../game/buildings';
 import { BUILDING_DEFS } from '../game/buildingDefs';
+
+const UPGRADE_DEFS: Array<{ key: keyof PlayerUpgrades; name: string; emoji: string; desc: string; food: number; gold: number; stone: number }> = [
+  { key: 'metallurgy',    name: 'Metalurgia',    emoji: '⚔️', desc: 'Todas las unidades +6 ataque permanentemente', food: 0, gold: 150, stone: 100 },
+  { key: 'logistics',     name: 'Logística',     emoji: '👟', desc: 'Todas las unidades +0.4 velocidad permanentemente', food: 100, gold: 100, stone: 0 },
+  { key: 'fortification', name: 'Fortificación', emoji: '🛡️', desc: 'Todas las unidades +50 HP máx permanentemente', food: 0, gold: 80, stone: 150 },
+];
 
 const BUILDABLE: BuildingType[] = [
   BuildingType.BARRACKS,
@@ -18,17 +24,19 @@ export class ProductionPanel {
   private el:       HTMLElement;
   private building: Building | null = null;
   private player:   Player   | null = null;
-  private tab:      'train' | 'build' = 'train';
+  private tab:      'train' | 'build' | 'upgrade' = 'train';
 
-  onTrain:  ((unitType: UnitType) => void)       | null = null;
-  onBuild:  ((type: BuildingType) => void)       | null = null;
-  onCancel: (() => void)                         | null = null;
+  onTrain:   ((unitType: UnitType) => void)                    | null = null;
+  onBuild:   ((type: BuildingType) => void)                    | null = null;
+  onUpgrade: ((key: keyof PlayerUpgrades) => void)             | null = null;
+  onCancel:  (() => void)                                      | null = null;
 
   constructor() {
     this.el = document.getElementById('production-panel')!;
     document.getElementById('prod-close')?.addEventListener('click', () => this.hide());
     document.getElementById('prod-tab-train')?.addEventListener('click', () => this.switchTab('train'));
     document.getElementById('prod-tab-build')?.addEventListener('click', () => this.switchTab('build'));
+    document.getElementById('prod-tab-upgrade')?.addEventListener('click', () => this.switchTab('upgrade'));
   }
 
   show(building: Building, player: Player) {
@@ -49,7 +57,7 @@ export class ProductionPanel {
     if (this.building && this.player) this.render();
   }
 
-  private switchTab(tab: 'train' | 'build') {
+  private switchTab(tab: 'train' | 'build' | 'upgrade') {
     this.tab = tab;
     this.render();
   }
@@ -65,19 +73,23 @@ export class ProductionPanel {
     // Tab state
     document.getElementById('prod-tab-train')?.classList.toggle('active', this.tab === 'train');
     document.getElementById('prod-tab-build')?.classList.toggle('active', this.tab === 'build');
+    document.getElementById('prod-tab-upgrade')?.classList.toggle('active', this.tab === 'upgrade');
 
-    const trainSection = document.getElementById('prod-train-section')!;
-    const buildSection = document.getElementById('prod-build-section')!;
+    const trainSection   = document.getElementById('prod-train-section')!;
+    const buildSection   = document.getElementById('prod-build-section')!;
+    const upgradeSection = document.getElementById('prod-upgrade-section')!;
+
+    trainSection.classList.toggle('hidden',   this.tab !== 'train');
+    buildSection.classList.toggle('hidden',   this.tab !== 'build');
+    upgradeSection.classList.toggle('hidden', this.tab !== 'upgrade');
 
     if (this.tab === 'train') {
-      trainSection.classList.remove('hidden');
-      buildSection.classList.add('hidden');
       this.renderTrainList(b, p, civDef);
       this.renderQueue();
-    } else {
-      trainSection.classList.add('hidden');
-      buildSection.classList.remove('hidden');
+    } else if (this.tab === 'build') {
       this.renderBuildList(p);
+    } else {
+      this.renderUpgradeList(p);
     }
   }
 
@@ -138,8 +150,35 @@ export class ProductionPanel {
     }
   }
 
+  private renderUpgradeList(p: Player) {
+    const listEl = document.getElementById('prod-upgrade-list')!;
+    listEl.innerHTML = '';
+
+    for (const upg of UPGRADE_DEFS) {
+      const done = p.upgrades[upg.key];
+      const canAfford = !done && p.resources.food >= upg.food && p.resources.gold >= upg.gold && p.resources.stone >= upg.stone;
+
+      const btn = document.createElement('button');
+      btn.className = 'prod-unit-btn' + (done ? ' done' : canAfford ? '' : ' disabled');
+      btn.title = upg.desc;
+      btn.innerHTML = `
+        <span class="prod-unit-icon">${done ? '✅' : upg.emoji}</span>
+        <div class="prod-unit-info">
+          <div class="prod-unit-name">${upg.name}${done ? ' — Investigado' : ''}</div>
+          <div class="prod-unit-cost">
+            ${upg.food ? `🌽${upg.food} ` : ''}${upg.gold ? `⚜️${upg.gold} ` : ''}${upg.stone ? `🪨${upg.stone}` : ''}
+          </div>
+        </div>
+      `;
+      if (canAfford) {
+        btn.addEventListener('click', () => { this.onUpgrade?.(upg.key); this.render(); });
+      }
+      listEl.appendChild(btn);
+    }
+  }
+
   renderQueue() {
-    if (!this.building || this.tab !== 'train') return;
+    if (!this.building || !this.player || this.tab !== 'train') return;
     const b = this.building;
 
     const qEl = document.getElementById('prod-queue')!;

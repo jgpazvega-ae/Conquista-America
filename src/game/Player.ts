@@ -9,6 +9,12 @@ export interface Resources {
   stone: number;
 }
 
+export interface PlayerUpgrades {
+  metallurgy:    boolean; // +6 attack all units
+  logistics:     boolean; // +0.4 speed all units
+  fortification: boolean; // +50 HP all units
+}
+
 export class Player {
   readonly id: number;
   readonly civType: CivilizationType;
@@ -17,6 +23,7 @@ export class Player {
 
   resources: Resources;
   units: Unit[] = [];
+  upgrades: PlayerUpgrades = { metallurgy: false, logistics: false, fortification: false };
 
   // Simple AI state
   aiTimer = 0;
