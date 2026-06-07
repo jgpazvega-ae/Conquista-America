@@ -195,6 +195,15 @@ class GameInstance {
         this.audio.playBuild();
         this.prodPanel.refresh();
       };
+      this.prodPanel.onUpgrade = (key) => {
+        const ok = this.game.applyUpgrade(key, this.game.humanPlayerId);
+        if (ok) {
+          const names: Record<string, string> = { metallurgy: 'Metalurgia', logistics: 'Logística', fortification: 'Fortificación' };
+          this.hud.notify(`🔬 ${names[key]} investigada — beneficio aplicado`, 'success');
+          this.audio.playBuild();
+          this.prodPanel.refresh();
+        }
+      };
       this.prodPanel.onBuild = (btype) => {
         const def = BUILDING_DEFS[btype];
         this._placingType = btype;
