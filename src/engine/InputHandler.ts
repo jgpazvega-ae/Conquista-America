@@ -30,6 +30,7 @@ export class InputHandler {
   onAttackMove:       ((units: import('../game/Unit').Unit[], col: number, row: number) => void) | null = null;
   onRallySet:         ((col: number, row: number) => void) | null = null;
   onPatrolSet:        (() => void) | null = null;
+  onHover:            ((unitId: number | null, buildingId: number | null, screenX: number, screenY: number) => void) | null = null;
 
   private _placingMode     = false;
   private _attackMoveMode  = false;
@@ -70,6 +71,18 @@ export class InputHandler {
     if (this._placingMode && this.onTerrainHover) {
       const hit = this.renderer.pickFromScreen(e.clientX, e.clientY);
       if (hit?.type === 'tile') this.onTerrainHover(hit.col, hit.row);
+    }
+
+    // Unit/building hover tooltip (only when not dragging)
+    if (this.onHover && !this.drag.active && e.buttons === 0) {
+      const hit = this.renderer.pickFromScreen(e.clientX, e.clientY);
+      if (hit?.type === 'unit') {
+        this.onHover(hit.unitId, null, e.clientX, e.clientY);
+      } else if (hit?.type === 'building') {
+        this.onHover(null, hit.buildingId, e.clientX, e.clientY);
+      } else {
+        this.onHover(null, null, e.clientX, e.clientY);
+      }
     }
 
     if (!this.mouseDownPos || e.buttons !== 1) return;
