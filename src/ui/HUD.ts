@@ -200,6 +200,7 @@ export class HUD {
     this.updateObjectives();
     this.updatePowerButton();
     this.updateBuildingHpBars();
+    this.updateHeroPanel();
   }
 
   private updatePowerButton() {
@@ -261,6 +262,35 @@ export class HUD {
       </div>`;
     }).join('');
     this.elScoreboard.innerHTML = html;
+  }
+
+  private updateHeroPanel() {
+    const panel    = document.getElementById('hero-panel');
+    const portrait = document.getElementById('hero-panel-portrait');
+    const nameEl   = document.getElementById('hero-panel-name');
+    const statusEl = document.getElementById('hero-panel-status');
+    if (!panel) return;
+
+    const hero = this.game.getAllUnits().find(u => u.playerId === this.game.humanPlayerId && u.isHero);
+    if (!hero) { panel.classList.add('hidden'); return; }
+    panel.classList.remove('hidden');
+
+    if (portrait) portrait.textContent = hero.def.emoji;
+    if (nameEl)   nameEl.textContent   = `${hero.heroName} ★`;
+
+    if (statusEl) {
+      if (hero.isAlive()) {
+        const pct   = (hero.hp / hero.maxHp) * 100;
+        const color = pct > 50 ? '#22dd44' : pct > 25 ? '#ddaa00' : '#dd2222';
+        statusEl.innerHTML =
+          `<div style="width:80px;height:5px;background:#333;border-radius:3px">` +
+          `<div style="width:${pct.toFixed(0)}%;height:100%;background:${color};border-radius:3px;transition:width 0.3s"></div></div>` +
+          `<span style="font-size:9px;color:#aaa">&nbsp;${hero.hp}/${hero.maxHp}</span>`;
+      } else {
+        const timer = this.game.getHeroRespawnTimer(hero.playerId);
+        statusEl.innerHTML = `☠️ Respawn: <b style="color:#ffaa44">${timer !== undefined ? Math.ceil(timer) : '—'}s</b>`;
+      }
+    }
   }
 
   private showUnitInfo(unit: Unit) {
