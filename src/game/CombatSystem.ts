@@ -18,12 +18,14 @@ function terrainDefenseBonus(terrain: TerrainType | undefined): number {
 }
 
 export interface DamageEvent {
-  attacker: Unit | null;
-  target:   Unit;
-  damage:   number;
-  worldX:   number;
-  worldZ:   number;
-  critical?: boolean;
+  attacker:      Unit | null;
+  target:        Unit;
+  damage:        number;
+  worldX:        number;
+  worldZ:        number;
+  critical?:     boolean;
+  sourceWorldX?: number; // set for building-sourced attacks (watchtower)
+  sourceWorldZ?: number;
 }
 
 export class CombatSystem {
