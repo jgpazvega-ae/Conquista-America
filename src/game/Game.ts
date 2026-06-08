@@ -206,6 +206,28 @@ export class Game {
       unit.update(dt, this.map);
     }
 
+    // Auto-retreat: units that dropped below 20% HP flee toward nearest friendly building
+    for (const unit of this.allUnits) {
+      if (!unit.wantsRetreat || !unit.isAlive()) { unit.wantsRetreat = false; continue; }
+      unit.wantsRetreat = false;
+      unit.attackTarget = null;
+      unit.attackBuildingTarget = null;
+      const base = this.allBuildings
+        .filter(b => b.playerId === unit.playerId && b.isAlive())
+        .sort((a, b) => {
+          const da = (unit.col - a.col) ** 2 + (unit.row - a.row) ** 2;
+          const db = (unit.col - b.col) ** 2 + (unit.row - b.row) ** 2;
+          return da - db;
+        })[0];
+      if (base) {
+        const near = this.map.findWalkableNear(base.col, base.row, 3);
+        if (near) {
+          const path = findPath(this.map, unit.gridPos(), { col: near[0], row: near[1] }, 300);
+          if (path.length > 0) unit.moveTo(path);
+        }
+      }
+    }
+
     this.newlySpawnedUnits = [];
     this.newlyPlacedBuildings = [];
     this.newlyCompletedBuildings = [];
