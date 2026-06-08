@@ -117,6 +117,28 @@ export class EffectManager {
     this.projectiles.push({ mesh, sx, sy: 0.6, sz, tx, ty: 0.6, tz, t: 0, dur: Math.max(0.12, dist * 0.04), trailTimer: 0 });
   }
 
+  /** Golden star burst for unit level-up. */
+  createLevelUpBurst(x: number, y: number, z: number) {
+    // Rising gold sparks
+    for (let i = 0; i < 14; i++) {
+      const angle = (i / 14) * Math.PI * 2;
+      const speed = 2.5 + Math.random() * 2;
+      const v = new THREE.Vector3(Math.cos(angle) * speed, 3 + Math.random() * 2, Math.sin(angle) * speed);
+      this.spawn(this.sphere, i % 2 === 0 ? 0xffdd00 : 0xffffff, x, y, z,
+        0.07 + Math.random() * 0.06, v, 0.7 + Math.random() * 0.3,
+        { additive: true, gravity: 4, spin: 8, opacity: 1 });
+    }
+    // Central flash
+    this.spawn(this.sphere, 0xffffaa, x, y + 0.5, z, 0.35,
+      new THREE.Vector3(0, 0, 0), 0.25, { additive: true, grow: 2.5, opacity: 1 });
+    // Floating star shards
+    for (let i = 0; i < 6; i++) {
+      const v = new THREE.Vector3((Math.random()-0.5)*3, 4+Math.random()*3, (Math.random()-0.5)*3);
+      this.spawn(this.shard, 0xffd700, x, y, z, 0.06, v, 0.9,
+        { additive: true, gravity: -1, spin: 10, opacity: 0.9 });
+    }
+  }
+
   createMuzzleFlash(x: number, y: number, z: number) {
     this.spawn(this.sphere, 0xffee99, x, y, z, 0.2, new THREE.Vector3(0, 0, 0), 0.1,
       { additive: true, grow: 2, opacity: 1 });
