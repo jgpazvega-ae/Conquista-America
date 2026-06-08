@@ -129,6 +129,7 @@ class GameInstance {
   private _treasuryWarned75 = false; // notified player at 75% of economic victory
   private _buildingSmokeTimers = new Map<number, number>(); // building.id → seconds since last puff
   private _statusParticleTimers = new Map<number, number>(); // unit.id → time since last status particle
+  private _wasNight = false;
 
   constructor(civ: CivilizationType, saveSystem: SaveSystem, difficulty: Difficulty = 'normal') {
     this.civ        = civ;
@@ -482,6 +483,11 @@ class GameInstance {
     const isNight = dayT > 0.75 || dayT < 0.15;
     if (isNight && !this.renderer.isRaining) this.renderer.startRain();
     else if (!isNight && this.renderer.isRaining) this.renderer.stopRain();
+    // Notify player when day/night phase transitions
+    if (isNight !== this._wasNight) {
+      this._wasNight = isNight;
+      this.hud.notify(isNight ? '🌙 Anochece — visión reducida 40%' : '☀️ Amanece — visión restaurada', 'info');
+    }
 
     // Random events every 2–4 minutes of game time
     if (this.game.gameTime >= this._nextEventTime) {
@@ -564,7 +570,7 @@ class GameInstance {
       for (const evt of this.game.damageEvents) {
         // Minimap combat ping
         this.hud.addCombatPing(evt.worldX / TILE_SIZE, evt.worldZ / TILE_SIZE);
-        // Projectile for ranged attacks
+        // Projectile for ranged unit attacks
         if (evt.attacker && evt.attacker.attackRange > 1.5) {
           const projColor = evt.attacker.attackRange > 3 ? 0xffcc44 : 0xddffcc;
           this.renderer.effects.createProjectile(
@@ -572,6 +578,12 @@ class GameInstance {
             evt.worldX, evt.worldZ, projColor,
           );
           this.renderer.effects.createMuzzleFlash(evt.attacker.worldX, 0.6, evt.attacker.worldZ);
+        }
+        // Projectile for building-sourced attacks (watchtower)
+        if (!evt.attacker && evt.sourceWorldX !== undefined) {
+          this.renderer.effects.createProjectile(evt.sourceWorldX, evt.sourceWorldZ!, evt.worldX, evt.worldZ, 0xff8833);
+          this.renderer.effects.createMuzzleFlash(evt.sourceWorldX, 1.8, evt.sourceWorldZ!);
+          this.audio.playHit(0.5);
         }
         this.renderer.effects.createHitEffect(evt.worldX, 0.5, evt.worldZ);
         if (evt.critical) {

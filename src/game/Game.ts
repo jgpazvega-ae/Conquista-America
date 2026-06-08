@@ -293,7 +293,10 @@ export class Game {
 
     this.applyBuildingBonuses(dt);
 
-    this.fog.update(this);
+    // Sight reduced by 40% at night (day cycle 0.75–1.0 and 0.0–0.15)
+    const dayT = (this.gameTime % 480) / 480;
+    const isNight = dayT > 0.75 || dayT < 0.15;
+    this.fog.update(this, isNight ? 0.6 : 1.0);
 
     this.aiSystem.update(dt, this);
 
@@ -391,11 +394,13 @@ export class Game {
       if (nearest) {
         const actual = nearest.takeDamage(TOWER_DAMAGE + Math.floor(Math.random() * 4) - 2);
         this.damageEvents.push({
-          attacker: null as any,
+          attacker: null,
           target: nearest,
           damage: actual,
           worldX: nearest.worldX,
           worldZ: nearest.worldZ,
+          sourceWorldX: b.col * TILE_SIZE + TILE_SIZE / 2,
+          sourceWorldZ: b.row * TILE_SIZE + TILE_SIZE / 2,
         });
         b.attackTimer = TOWER_COOLDOWN;
       }
