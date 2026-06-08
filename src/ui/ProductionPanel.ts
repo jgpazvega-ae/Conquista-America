@@ -26,6 +26,7 @@ const BUILDABLE: BuildingType[] = [
   BuildingType.STOREHOUSE,
   BuildingType.TEMPLE,
   BuildingType.FORGE,
+  BuildingType.WONDER,
 ];
 
 export class ProductionPanel {

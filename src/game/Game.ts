@@ -15,7 +15,7 @@ import { FogOfWarManager } from './FogOfWar';
 import { ObjectiveSystem } from './Objectives';
 import { updateCivPowers } from './CivPowers';
 import { CIVILIZATIONS } from './civilizations';
-import { CIV_COLORS, TILE_SIZE } from './constants';
+import { CIV_COLORS, TILE_SIZE, WONDER_NAMES } from './constants';
 import type { DamageEvent } from './CombatSystem';
 import { BuildingType } from './buildings';
 import { BUILDING_DEFS } from './buildingDefs';
@@ -59,8 +59,11 @@ export class Game {
   newlyRespawnedHeroes: Unit[] = [];
   private _heroRespawnTimers = new Map<number, number>(); // playerId → seconds until respawn
   status: GameStatus = 'PLAYING';
-  victoryType: 'MILITARY' | 'ECONOMIC' = 'MILITARY';
+  victoryType: 'MILITARY' | 'ECONOMIC' | 'WONDER' = 'MILITARY';
   static readonly ECONOMIC_VICTORY_GOLD = 800;
+  static readonly WONDER_VICTORY_DURATION = 180;
+  wonderCountdown: number | null = null;
+  private _wonderWasAlive = false;
   paused = false;
   humanPlayerId = 0;
   gameTime = 0;
@@ -369,6 +372,12 @@ export class Game {
 
     this.objectives.update(this);
     updateCivPowers(this, dt);
+
+    // Tick wonder countdown
+    if (this.wonderCountdown !== null && this.status === 'PLAYING') {
+      this.wonderCountdown -= dt;
+    }
+
     this.checkEndConditions();
   }
 
@@ -688,6 +697,33 @@ export class Game {
     // Defeat: human settlement destroyed (units may survive but can't retrain)
     if (!this.hasSettlement(this.humanPlayerId)) {
       this.status = 'DEFEAT';
+      return;
+    }
+
+    // Wonder victory: completed wonder survived the countdown
+    const humanWonder = this.allBuildings.find(
+      b => b.playerId === this.humanPlayerId && b.type === BuildingType.WONDER && b.isComplete() && b.isAlive(),
+    );
+    const wonderIsAlive = !!humanWonder;
+
+    if (wonderIsAlive && this.wonderCountdown === null) {
+      // Wonder just completed — start the 3-minute countdown
+      this.wonderCountdown = Game.WONDER_VICTORY_DURATION;
+      const civKey = human.civType as string;
+      const name = WONDER_NAMES[civKey] ?? 'Gran Maravilla';
+      this.pendingEventMessages.push(`🏛️ ¡${name} terminada! Defiéndela ${Math.round(Game.WONDER_VICTORY_DURATION / 60)} minutos para la VICTORIA`);
+    }
+
+    if (!wonderIsAlive && this._wonderWasAlive && this.wonderCountdown !== null) {
+      // Wonder was destroyed while countdown was active
+      this.wonderCountdown = null;
+      this.pendingEventMessages.push('💀 ¡Tu maravilla fue destruida! El contador de victoria se ha cancelado');
+    }
+    this._wonderWasAlive = wonderIsAlive;
+
+    if (this.wonderCountdown !== null && this.wonderCountdown <= 0 && wonderIsAlive) {
+      this.victoryType = 'WONDER';
+      this.status = 'VICTORY';
       return;
     }
 
