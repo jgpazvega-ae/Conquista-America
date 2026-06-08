@@ -442,7 +442,12 @@ class GameInstance {
 
     // Day/night cycle: one full cycle every 480 game-seconds
     const DAY_CYCLE = 480;
-    this.renderer.setDayNight((this.game.gameTime % DAY_CYCLE) / DAY_CYCLE);
+    const dayT = (this.game.gameTime % DAY_CYCLE) / DAY_CYCLE;
+    this.renderer.setDayNight(dayT);
+    // Rain during the night half of the cycle (t 0.75–1.0 and 0.0–0.25)
+    const isNight = dayT > 0.75 || dayT < 0.15;
+    if (isNight && !this.renderer.isRaining) this.renderer.startRain();
+    else if (!isNight && this.renderer.isRaining) this.renderer.stopRain();
 
     // Random events every 2–4 minutes of game time
     if (this.game.gameTime >= this._nextEventTime) {
@@ -961,6 +966,8 @@ class GameInstance {
         apply: () => {
           player.resources.food  = Math.max(0, player.resources.food  - 80);
           player.resources.stone = Math.max(0, player.resources.stone - 60);
+          this.renderer.startRain();
+          setTimeout(() => this.renderer.stopRain(), 30000);
         },
       },
       {
