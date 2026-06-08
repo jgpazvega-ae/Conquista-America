@@ -215,6 +215,13 @@ class GameInstance {
       if (building.playerId !== this.game.humanPlayerId) return;
       this._cancelPlacing();
       this._panelBuilding = building;
+      // Show attack range ring for watchtowers
+      this.renderer.clearRangeRing();
+      if (building.type === BuildingType.WATCHTOWER) {
+        const wx = building.col * TILE_SIZE;
+        const wz = building.row * TILE_SIZE;
+        this.renderer.showRangeRing(wx, wz, 5.5 * TILE_SIZE, 0xff4444);
+      }
       this.prodPanel.show(building, this.game.humanPlayer);
       this.prodPanel.onTrain = (unitType) => {
         const cost = TRAIN_COSTS[unitType];
@@ -520,7 +527,12 @@ class GameInstance {
           this.renderer.effects.createMuzzleFlash(evt.attacker.worldX, 0.6, evt.attacker.worldZ);
         }
         this.renderer.effects.createHitEffect(evt.worldX, 0.5, evt.worldZ);
-        if (evt.damage > 20) this.renderer.effects.createExplosion(evt.worldX, 0.5, evt.worldZ, evt.damage / 40);
+        if (evt.critical) {
+          // Flanking / type-advantage critical: always show explosion burst
+          this.renderer.effects.createExplosion(evt.worldX, 0.5, evt.worldZ, Math.max(0.5, evt.damage / 35));
+        } else if (evt.damage > 20) {
+          this.renderer.effects.createExplosion(evt.worldX, 0.5, evt.worldZ, evt.damage / 40);
+        }
         if (!evt.target.isAlive()) {
           this.audio.playDeath();
           if (evt.target.playerId !== this.game.humanPlayerId) this.killCount++;
