@@ -55,6 +55,7 @@ export class Game {
   newlyDestroyedBuildings: Building[] = [];
   newlyDepletedNodes: ResourceNode[] = [];
   newlyRetreatingUnits: Unit[] = [];
+  newlyRegeneratedNodes: import('./ResourceNode').ResourceNode[] = [];
   status: GameStatus = 'PLAYING';
   paused = false;
   humanPlayerId = 0;
@@ -250,6 +251,7 @@ export class Game {
     this.newlyDestroyedBuildings = [];
     this.newlyDepletedNodes = [];
     this.newlyRetreatingUnits = [];
+    this.newlyRegeneratedNodes = [];
     for (const building of this.allBuildings) {
       if (!building.isComplete()) {
         const wasIncomplete = true;
@@ -275,6 +277,7 @@ export class Game {
       const wasEmpty = node.isEmpty();
       node.updateRegen(dt);
       if (!wasEmpty && node.isEmpty()) this.newlyDepletedNodes.push(node);
+      if (node.justRegenerated) this.newlyRegeneratedNodes.push(node);
     }
 
     this.damageEvents = this.combat.update(this.allUnits, this.map);
