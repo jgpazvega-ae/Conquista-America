@@ -72,6 +72,8 @@ export class Game {
   private _eventTimer = 60 + Math.random() * 60;
   private _autoAttackTimer = 0;
   private _bonusTimer = 0;
+  stormTimer = 0;            // seconds remaining in tropical storm
+  private _approachTimer = 0; // throttle for enemy-approach notifications
 
   constructor(humanCiv: CivilizationType = CivilizationType.AZTEC) {
     this.map = new GameMap(12345);
@@ -351,7 +353,9 @@ export class Game {
     // Sight reduced by 40% at night (day cycle 0.75–1.0 and 0.0–0.15)
     const dayT = (this.gameTime % 480) / 480;
     const isNight = dayT > 0.75 || dayT < 0.15;
-    this.fog.update(this, isNight ? 0.6 : 1.0);
+    if (this.stormTimer > 0) this.stormTimer -= dt;
+    const stormMult = this.stormTimer > 0 ? 0.5 : 1.0;
+    this.fog.update(this, (isNight ? 0.6 : 1.0) * stormMult);
 
     this.aiSystem.update(dt, this);
 
@@ -368,6 +372,25 @@ export class Game {
     if (this._eventTimer <= 0) {
       this._eventTimer = 60 + Math.random() * 60;
       this.fireRandomEvent();
+    }
+
+    // Enemy approach alerts — check every 15s
+    this._approachTimer -= dt;
+    if (this._approachTimer <= 0) {
+      this._approachTimer = 15;
+      const settle = this.allBuildings.find(
+        b => b.playerId === this.humanPlayerId && b.type === BuildingType.SETTLEMENT && b.isAlive(),
+      );
+      if (settle) {
+        const approaching = this.allUnits.filter(u => {
+          if (u.playerId === this.humanPlayerId || !u.isAlive()) return false;
+          const d = Math.sqrt((u.col - settle.col) ** 2 + (u.row - settle.row) ** 2);
+          return d <= 12;
+        });
+        if (approaching.length >= 3) {
+          this.pendingEventMessages.push(`⚔️ ¡Alerta! ${approaching.length} enemigos aproximándose a tu asentamiento`);
+        }
+      }
     }
 
     this.objectives.update(this);
@@ -660,6 +683,30 @@ export class Game {
         unit.hp = 0;
         unit['die']?.();
         return '🏃 ¡Un guerrero enemigo desertó!';
+      },
+      // Tropical storm: halve all sight for 30 seconds
+      () => {
+        if (this.stormTimer > 0) return null;
+        this.stormTimer = 30;
+        return '🌪️ ¡Tormenta tropical! Visibilidad reducida 30s — ¡cuidado con emboscadas!';
+      },
+      // Plague: weaken a random enemy unit
+      () => {
+        if (enemies.length === 0) return null;
+        const enemy = enemies[Math.floor(Math.random() * enemies.length)];
+        if (enemy.aliveUnits.length === 0) return null;
+        const unit = enemy.aliveUnits[Math.floor(Math.random() * enemy.aliveUnits.length)];
+        const dmg = Math.floor(unit.maxHp * 0.4);
+        unit.hp = Math.max(1, unit.hp - dmg);
+        unit.poisoned = Math.max(unit.poisoned, 8);
+        return `🦠 ¡Epidemia azotó a las tropas enemigas! Un ${unit.def?.name ?? 'guerrero'} fue debilitado`;
+      },
+      // Harvest festival: double food production bonus
+      () => {
+        if (human.resources.food > 1500) return null;
+        human.resources.food = Math.min(cap, human.resources.food + 150);
+        human.resources.stone = Math.min(cap, human.resources.stone + 50);
+        return '🌽 ¡Festival de la cosecha! +150 🌽 alimentos, +50 🪨 piedra';
       },
     ];
 
