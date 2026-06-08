@@ -858,6 +858,15 @@ class GameInstance {
         }
         return;
       }
+      // 1-4 when production panel is open on train tab: train unit
+      if (!e.ctrlKey && !e.altKey && /^Digit[1-4]$/.test(e.code) &&
+          this.prodPanel.isVisible && this.prodPanel.currentTab === 'train') {
+        e.preventDefault();
+        const idx = parseInt(e.code.replace('Digit', '')) - 1;
+        const units = this.prodPanel.getTrainableUnits();
+        if (idx < units.length) this.prodPanel.onTrain?.(units[idx]);
+        return;
+      }
       // Ctrl+1-5: save unit group
       if (e.ctrlKey && /^Digit[1-5]$/.test(e.code)) {
         e.preventDefault();
@@ -867,8 +876,8 @@ class GameInstance {
         this.hud.notify(`Grupo ${n} guardado — ${sel.length} unidades`, 'info');
         return;
       }
-      // 1-5 (no ctrl): recall unit group + center camera
-      if (!e.ctrlKey && !e.altKey && /^Digit[1-5]$/.test(e.code)) {
+      // 1-5 (no ctrl): recall unit group + center camera (skip when production panel is focused)
+      if (!e.ctrlKey && !e.altKey && /^Digit[1-5]$/.test(e.code) && !this.prodPanel.isVisible) {
         const n = parseInt(e.code.replace('Digit', ''));
         const ids = this.unitGroups.get(n);
         if (!ids?.length) return;

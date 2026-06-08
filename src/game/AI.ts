@@ -26,8 +26,9 @@ interface AIState {
   workerTimer:  number;
   trainTimer:   number;
   upgradeTimer: number;
-  phase:        'gathering' | 'attacking';
+  phase:        'gathering' | 'attacking' | 'defending';
   phaseTimer:   number;
+  defendTimer:  number; // how long we've been in defending phase
 }
 
 export class AISystem {
@@ -44,6 +45,7 @@ export class AISystem {
           trainTimer: Math.random() * 8,
           upgradeTimer: Math.random() * 20,
           phase: 'gathering', phaseTimer: Math.random() * 15,
+          defendTimer: 0,
         };
         this.aiStates.set(player.id, state);
       }
@@ -65,8 +67,30 @@ export class AISystem {
         ? 8
         : 15 + Math.floor(elapsed / 60) * (game.difficulty === 'hard' ? 3 : 2);
 
+      // Check if base is under attack (any owned building damaged below 70% HP)
+      const baseUnderAttack = game.allBuildings.some(
+        b => b.playerId === player.id && b.isAlive() && b.hp < b.maxHp * 0.7,
+      );
+
       // Phase-based attack logic (thresholds use scale factor)
-      if (state.phase === 'gathering') {
+      if (state.phase === 'defending') {
+        state.defendTimer += dt;
+        this.defendBase(player, game);
+        // Leave defending once buildings are healed and we've been defending at least 10s
+        const baseHealed = !game.allBuildings.some(
+          b => b.playerId === player.id && b.isAlive() && b.hp < b.maxHp * 0.85,
+        );
+        if (baseHealed && state.defendTimer >= 10) {
+          state.phase = 'gathering';
+          state.phaseTimer = 0;
+          state.defendTimer = 0;
+        }
+      } else if (baseUnderAttack) {
+        // Switch to defending immediately when base takes significant damage
+        state.phase = 'defending';
+        state.defendTimer = 0;
+        this.defendBase(player, game);
+      } else if (state.phase === 'gathering') {
         this.rallyTroops(player, game);
         if (state.phaseTimer >= GATHER_DURATION * scale || player.aliveUnits.length >= rallyCap) {
           state.phase = 'attacking';
@@ -121,6 +145,52 @@ export class AISystem {
         if (near) {
           const path = findPath(game.map, unit.gridPos(), { col: near[0], row: near[1] }, 200);
           if (path.length > 0) unit.moveTo(path);
+        }
+      }
+    }
+  }
+
+  /** Defend-phase: rush all units to protect damaged buildings and engage nearby threats. */
+  private defendBase(player: Player, game: Game) {
+    const damagedBuilding = game.allBuildings
+      .filter(b => b.playerId === player.id && b.isAlive() && b.hp < b.maxHp * 0.85)
+      .sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0]; // most-damaged first
+    if (!damagedBuilding) return;
+
+    const cx = damagedBuilding.col;
+    const cz = damagedBuilding.row;
+
+    // Find threats near the damaged building
+    const nearbyEnemies = game.allUnits.filter(u => {
+      if (u.playerId === player.id || !u.isAlive()) return false;
+      const d = Math.sqrt((u.col - cx) ** 2 + (u.row - cz) ** 2);
+      return d < 10;
+    });
+
+    for (const unit of player.aliveUnits) {
+      if (nearbyEnemies.length > 0) {
+        // Engage nearest threat to the damaged building
+        let best = nearbyEnemies[0];
+        let bestD = unit.distanceTo(best);
+        for (const e of nearbyEnemies) {
+          const d = unit.distanceTo(e);
+          if (d < bestD) { bestD = d; best = e; }
+        }
+        if (unit.distanceTo(best) <= unit.attackRange + 1.0) {
+          unit.attackUnit(best);
+        } else {
+          const path = findPath(game.map, unit.gridPos(), best.gridPos(), 300);
+          if (path.length > 0) unit.moveTo(path);
+        }
+      } else {
+        // No visible threats — rally near the damaged building
+        const d = Math.sqrt((unit.col - cx) ** 2 + (unit.row - cz) ** 2);
+        if (d > 5) {
+          const near = game.map.findWalkableNear(cx, cz, 4);
+          if (near) {
+            const path = findPath(game.map, unit.gridPos(), { col: near[0], row: near[1] }, 300);
+            if (path.length > 0) unit.moveTo(path);
+          }
         }
       }
     }

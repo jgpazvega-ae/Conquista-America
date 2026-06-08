@@ -61,6 +61,23 @@ export class ProductionPanel {
     this.player   = null;
   }
 
+  get isVisible(): boolean {
+    return !this.el.classList.contains('hidden');
+  }
+
+  get currentTab(): 'train' | 'build' | 'upgrade' {
+    return this.tab;
+  }
+
+  /** Returns the trainable unit types for the current civ (in display order). */
+  getTrainableUnits(): UnitType[] {
+    if (!this.player) return [];
+    const civDef = CIVILIZATIONS[this.player.civType] as any;
+    return civDef.units
+      .filter((u: any) => TRAIN_COSTS[u.type as UnitType])
+      .map((u: any) => u.type as UnitType);
+  }
+
   refresh() {
     if (this.building && this.player) this.render();
   }
