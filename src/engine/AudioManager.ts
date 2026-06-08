@@ -222,6 +222,18 @@ export class AudioManager {
     this.osc(262, 'sawtooth', 0.20, 0.040 * this.effectsVol, 0.44, 220);
   }
 
+  playResearchComplete() {
+    // Triumphant ascending arpeggio (C-E-G-C)
+    const notes = [262, 330, 392, 523];
+    notes.forEach((f, i) => {
+      this.osc(f, 'triangle', 0.30, 0.045 * this.musicVol, i * 0.12, f + 30);
+      this.osc(f * 2, 'sine', 0.18, 0.015 * this.musicVol, i * 0.12 + 0.04);
+    });
+    // Final chord sustain
+    this.osc(523, 'sine',     0.55, 0.030 * this.musicVol, 0.50);
+    this.osc(659, 'triangle', 0.55, 0.020 * this.musicVol, 0.50);
+  }
+
   // ── Volume control ───────────────────────────────────────────────────────────
 
   setEffectsVolume(v: number) {

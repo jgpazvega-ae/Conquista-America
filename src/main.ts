@@ -267,7 +267,7 @@ class GameInstance {
             civTech:       civTechNames[this.game.humanPlayer.civType],
           };
           this.hud.notify(`🔬 ${names[key]} investigada — beneficio aplicado`, 'success');
-          this.audio.playBuild();
+          this.audio.playResearchComplete();
           this.prodPanel.refresh();
         }
       };
