@@ -83,9 +83,16 @@ export class CombatSystem {
           // Flanking bonus: +25% damage when 2 or more allies attack the same target
           const isFlanking = (attackerCount.get(target.id) ?? 1) >= 2;
           if (isFlanking) dmg = Math.round(dmg * 1.25);
+          // Cavalry charge: +60% on first strike after 3s idle
+          let isCharge = false;
+          if (unit.type === UnitType.CAVALRY && unit.chargeReady) {
+            dmg = Math.round(dmg * 1.6);
+            unit.chargeReady = false;
+            isCharge = true;
+          }
           const actual = target.takeDamage(dmg);
           unit.attackTimer = unit.attackCooldown;
-          const isCrit = multiplier >= 1.5 || isFlanking;
+          let isCrit = multiplier >= 1.5 || isFlanking || isCharge;
           this.events.push({ attacker: unit, target, damage: actual, worldX: target.worldX, worldZ: target.worldZ, critical: isCrit });
 
           // Cannon: splash damage + burning status effect (30% chance on direct hit)
