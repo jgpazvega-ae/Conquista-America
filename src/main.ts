@@ -595,6 +595,10 @@ class GameInstance {
         if (!evt.target.isAlive()) {
           this.audio.playDeath();
           if (evt.target.playerId !== this.game.humanPlayerId) this.killCount++;
+          // Death burst: scale with unit level
+          const deathScale = evt.target.level >= 3 ? 1.1 : evt.target.level >= 2 ? 0.75 : 0.45;
+          this.renderer.effects.createExplosion(evt.worldX, 0.5, evt.worldZ, deathScale);
+          this.renderer.effects.createDustCloud(evt.worldX, evt.worldZ);
         } else {
           this.audio.playHit(evt.damage / 30);
           if (evt.target.playerId === this.game.humanPlayerId) humanUnderAttack = true;

@@ -85,6 +85,10 @@ export class Unit {
   private _burnTick   = 0;
   private _poisonTick = 0;
 
+  // Cavalry charge: ready after 3s idle; consumed on first attack
+  chargeReady     = false;
+  private _chargeIdleTime = 0;
+
   constructor(
     type: UnitType, civ: CivilizationType, playerId: number,
     col: number, row: number, civColor: number,
@@ -753,6 +757,18 @@ export class Unit {
         this.hp = Math.max(1, this.hp - 2);
         this.updateHealthBar();
       }
+    }
+
+    // Cavalry charge tracking
+    if (this.type === UnitType.CAVALRY) {
+      if (this.state === UnitState.IDLE || this.state === UnitState.HOLD) {
+        this._chargeIdleTime += dt;
+        if (this._chargeIdleTime >= 3) this.chargeReady = true;
+      } else if (this.state === UnitState.MOVING || this.state === UnitState.ATTACK_MOVE) {
+        this._chargeIdleTime = 0;
+        this.chargeReady = false;
+      }
+      // While ATTACKING: chargeReady persists until consumed in CombatSystem
     }
 
     if (this.state === UnitState.MOVING || this.state === UnitState.ATTACK_MOVE) {
