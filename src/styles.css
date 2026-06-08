@@ -988,6 +988,25 @@ input.toggle { width: 22px; height: 22px; accent-color: #d4880a; }
 }
 #pop-bar-fill.pop-near  { background: #ddaa22; }
 #pop-bar-fill.pop-full  { background: #ee4444; }
+
+/* Treasury (economic victory) progress bar */
+#treasury-wrap {
+  display: inline-block;
+  width: 44px; height: 5px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 3px; overflow: hidden;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+#treasury-bar-fill {
+  height: 100%; width: 0%;
+  background: #ffd700;
+  border-radius: 3px;
+  transition: width 0.5s;
+}
+#treasury-bar-fill.treasury-near { background: #ffaa00; animation: treasury-pulse 1s ease-in-out infinite alternate; }
+@keyframes treasury-pulse { from { opacity: 0.7; } to { opacity: 1; } }
+
 #minimap-container { cursor: crosshair; }
 #speed-indicator {
   font-size: 12px; color: #f0c060; font-weight: 700;
