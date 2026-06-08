@@ -213,6 +213,10 @@ export class Game {
     return this.players[this.humanPlayerId];
   }
 
+  getHeroRespawnTimer(playerId: number): number | undefined {
+    return this._heroRespawnTimers.get(playerId);
+  }
+
   getAllUnits(): Unit[] {
     return this.allUnits;
   }
