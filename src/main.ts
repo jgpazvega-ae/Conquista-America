@@ -899,6 +899,20 @@ class GameInstance {
         this.hud.notify(`🔍 Unidad inactiva seleccionada (${this._idleUnitIdx}/${idle.length})`, 'info');
         return;
       }
+      // H: toggle Hold Position for selected units
+      if (e.code === 'KeyH' && !e.ctrlKey && !e.altKey) {
+        const sel = this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId);
+        if (sel.length > 0) {
+          const allHold = sel.every(u => u.state === UnitState.HOLD);
+          for (const u of sel) {
+            u.path = [];
+            u.attackTarget = null;
+            u.state = allHold ? UnitState.IDLE : UnitState.HOLD;
+          }
+          this.hud.notify(allHold ? '🏃 Posición liberada' : '🛡️ ¡Posición de defensa! (+2 defensa)', 'info');
+        }
+        return;
+      }
       // Q: auto-assign idle workers to nearest resource
       if (e.code === 'KeyQ' && !e.ctrlKey && !e.altKey) {
         this.autoAssignWorkers();

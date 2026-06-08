@@ -44,6 +44,7 @@ export enum UnitState {
   MOVING       = 'MOVING',
   ATTACKING    = 'ATTACKING',
   ATTACK_MOVE  = 'ATTACK_MOVE',
+  HOLD         = 'HOLD',
   DEAD         = 'DEAD',
 }
 

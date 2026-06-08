@@ -8,6 +8,7 @@ import { ResourceType } from '../game/ResourceNode';
 import { BuildingType } from '../game/buildings';
 import type { Renderer } from '../engine/Renderer';
 import { CIV_POWER_DEFS } from '../game/CivPowers';
+import { UnitState } from '../game/types';
 
 function hex(n: number): string {
   return '#' + n.toString(16).padStart(6, '0');
@@ -278,11 +279,15 @@ export class HUD {
     this.elHpBar.style.background = pct > 0.5 ? '#22dd44' : pct > 0.25 ? '#ddaa00' : '#dd2222';
     this.elHpText.textContent     = `${unit.hp}/${unit.maxHp}`;
 
+    const holdBadge   = unit.state === UnitState.HOLD ? `<span title="Posición de defensa (+2 def)" style="color:#88ccff">🛡️DEF</span>` : '';
+    const burnBadge   = unit.burning  > 0 ? `<span title="En llamas" style="color:#ff8822">🔥${Math.ceil(unit.burning)}s</span>`   : '';
+    const poisonBadge = unit.poisoned > 0 ? `<span title="Envenenado" style="color:#44dd44">☠️${Math.ceil(unit.poisoned)}s</span>` : '';
     this.elUnitStats.innerHTML =
       `<span>⚔️ ${unit.attack}</span>` +
       `<span>🛡️ ${unit.defense}</span>` +
       `<span>💨 ${unit.speed.toFixed(1)}</span>` +
-      `<span>🎯 ${unit.attackRange.toFixed(1)}</span>`;
+      `<span>🎯 ${unit.attackRange.toFixed(1)}</span>` +
+      holdBadge + burnBadge + poisonBadge;
 
     // XP bar (only if unit can still level up)
     const xpEl = document.getElementById('unit-xp-row');
