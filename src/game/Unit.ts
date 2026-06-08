@@ -79,6 +79,12 @@ export class Unit {
   _nearSettlement  = false; // set each frame by Game.ts; boosts idle heal rate
   wantsRetreat     = false; // set by takeDamage when HP < 20%; cleared by Game
 
+  // Status effects (damage over time)
+  burning  = 0;  // remaining burn duration (s); 2 HP every 0.5 s
+  poisoned = 0;  // remaining poison duration (s); 2 HP every 1 s
+  private _burnTick   = 0;
+  private _poisonTick = 0;
+
   constructor(
     type: UnitType, civ: CivilizationType, playerId: number,
     col: number, row: number, civColor: number,
@@ -727,6 +733,26 @@ export class Unit {
       }
     } else if (this.state !== UnitState.IDLE) {
       this._idleHealTimer = 0;
+    }
+
+    // Status effect DoT
+    if (this.burning > 0) {
+      this.burning = Math.max(0, this.burning - dt);
+      this._burnTick += dt;
+      while (this._burnTick >= 0.5) {
+        this._burnTick -= 0.5;
+        this.hp = Math.max(1, this.hp - 2);
+        this.updateHealthBar();
+      }
+    }
+    if (this.poisoned > 0) {
+      this.poisoned = Math.max(0, this.poisoned - dt);
+      this._poisonTick += dt;
+      while (this._poisonTick >= 1) {
+        this._poisonTick -= 1;
+        this.hp = Math.max(1, this.hp - 2);
+        this.updateHealthBar();
+      }
     }
 
     if (this.state === UnitState.MOVING || this.state === UnitState.ATTACK_MOVE) {
