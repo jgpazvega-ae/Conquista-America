@@ -57,6 +57,8 @@ export class Game {
   newlyRetreatingUnits: Unit[] = [];
   newlyRegeneratedNodes: import('./ResourceNode').ResourceNode[] = [];
   status: GameStatus = 'PLAYING';
+  victoryType: 'MILITARY' | 'ECONOMIC' = 'MILITARY';
+  static readonly ECONOMIC_VICTORY_GOLD = 800;
   paused = false;
   humanPlayerId = 0;
   gameTime = 0;
@@ -632,8 +634,16 @@ export class Game {
       return;
     }
 
-    // Victory: all enemy settlements destroyed
+    // Economic victory: accumulate enough gold while keeping the settlement
+    if (human.resources.gold >= Game.ECONOMIC_VICTORY_GOLD) {
+      this.victoryType = 'ECONOMIC';
+      this.status = 'VICTORY';
+      return;
+    }
+
+    // Military victory: all enemy settlements destroyed
     if (enemies.every(p => !this.hasSettlement(p.id))) {
+      this.victoryType = 'MILITARY';
       this.status = 'VICTORY';
     }
   }

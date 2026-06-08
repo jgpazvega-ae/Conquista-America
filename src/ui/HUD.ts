@@ -38,8 +38,11 @@ export class HUD {
   private minimapBuilt = false;
   private minimapBase: ImageData | null = null;
   private elTimer      = document.getElementById('game-timer');
-  private elPop        = document.getElementById('pop-count');
-  private elPopBarFill = document.getElementById('pop-bar-fill') as HTMLDivElement | null;
+  private elPop             = document.getElementById('pop-count');
+  private elPopBarFill      = document.getElementById('pop-bar-fill') as HTMLDivElement | null;
+  private elTreasuryWrap    = document.getElementById('treasury-wrap') as HTMLElement | null;
+  private elTreasuryFill    = document.getElementById('treasury-bar-fill') as HTMLDivElement | null;
+  static readonly ECON_GOAL = 800;
   private elScoreboard = document.getElementById('scoreboard')!
 
   onMinimapClick: ((worldX: number, worldZ: number) => void) | null = null;
@@ -124,6 +127,18 @@ export class HUD {
     this.elFood.closest('.res')?.classList.toggle('res-low', player.resources.food < 50);
     this.elGold.closest('.res')?.classList.toggle('res-low', player.resources.gold < 30);
     this.elStone.closest('.res')?.classList.toggle('res-low', player.resources.stone < 30);
+
+    // Treasury (economic victory) progress bar: visible once gold > 150
+    if (this.elTreasuryWrap && this.elTreasuryFill) {
+      const gold = Math.floor(player.resources.gold);
+      const show = gold >= 150;
+      this.elTreasuryWrap.classList.toggle('hidden', !show);
+      if (show) {
+        const pct = Math.min(100, (gold / HUD.ECON_GOAL) * 100);
+        this.elTreasuryFill.style.width = `${pct}%`;
+        this.elTreasuryFill.classList.toggle('treasury-near', pct >= 75);
+      }
+    }
 
     // Timer
     const secs = Math.floor(this.game.gameTime);
