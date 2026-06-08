@@ -68,6 +68,9 @@ export class Renderer {
   // ── Attack range ring for selected unit ────────────────────────────────────
   private _rangeRing: THREE.Mesh | null = null;
 
+  // ── Patrol path line ────────────────────────────────────────────────────────
+  private _patrolLine: THREE.Line | null = null;
+
   // ── Rain effect ────────────────────────────────────────────────────────────
   private _rainSystem: THREE.Points | null = null;
   private _rainPositions: Float32Array | null = null;
@@ -754,6 +757,42 @@ export class Renderer {
       this.scene.remove(this._rangeRing);
       (this._rangeRing.material as THREE.Material).dispose();
       this._rangeRing = null;
+    }
+  }
+
+  showPatrolPath(ax: number, az: number, bx: number, bz: number) {
+    this.clearPatrolPath();
+    const ya = this.getHeightAt(ax, az) + 0.12;
+    const yb = this.getHeightAt(bx, bz) + 0.12;
+    const points = [new THREE.Vector3(ax, ya, az), new THREE.Vector3(bx, yb, bz)];
+    const geo = new THREE.BufferGeometry().setFromPoints(points);
+    const mat = new THREE.LineBasicMaterial({ color: 0x00ddff, transparent: true, opacity: 0.55, depthWrite: false });
+    this._patrolLine = new THREE.Line(geo, mat);
+    this._patrolLine.renderOrder = 5;
+    this.scene.add(this._patrolLine);
+    // Endpoint markers
+    for (const [wx, wz, y] of [[ax, az, ya], [bx, bz, yb]] as [number, number, number][]) {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.18, 0.30, 20),
+        new THREE.MeshBasicMaterial({ color: 0x00ddff, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }),
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(wx, y, wz);
+      ring.renderOrder = 5;
+      this._patrolLine.add(ring);
+    }
+  }
+
+  clearPatrolPath() {
+    if (this._patrolLine) {
+      this.scene.remove(this._patrolLine);
+      this._patrolLine.traverse(c => {
+        if (c instanceof THREE.Mesh || c instanceof THREE.Line) {
+          c.geometry.dispose();
+          (c.material as THREE.Material).dispose();
+        }
+      });
+      this._patrolLine = null;
     }
   }
 
