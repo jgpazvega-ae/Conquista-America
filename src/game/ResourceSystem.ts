@@ -12,8 +12,10 @@ export class ResourceSystem {
       const player = game.players[worker.playerId];
       if (!player) continue;
 
+      // Workers can deposit at any completed settlement OR storehouse (reduces travel time)
       const settlements = game.allBuildings.filter(
-        b => b.playerId === worker.playerId && b.isComplete() && (b.type as string) === 'SETTLEMENT',
+        b => b.playerId === worker.playerId && b.isComplete() &&
+             ((b.type as string) === 'SETTLEMENT' || (b.type as string) === 'STOREHOUSE'),
       );
       if (settlements.length === 0) continue;
 
