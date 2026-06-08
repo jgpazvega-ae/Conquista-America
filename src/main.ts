@@ -595,10 +595,15 @@ class GameInstance {
         if (!evt.target.isAlive()) {
           this.audio.playDeath();
           if (evt.target.playerId !== this.game.humanPlayerId) this.killCount++;
-          // Death burst: scale with unit level
-          const deathScale = evt.target.level >= 3 ? 1.1 : evt.target.level >= 2 ? 0.75 : 0.45;
+          // Death burst: scale with unit level / hero status
+          const deathScale = evt.target.isHero ? 1.5 : evt.target.level >= 3 ? 1.1 : evt.target.level >= 2 ? 0.75 : 0.45;
           this.renderer.effects.createExplosion(evt.worldX, 0.5, evt.worldZ, deathScale);
           this.renderer.effects.createDustCloud(evt.worldX, evt.worldZ);
+          // Hero death notification
+          if (evt.target.isHero && evt.target.playerId === this.game.humanPlayerId) {
+            this.hud.notify(`☠️ ${evt.target.heroName} ha caído — regresará en 60s`, 'warning');
+            this.camera.shake(0.4, 0.6);
+          }
         } else {
           this.audio.playHit(evt.damage / 30);
           if (evt.target.playerId === this.game.humanPlayerId) humanUnderAttack = true;
@@ -618,6 +623,15 @@ class GameInstance {
         this.renderer.effects.createLevelUpBurst(u.worldX, 1.0, u.worldZ);
       }
       this._unitLevels.set(u.id, u.level);
+    }
+
+    // Hero respawn notifications
+    for (const hero of this.game.newlyRespawnedHeroes) {
+      if (hero.playerId === this.game.humanPlayerId) {
+        this.hud.notify(`⚔️ ${hero.heroName} ha regresado a la batalla`, 'success');
+        this.audio.playLevelUp();
+        this.renderer.effects.createLevelUpBurst(hero.worldX, 1.0, hero.worldZ);
+      }
     }
 
     // Retreat sound: play once per frame if any human unit retreated this frame
