@@ -89,6 +89,10 @@ export class Unit {
   chargeReady     = false;
   private _chargeIdleTime = 0;
 
+  // Hero unit
+  isHero   = false;
+  heroName = '';
+
   constructor(
     type: UnitType, civ: CivilizationType, playerId: number,
     col: number, row: number, civColor: number,
@@ -881,5 +885,26 @@ export class Unit {
     this._levelRing.position.y = 0.04;
     this._levelRing.renderOrder = 9;
     this.mesh.add(this._levelRing);
+  }
+
+  markAsHero(name: string) {
+    this.isHero   = true;
+    this.heroName = name;
+    // Boost stats
+    this.maxHp    = Math.round(this.maxHp    * 1.5);
+    this.hp       = this.maxHp;
+    this.attack   = Math.round(this.attack   * 1.35);
+    this.defense  = Math.round(this.defense  * 1.5);
+    this.speed   += 0.2;
+    // Distinctive double gold ring
+    const matOuter = new THREE.MeshBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0.90, depthTest: false });
+    const matInner = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.50, depthTest: false });
+    const outer = new THREE.Mesh(new THREE.RingGeometry(0.90, 1.10, 32), matOuter);
+    const inner = new THREE.Mesh(new THREE.RingGeometry(0.72, 0.88, 32), matInner);
+    outer.rotation.x = inner.rotation.x = -Math.PI / 2;
+    outer.position.y = 0.02;
+    inner.position.y = 0.03;
+    outer.renderOrder = inner.renderOrder = 8;
+    this.mesh.add(outer, inner);
   }
 }
