@@ -128,6 +128,7 @@ class GameInstance {
   private _totalResourcesSpent = 0; // food+gold+stone combined
   private _treasuryWarned75 = false; // notified player at 75% of economic victory
   private _buildingSmokeTimers = new Map<number, number>(); // building.id → seconds since last puff
+  private _statusParticleTimers = new Map<number, number>(); // unit.id → time since last status particle
 
   constructor(civ: CivilizationType, saveSystem: SaveSystem, difficulty: Difficulty = 'normal') {
     this.civ        = civ;
@@ -530,6 +531,26 @@ class GameInstance {
         }
       } else {
         this._dustTimers.set(u.id, prev + dt);
+      }
+    }
+
+    // Status effect particles: burning (orange flames) and poisoned (green gas)
+    for (const u of this.game.getAllUnits()) {
+      const hasBurn = u.burning > 0;
+      const hasPoison = u.poisoned > 0;
+      if (!u.isAlive() || (!hasBurn && !hasPoison)) {
+        this._statusParticleTimers.delete(u.id);
+        continue;
+      }
+      const vis = humanFog ? humanFog.getVisibility(u.col, u.row) : 1;
+      if (vis === 0 /* UNEXPLORED */) continue;
+      const prev = this._statusParticleTimers.get(u.id) ?? 0;
+      if (prev + dt >= 0.3) {
+        this._statusParticleTimers.set(u.id, 0);
+        if (hasBurn)   this.renderer.effects.createBurningEffect(u.worldX, 0.6, u.worldZ);
+        if (hasPoison) this.renderer.effects.createPoisonEffect(u.worldX, 0.4, u.worldZ);
+      } else {
+        this._statusParticleTimers.set(u.id, prev + dt);
       }
     }
 

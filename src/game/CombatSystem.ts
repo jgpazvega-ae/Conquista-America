@@ -78,16 +78,25 @@ export class CombatSystem {
           const isCrit = multiplier >= 1.5 || isFlanking;
           this.events.push({ attacker: unit, target, damage: actual, worldX: target.worldX, worldZ: target.worldZ, critical: isCrit });
 
-          // Cannon splash: deal reduced damage to all units near the primary target
+          // Cannon: splash damage + burning status effect (30% chance on direct hit)
           if (unit.type === UnitType.CANNON) {
+            if (Math.random() < 0.30 && target.isAlive()) target.burning = Math.max(target.burning, 4);
             const splashDmg = Math.max(1, Math.round(dmg * SPLASH_DAMAGE_RATIO));
             for (const other of allUnits) {
               if (!other.isAlive() || other === target) continue;
               const d = Math.sqrt((other.col - target.col) ** 2 + (other.row - target.row) ** 2);
               if (d <= SPLASH_RADIUS) {
                 const splashActual = other.takeDamage(splashDmg);
+                if (Math.random() < 0.15) other.burning = Math.max(other.burning, 3);
                 this.events.push({ attacker: unit, target: other, damage: splashActual, worldX: other.worldX, worldZ: other.worldZ, critical: false });
               }
+            }
+          }
+          // Jungle melee: 20% chance to poison target
+          if (unit.attackRange < 2) {
+            const attackerTile = map.getTile(unit.col, unit.row);
+            if (attackerTile?.terrain === TerrainType.JUNGLE && Math.random() < 0.20) {
+              target.poisoned = Math.max(target.poisoned, 6);
             }
           }
         }
