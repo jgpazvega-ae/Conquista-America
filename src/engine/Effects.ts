@@ -139,6 +139,28 @@ export class EffectManager {
     }
   }
 
+  createBurningEffect(x: number, y: number, z: number) {
+    const colors = [0xff6600, 0xffaa22, 0xff3300];
+    for (let i = 0; i < 3; i++) {
+      const v = new THREE.Vector3((Math.random() - 0.5) * 1.5, 1.5 + Math.random() * 2, (Math.random() - 0.5) * 1.5);
+      this.spawn(this.sphere, colors[i % colors.length],
+        x + (Math.random() - 0.5) * 0.6, 0.6, z + (Math.random() - 0.5) * 0.6,
+        0.07 + Math.random() * 0.05, v, 0.35 + Math.random() * 0.25,
+        { additive: true, gravity: -1.5, grow: 0.4, opacity: 0.9 });
+    }
+  }
+
+  createPoisonEffect(x: number, y: number, z: number) {
+    const colors = [0x44cc44, 0x228822, 0x66ff44];
+    for (let i = 0; i < 4; i++) {
+      const v = new THREE.Vector3((Math.random() - 0.5) * 1.2, 0.8 + Math.random() * 0.8, (Math.random() - 0.5) * 1.2);
+      this.spawn(this.sphere, colors[i % colors.length],
+        x + (Math.random() - 0.5) * 0.8, 0.4, z + (Math.random() - 0.5) * 0.8,
+        0.1 + Math.random() * 0.08, v, 0.6 + Math.random() * 0.4,
+        { gravity: -0.8, grow: 0.8, opacity: 0.55 });
+    }
+  }
+
   createMuzzleFlash(x: number, y: number, z: number) {
     this.spawn(this.sphere, 0xffee99, x, y, z, 0.2, new THREE.Vector3(0, 0, 0), 0.1,
       { additive: true, grow: 2, opacity: 1 });
