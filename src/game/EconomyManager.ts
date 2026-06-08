@@ -1,5 +1,6 @@
 import type { Player } from './Player';
 import type { Game } from './Game';
+import { BuildingType } from './buildings';
 
 export interface EconomyStats {
   foodProduction: number;
@@ -59,6 +60,17 @@ export class EconomyManager {
         goldProd += 40;
       }
     }
+
+    // Trade routes: pairs of Storehouses within 10 tiles (max 2 active routes)
+    const stores = game.allBuildings.filter(b => b.playerId === player.id && b.isComplete() && b.type === BuildingType.STOREHOUSE);
+    let routes = 0;
+    for (let i = 0; i < stores.length && routes < 2; i++) {
+      for (let j = i + 1; j < stores.length && routes < 2; j++) {
+        const d = Math.sqrt((stores[i].col - stores[j].col) ** 2 + (stores[i].row - stores[j].row) ** 2);
+        if (d <= 10) routes++;
+      }
+    }
+    goldProd += routes * 20; // 20 gold/5s per route (~60 gold/min each)
 
     // Unit consumption
     const unitCount = player.aliveUnits.length;

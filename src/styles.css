@@ -633,6 +633,19 @@ input.toggle { width: 22px; height: 22px; accent-color: #d4880a; }
   transition: transform 0.3s linear;
 }
 
+/* ═══════════════════════════════════════ HERO PANEL ══ */
+#hero-panel {
+  position: absolute; right: 12px; bottom: 230px; z-index: 115;
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(5,2,1,0.88); border: 1px solid #c4820a;
+  border-radius: 8px; padding: 6px 10px; min-width: 130px;
+  backdrop-filter: blur(4px);
+}
+#hero-panel.hidden { display: none; }
+#hero-panel-portrait { font-size: 22px; }
+#hero-panel-name { font-weight: 700; color: #ffd700; font-size: 11px; line-height: 1.2; }
+#hero-panel-status { font-size: 10px; color: #e8d5a0; margin-top: 3px; }
+
 /* ═══════════════════════════════════════ OBJECTIVES PANEL ══ */
 #objectives-panel {
   position: absolute; top: 58px; left: 8px; z-index: 110;
