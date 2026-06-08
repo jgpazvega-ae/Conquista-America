@@ -73,6 +73,11 @@ export class Unit {
   private attackAnim  = 0;
   private _deathTimer = -1;
 
+  // Passive healing / retreat
+  _damageCooldown  = 0;   // seconds since last hit; healing begins when this reaches 0
+  _idleHealTimer   = 0;   // accumulates while healing; heals 2 HP per 0.5 s
+  wantsRetreat     = false; // set by takeDamage when HP < 20%; cleared by Game
+
   constructor(
     type: UnitType, civ: CivilizationType, playerId: number,
     col: number, row: number, civColor: number,
@@ -659,6 +664,11 @@ export class Unit {
   takeDamage(amount: number): number {
     const dmg = Math.max(1, amount - this.defense);
     this.hp   = Math.max(0, this.hp - dmg);
+    this._damageCooldown = 5;  // 5 s before healing starts
+    this._idleHealTimer  = 0;
+    if (this.hp > 0 && this.hp < this.maxHp * 0.20 && !this.wantsRetreat) {
+      this.wantsRetreat = true;
+    }
     this.updateHealthBar();
     if (this.hp <= 0) this.die();
     return dmg;
@@ -701,6 +711,20 @@ export class Unit {
 
     this.attackTimer = Math.max(0, this.attackTimer - dt);
     this.animT += dt;
+
+    // Passive idle healing: 2 HP every 0.5 s after 5 s without damage
+    if (this._damageCooldown > 0) {
+      this._damageCooldown -= dt;
+    } else if (this.state === UnitState.IDLE && this.hp < this.maxHp) {
+      this._idleHealTimer += dt;
+      while (this._idleHealTimer >= 0.5) {
+        this._idleHealTimer -= 0.5;
+        this.hp = Math.min(this.maxHp, this.hp + 2);
+        this.updateHealthBar();
+      }
+    } else if (this.state !== UnitState.IDLE) {
+      this._idleHealTimer = 0;
+    }
 
     if (this.state === UnitState.MOVING || this.state === UnitState.ATTACK_MOVE) {
       this.updateMovement(dt, map);
