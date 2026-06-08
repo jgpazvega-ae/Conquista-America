@@ -545,6 +545,13 @@ class GameInstance {
       this._unitLevels.set(u.id, u.level);
     }
 
+    // Retreat sound: play once per frame if any human unit retreated this frame
+    const humanRetreats = this.game.newlyRetreatingUnits.filter(u => u.playerId === this.game.humanPlayerId);
+    if (humanRetreats.length > 0) {
+      this.audio.playRetreat();
+      this.hud.notify(`🏃 ${humanRetreats.length > 1 ? `${humanRetreats.length} unidades retroceden` : 'Unidad retrocediendo'}`, 'warning');
+    }
+
     // Idle worker warning: notify every 30 s of game time while workers are idle
     const humanWorkers = this.game.allWorkers.filter(w => w.playerId === this.game.humanPlayerId);
     const idleCount = humanWorkers.filter(w => (w.task as string) === 'IDLE').length;
