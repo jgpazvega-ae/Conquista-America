@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { UnitType, CivilizationType, UnitState } from './types';
+import { UnitType, CivilizationType, UnitState, TerrainType } from './types';
 import type { GridPos } from './types';
 import type { UnitDef } from './civilizations';
 import { getUnitDef } from './civilizations';
@@ -741,7 +741,7 @@ export class Unit {
     this.mesh.position.z = this.worldZ;
   }
 
-  private updateMovement(dt: number, _map: GameMap) {
+  private updateMovement(dt: number, map: GameMap) {
     if (this.pathIndex >= this.path.length) {
       this.state = UnitState.IDLE;
       return;
@@ -753,7 +753,17 @@ export class Unit {
     const dx = tx - this.worldX;
     const dz = tz - this.worldZ;
     const dist = Math.sqrt(dx * dx + dz * dz);
-    const step = this.speed * TILE_SIZE * dt;
+
+    // Terrain-based speed modifier
+    const tile = map.getTile(this.col, this.row);
+    let terrainMult = 1.0;
+    switch (tile?.terrain) {
+      case TerrainType.JUNGLE:   terrainMult = 0.62; break;
+      case TerrainType.MOUNTAIN: terrainMult = 0.48; break;
+      case TerrainType.HIGHLAND: terrainMult = 0.72; break;
+      case TerrainType.DESERT:   terrainMult = 0.88; break;
+    }
+    const step = this.speed * TILE_SIZE * dt * terrainMult;
 
     if (dist <= step) {
       this.worldX = tx; this.worldZ = tz;

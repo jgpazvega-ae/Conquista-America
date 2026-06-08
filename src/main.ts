@@ -123,6 +123,7 @@ class GameInstance {
   private _idleUnitIdx = 0; // cycles through idle units on 'I' press
   private _unitsTrainedCount = 0;
   private _nextEventTime = 120; // first random event after 2 min
+  private _dustTimers = new Map<number, number>(); // unit.id → time since last dust puff
   private _totalResourcesSpent = 0; // food+gold+stone combined
   private _buildingSmokeTimers = new Map<number, number>(); // building.id → seconds since last puff
 
@@ -471,6 +472,26 @@ class GameInstance {
         }
       } else {
         this._buildingSmokeTimers.set(b.id, prev + dt);
+      }
+    }
+
+    // Dust trails for moving units (throttled per unit)
+    for (const u of this.game.getAllUnits()) {
+      if (u.state !== UnitState.MOVING && u.state !== UnitState.ATTACK_MOVE) {
+        this._dustTimers.delete(u.id);
+        continue;
+      }
+      const prev = this._dustTimers.get(u.id) ?? 0;
+      if (prev + dt >= 0.28) {
+        this._dustTimers.set(u.id, 0);
+        // Only emit dust on non-water terrain; skip if fogged
+        const fog = humanFog;
+        const vis = fog ? fog.getVisibility(u.col, u.row) : 1;
+        if (vis !== 0 /* not UNEXPLORED */) {
+          this.renderer.effects.createDustCloud(u.worldX, u.worldZ);
+        }
+      } else {
+        this._dustTimers.set(u.id, prev + dt);
       }
     }
 
