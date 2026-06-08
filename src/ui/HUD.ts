@@ -271,8 +271,8 @@ export class HUD {
     this.elPortrait.style.background = `rgba(${(civColor >> 16) & 0xff}, ${(civColor >> 8) & 0xff}, ${civColor & 0xff}, 0.25)`;
     this.elPortrait.style.borderColor = hex(civColor);
 
-    this.elUnitName.textContent = unit.def.name;
-    this.elUnitCiv.textContent  = CIV_NAMES[unit.civType];
+    this.elUnitName.textContent = unit.isHero ? `${unit.heroName} ★` : unit.def.name;
+    this.elUnitCiv.textContent  = unit.isHero ? `Héroe — ${CIV_NAMES[unit.civType]}` : CIV_NAMES[unit.civType];
 
     const pct = unit.hp / unit.maxHp;
     this.elHpBar.style.width      = `${pct * 100}%`;

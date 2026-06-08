@@ -1,4 +1,4 @@
-import { CivilizationType, UnitState } from './types';
+import { CivilizationType, UnitState, UnitType } from './types';
 import { GameMap } from './Map';
 import { findPath } from './Pathfinding';
 import { Unit } from './Unit';
@@ -56,6 +56,8 @@ export class Game {
   newlyDepletedNodes: ResourceNode[] = [];
   newlyRetreatingUnits: Unit[] = [];
   newlyRegeneratedNodes: import('./ResourceNode').ResourceNode[] = [];
+  newlyRespawnedHeroes: Unit[] = [];
+  private _heroRespawnTimers = new Map<number, number>(); // playerId → seconds until respawn
   status: GameStatus = 'PLAYING';
   victoryType: 'MILITARY' | 'ECONOMIC' = 'MILITARY';
   static readonly ECONOMIC_VICTORY_GOLD = 800;
@@ -96,7 +98,29 @@ export class Game {
     });
   }
 
+  private static readonly HERO_DEFS: Record<CivilizationType, { name: string; unitType: UnitType }> = {
+    [CivilizationType.AZTEC]:        { name: 'Tlacaelel',      unitType: UnitType.EAGLE_WARRIOR  },
+    [CivilizationType.MAYA]:         { name: 'Lady Xoc',       unitType: UnitType.AHAU_WARRIOR   },
+    [CivilizationType.INCA]:         { name: 'Pachacuti',      unitType: UnitType.CHAKANA_GUARD  },
+    [CivilizationType.CONQUISTADOR]: { name: 'Hernán Cortés',  unitType: UnitType.CAVALRY        },
+  };
+
+  private spawnHero(player: Player): Unit | null {
+    const heroDef  = Game.HERO_DEFS[player.civType];
+    const [baseCol, baseRow] = START_POSITIONS[player.civType];
+    const pos = this.map.findWalkableNear(baseCol, baseRow + 2, 6);
+    if (!pos) return null;
+    const unit = new Unit(heroDef.unitType, player.civType, player.id, pos[0], pos[1], CIV_COLORS[player.civType]);
+    unit.markAsHero(heroDef.name);
+    player.addUnit(unit);
+    this.allUnits.push(unit);
+    return unit;
+  }
+
   private spawnUnitsFor(player: Player) {
+    // Spawn hero first
+    this.spawnHero(player);
+
     const civDef = CIVILIZATIONS[player.civType];
     const [baseCol, baseRow] = START_POSITIONS[player.civType];
     const color = CIV_COLORS[player.civType];
@@ -222,6 +246,11 @@ export class Game {
         s => Math.abs(unit.col - s.col) <= 4 && Math.abs(unit.row - s.row) <= 4,
       );
       unit.update(dt, this.map);
+
+      // Hero death → start respawn countdown (60s)
+      if (unit.isHero && !unit.isAlive() && !this._heroRespawnTimers.has(unit.playerId)) {
+        this._heroRespawnTimers.set(unit.playerId, 60);
+      }
     }
 
     // Auto-retreat: units that dropped below 20% HP flee toward nearest friendly building
@@ -254,6 +283,25 @@ export class Game {
     this.newlyDepletedNodes = [];
     this.newlyRetreatingUnits = [];
     this.newlyRegeneratedNodes = [];
+    this.newlyRespawnedHeroes = [];
+
+    // Hero respawn timers
+    for (const [playerId, timer] of this._heroRespawnTimers) {
+      const newTimer = timer - dt;
+      if (newTimer <= 0) {
+        this._heroRespawnTimers.delete(playerId);
+        const player = this.players[playerId];
+        if (player && !player.isDefeated()) {
+          const hero = this.spawnHero(player);
+          if (hero) {
+            this.newlySpawnedUnits.push(hero);
+            this.newlyRespawnedHeroes.push(hero);
+          }
+        }
+      } else {
+        this._heroRespawnTimers.set(playerId, newTimer);
+      }
+    }
     for (const building of this.allBuildings) {
       if (!building.isComplete()) {
         const wasIncomplete = true;
