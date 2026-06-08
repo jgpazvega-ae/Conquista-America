@@ -68,6 +68,12 @@ export class Renderer {
   // ── Attack range ring for selected unit ────────────────────────────────────
   private _rangeRing: THREE.Mesh | null = null;
 
+  // ── Rain effect ────────────────────────────────────────────────────────────
+  private _rainSystem: THREE.Points | null = null;
+  private _rainPositions: Float32Array | null = null;
+  private _rainActive = false;
+  private static readonly RAIN_COUNT = 1200;
+
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -755,6 +761,7 @@ export class Renderer {
     this.effects.update(dt);
     if (this.waterMat) this.waterMat.uniforms.time.value += dt;
     this.updateMarkers(dt);
+    this.updateRain(dt);
     // Animate rally marker: gentle bob + ring pulse
     if (this._rallyMarker) {
       this._rallyPhase += dt * 2.2;
@@ -816,6 +823,64 @@ export class Renderer {
     const bgB = 0.12 + dayFraction * 0.50;
     this.scene.background = new THREE.Color(bgR, bgG, bgB);
   }
+
+  /** Start rain particles. Call stopRain() to end. */
+  startRain() {
+    if (this._rainSystem) return;
+    const N = Renderer.RAIN_COUNT;
+    const positions = new Float32Array(N * 3);
+    const SPREAD = 80;
+    for (let i = 0; i < N; i++) {
+      positions[i * 3]     = (Math.random() - 0.5) * SPREAD;
+      positions[i * 3 + 1] = Math.random() * 30 + 5;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * SPREAD;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const mat = new THREE.PointsMaterial({
+      color: 0x99ccff, size: 0.09, transparent: true, opacity: 0.45,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    });
+    this._rainSystem = new THREE.Points(geo, mat);
+    this._rainSystem.renderOrder = 10;
+    this._rainPositions = positions;
+    this.scene.add(this._rainSystem);
+    this._rainActive = true;
+  }
+
+  stopRain() {
+    if (!this._rainSystem) return;
+    this.scene.remove(this._rainSystem);
+    (this._rainSystem.geometry as THREE.BufferGeometry).dispose();
+    (this._rainSystem.material as THREE.Material).dispose();
+    this._rainSystem = null;
+    this._rainPositions = null;
+    this._rainActive = false;
+  }
+
+  private updateRain(dt: number) {
+    if (!this._rainActive || !this._rainSystem || !this._rainPositions) return;
+    const N = Renderer.RAIN_COUNT;
+    const fallSpeed = 18 * dt;
+    const drift = 2 * dt;
+    const SPREAD = 80;
+    // Follow camera roughly
+    const camX = this.camera.position.x;
+    const camZ = this.camera.position.z;
+    for (let i = 0; i < N; i++) {
+      this._rainPositions[i * 3 + 1] -= fallSpeed;
+      this._rainPositions[i * 3]     -= drift;
+      if (this._rainPositions[i * 3 + 1] < 0) {
+        this._rainPositions[i * 3]     = camX + (Math.random() - 0.5) * SPREAD;
+        this._rainPositions[i * 3 + 1] = 28 + Math.random() * 8;
+        this._rainPositions[i * 3 + 2] = camZ + (Math.random() - 0.5) * SPREAD;
+      }
+    }
+    (this._rainSystem.geometry as THREE.BufferGeometry)
+      .attributes.position.needsUpdate = true;
+  }
+
+  get isRaining() { return this._rainActive; }
 
   render() {
     this.renderer.render(this.scene, this.camera);
