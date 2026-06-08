@@ -26,7 +26,7 @@ export class FogOfWar {
     }
   }
 
-  update(game: Game, playerId: number) {
+  update(game: Game, playerId: number, sightMultiplier = 1.0) {
     // Reset visibility each frame
     for (let r = 0; r < MAP_ROWS; r++) {
       for (let c = 0; c < MAP_COLS; c++) {
@@ -39,7 +39,7 @@ export class FogOfWar {
     // Units reveal terrain (jungle tiles need extra sight to reveal — stealth mechanic)
     const myUnits = game.allUnits.filter(u => u.playerId === playerId && u.isAlive());
     for (const unit of myUnits) {
-      this.revealAroundPoint(Math.round(unit.col), Math.round(unit.row), Math.ceil(unit.sight), game.map);
+      this.revealAroundPoint(Math.round(unit.col), Math.round(unit.row), Math.ceil(unit.sight * sightMultiplier), game.map);
     }
 
     // Buildings reveal terrain
@@ -110,9 +110,9 @@ export class FogOfWarManager {
     }
   }
 
-  update(game: Game) {
+  update(game: Game, sightMultiplier = 1.0) {
     for (const [playerId, fog] of this.fogMaps) {
-      fog.update(game, playerId);
+      fog.update(game, playerId, sightMultiplier);
     }
   }
 
