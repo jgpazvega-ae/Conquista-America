@@ -122,6 +122,7 @@ class GameInstance {
   private _fpsDisplay = 0;
   private _idleUnitIdx = 0; // cycles through idle units on 'I' press
   private _unitsTrainedCount = 0;
+  private _nextEventTime = 120; // first random event after 2 min
   private _totalResourcesSpent = 0; // food+gold+stone combined
   private _buildingSmokeTimers = new Map<number, number>(); // building.id → seconds since last puff
 
@@ -442,6 +443,12 @@ class GameInstance {
     const DAY_CYCLE = 480;
     this.renderer.setDayNight((this.game.gameTime % DAY_CYCLE) / DAY_CYCLE);
 
+    // Random events every 2–4 minutes of game time
+    if (this.game.gameTime >= this._nextEventTime) {
+      this._nextEventTime = this.game.gameTime + 120 + Math.random() * 120;
+      this.triggerRandomEvent();
+    }
+
     // Persistent smoke/fire for damaged buildings
     for (const b of this.game.allBuildings) {
       if (!b.isAlive() || !b.isComplete()) continue;
@@ -507,6 +514,7 @@ class GameInstance {
       if (u.level > prev) {
         this.audio.playLevelUp();
         this.hud.notify(`⭐ ${u.def.name} subió al nivel ${u.level}`, 'success');
+        this.renderer.effects.createLevelUpBurst(u.worldX, 1.0, u.worldZ);
       }
       this._unitLevels.set(u.id, u.level);
     }
@@ -902,6 +910,77 @@ class GameInstance {
       // Power ready but couldn't activate (e.g. Aztec needs a selected unit)
       this.hud.notify('⚠️ Selecciona una unidad para usar el poder', 'warning');
     }
+  }
+
+  private triggerRandomEvent() {
+    const player = this.game.humanPlayer;
+    const events = [
+      {
+        emoji: '🌽', name: 'Cosecha abundante',
+        desc: 'Las lluvias favorecieron los cultivos.',
+        type: 'success' as const,
+        apply: () => { player.resources.food += 180; },
+      },
+      {
+        emoji: '⚜️', name: 'Filón de oro',
+        desc: 'Tus exploradores hallaron un yacimiento rico.',
+        type: 'success' as const,
+        apply: () => { player.resources.gold += 120; },
+      },
+      {
+        emoji: '🪨', name: 'Cantera descubierta',
+        desc: 'Una nueva fuente de piedra ha sido localizada.',
+        type: 'success' as const,
+        apply: () => { player.resources.stone += 150; },
+      },
+      {
+        emoji: '🌩️', name: 'Tormenta devastadora',
+        desc: 'Las tormentas destruyeron parte de los suministros.',
+        type: 'warning' as const,
+        apply: () => {
+          player.resources.food  = Math.max(0, player.resources.food  - 80);
+          player.resources.stone = Math.max(0, player.resources.stone - 60);
+        },
+      },
+      {
+        emoji: '🦠', name: 'Epidemia',
+        desc: 'Una enfermedad afecta a tus guerreros.',
+        type: 'warning' as const,
+        apply: () => {
+          for (const u of player.aliveUnits) {
+            u.hp = Math.max(1, Math.floor(u.hp * 0.75));
+          }
+        },
+      },
+      {
+        emoji: '🔥', name: 'Espíritu guerrero',
+        desc: 'Tus tropas están inspiradas — sus armas brillan.',
+        type: 'success' as const,
+        apply: () => {
+          for (const u of player.aliveUnits) u.attack = Math.round(u.attack * 1.12);
+          // revert after 60s
+          setTimeout(() => {
+            for (const u of player.aliveUnits) u.attack = Math.round(u.attack / 1.12);
+          }, 60000);
+        },
+      },
+      {
+        emoji: '💨', name: 'Viento favorable',
+        desc: 'Tus tropas se mueven con el viento a su favor.',
+        type: 'info' as const,
+        apply: () => {
+          for (const u of player.aliveUnits) u.speed += 0.5;
+          setTimeout(() => {
+            for (const u of player.aliveUnits) u.speed = Math.max(0.5, u.speed - 0.5);
+          }, 45000);
+        },
+      },
+    ];
+    const evt = events[Math.floor(Math.random() * events.length)];
+    evt.apply();
+    this.hud.notify(`${evt.emoji} ${evt.name}: ${evt.desc}`, evt.type);
+    // Camera shake for dramatic events
+    if (evt.type === 'warning') this.camera.shake(0.18, 0.3);
   }
 
   private autoAssignWorkers() {
