@@ -126,6 +126,7 @@ class GameInstance {
   private _nextEventTime = 120; // first random event after 2 min
   private _dustTimers = new Map<number, number>(); // unit.id → time since last dust puff
   private _totalResourcesSpent = 0; // food+gold+stone combined
+  private _treasuryWarned75 = false; // notified player at 75% of economic victory
   private _buildingSmokeTimers = new Map<number, number>(); // building.id → seconds since last puff
 
   constructor(civ: CivilizationType, saveSystem: SaveSystem, difficulty: Difficulty = 'normal') {
@@ -589,6 +590,13 @@ class GameInstance {
       this.hud.notify(`🏃 ${humanRetreats.length > 1 ? `${humanRetreats.length} unidades retroceden` : 'Unidad retrocediendo'}`, 'warning');
     }
 
+    // Economic victory approach warning (at 75% of 800 gold target)
+    const goldNow = this.game.humanPlayer.resources.gold;
+    if (!this._treasuryWarned75 && goldNow >= 600) {
+      this._treasuryWarned75 = true;
+      this.hud.notify('💰 ¡75% hacia la victoria económica! Acumula 800 ⚜️ oro', 'info');
+    }
+
     // Idle worker warning: notify every 30 s of game time while workers are idle
     const humanWorkers = this.game.allWorkers.filter(w => w.playerId === this.game.humanPlayerId);
     const idleCount = humanWorkers.filter(w => (w.task as string) === 'IDLE').length;
@@ -654,11 +662,14 @@ class GameInstance {
     const sub    = document.getElementById('endgame-subtitle')!;
     const stats  = document.getElementById('endgame-stats')!;
 
-    icon.textContent = won ? '🏆' : '☠️';
+    const isEconomic = won && this.game.victoryType === 'ECONOMIC';
+    icon.textContent = won ? (isEconomic ? '💰' : '🏆') : '☠️';
     title.textContent = won ? '¡VICTORIA!' : 'DERROTA';
     title.className = 'endgame-title ' + (won ? 'victory' : 'defeat');
     sub.textContent = won
-      ? '¡Has conquistado el continente americano!'
+      ? (isEconomic
+          ? '¡Tu riqueza conquistó el continente americano! Victoria económica.'
+          : '¡Has aplastado a tus enemigos! Victoria militar.')
       : 'Tus fuerzas han sido aniquiladas.';
 
     const m = Math.floor(seconds / 60);
