@@ -1,7 +1,7 @@
 import type { Game } from '../game/Game';
 import type { Unit } from '../game/Unit';
 import type { GameMap } from '../game/Map';
-import { TERRAIN_COLORS, CIV_COLORS, CIV_NAMES, CIV_EMOJIS, TILE_SIZE } from '../game/constants';
+import { TERRAIN_COLORS, CIV_COLORS, CIV_NAMES, CIV_EMOJIS, TILE_SIZE, WONDER_NAMES, WONDER_EMOJIS } from '../game/constants';
 import type { DamageEvent } from '../game/CombatSystem';
 import { TileVisibility } from '../game/FogOfWar';
 import { ResourceType } from '../game/ResourceNode';
@@ -201,6 +201,7 @@ export class HUD {
     this.updatePowerButton();
     this.updateBuildingHpBars();
     this.updateHeroPanel();
+    this.updateWonderPanel();
   }
 
   private updatePowerButton() {
@@ -290,6 +291,34 @@ export class HUD {
         const timer = this.game.getHeroRespawnTimer(hero.playerId);
         statusEl.innerHTML = `☠️ Respawn: <b style="color:#ffaa44">${timer !== undefined ? Math.ceil(timer) : '—'}s</b>`;
       }
+    }
+  }
+
+  private updateWonderPanel() {
+    const panel  = document.getElementById('wonder-panel');
+    const fill   = document.getElementById('wonder-bar-fill');
+    const timeEl = document.getElementById('wonder-time');
+    const nameEl = document.getElementById('wonder-name');
+    if (!panel) return;
+
+    const wc = this.game.wonderCountdown;
+    if (wc === null || wc <= 0) { panel.classList.add('hidden'); return; }
+    panel.classList.remove('hidden');
+
+    const civKey = this.game.humanPlayer.civType as string;
+    const wonderName = WONDER_NAMES[civKey] ?? 'Gran Maravilla';
+    const wonderEmoji = WONDER_EMOJIS[civKey] ?? '🏛️';
+    if (nameEl) nameEl.textContent = `${wonderEmoji} ${wonderName}`;
+
+    const m   = Math.floor(wc / 60);
+    const s   = Math.ceil(wc % 60);
+    const pct = Math.min(100, (wc / 180) * 100);
+    if (fill)   fill.style.width = `${pct}%`;
+    if (timeEl) timeEl.textContent = `${m}:${String(s).padStart(2, '0')}`;
+
+    // Pulse red when under 30 seconds
+    if (fill) {
+      fill.style.background = wc < 30 ? '#dd3333' : wc < 60 ? '#ddaa00' : '#22aa66';
     }
   }
 

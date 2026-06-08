@@ -424,12 +424,22 @@ class GameInstance {
       if (b.playerId === this.game.humanPlayerId) {
         this.audio.playBuild();
         const def = BUILDING_DEFS[b.type];
-        this.hud.notify(`🏛️ ${def.name} completado`, 'success');
-        // Celebration particle burst at building location
         const wx = b.col * TILE_SIZE;
         const wz = b.row * TILE_SIZE;
-        this.renderer.effects.createExplosion(wx, 0.6, wz, 0.7);
-        this.renderer.effects.createDustCloud(wx, wz);
+        if (b.type === BuildingType.WONDER) {
+          // Wonder completion: grand celebration
+          this.hud.notify(`🏛️ ¡${def.name} completada! ¡Defiéndela 3 minutos!`, 'success');
+          this.camera.panTo(wx, wz);
+          this.camera.shake(0.6, 0.8);
+          this.renderer.effects.createExplosion(wx, 0.6, wz, 2.0);
+          this.renderer.effects.createDustCloud(wx, wz);
+          this.renderer.effects.createLevelUpBurst(wx, 1.5, wz);
+          this.audio.playVictory();
+        } else {
+          this.hud.notify(`🏛️ ${def.name} completado`, 'success');
+          this.renderer.effects.createExplosion(wx, 0.6, wz, 0.7);
+          this.renderer.effects.createDustCloud(wx, wz);
+        }
       }
     }
 
@@ -445,7 +455,11 @@ class GameInstance {
           this.hud.notify('💥 Edificio enemigo destruido', 'success');
         }
       } else {
-        if (b.type === BuildingType.SETTLEMENT) {
+        if (b.type === BuildingType.WONDER) {
+          this.hud.notify('💀 ¡Tu Gran Maravilla fue destruida! La victoria se escapa...', 'warning');
+          this.camera.shake(0.8, 1.0);
+          this.renderer.effects.createExplosion(b.col * TILE_SIZE, 0.6, b.row * TILE_SIZE, 2.0);
+        } else if (b.type === BuildingType.SETTLEMENT) {
           this.hud.notify('💀 ¡Tu asentamiento ha sido destruido!', 'warning');
         } else {
           this.hud.notify('🔥 Tu edificio ha sido destruido', 'warning');
@@ -714,12 +728,15 @@ class GameInstance {
     const stats  = document.getElementById('endgame-stats')!;
 
     const isEconomic = won && this.game.victoryType === 'ECONOMIC';
-    icon.textContent = won ? (isEconomic ? '💰' : '🏆') : '☠️';
+    const isWonder   = won && this.game.victoryType === 'WONDER';
+    icon.textContent = won ? (isEconomic ? '💰' : isWonder ? '🏛️' : '🏆') : '☠️';
     title.textContent = won ? '¡VICTORIA!' : 'DERROTA';
     title.className = 'endgame-title ' + (won ? 'victory' : 'defeat');
     sub.textContent = won
       ? (isEconomic
           ? '¡Tu riqueza conquistó el continente americano! Victoria económica.'
+          : isWonder
+          ? '¡Tu Gran Maravilla resistió el asedio y pasó a la historia! Victoria por Maravilla.'
           : '¡Has aplastado a tus enemigos! Victoria militar.')
       : 'Tus fuerzas han sido aniquiladas.';
 

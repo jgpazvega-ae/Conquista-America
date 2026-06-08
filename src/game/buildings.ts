@@ -5,6 +5,7 @@ export enum BuildingType {
   WATCHTOWER = 'WATCHTOWER',      // Torre de vigilancia (defensa)
   STOREHOUSE = 'STOREHOUSE',      // Almacén (bonus recursos)
   FORGE = 'FORGE',                // Herrería (mejora armamentos)
+  WONDER = 'WONDER',              // Maravilla (victoria por supervivencia)
 }
 
 export interface BuildingDef {
