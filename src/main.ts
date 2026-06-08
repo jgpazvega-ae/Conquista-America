@@ -130,6 +130,7 @@ class GameInstance {
   private _buildingSmokeTimers = new Map<number, number>(); // building.id → seconds since last puff
   private _statusParticleTimers = new Map<number, number>(); // unit.id → time since last status particle
   private _wasNight = false;
+  private _wasStorm = false;
 
   constructor(civ: CivilizationType, saveSystem: SaveSystem, difficulty: Difficulty = 'normal') {
     this.civ        = civ;
@@ -449,10 +450,23 @@ class GameInstance {
       this.camera.shake(b.type === BuildingType.SETTLEMENT ? 0.55 : 0.30, 0.45);
       if (b.playerId !== this.game.humanPlayerId) {
         this._enemyBuildingsDestroyed++;
+        // Loot: award 20% of building cost to human player
+        const def = BUILDING_DEFS[b.type];
+        const lootFood  = Math.round(def.cost.food  * 0.2);
+        const lootGold  = Math.round(def.cost.gold  * 0.2);
+        const lootStone = Math.round(def.cost.stone * 0.2);
+        const p = this.game.humanPlayer;
+        p.resources.food  = Math.min(2000, p.resources.food  + lootFood);
+        p.resources.gold  = Math.min(2000, p.resources.gold  + lootGold);
+        p.resources.stone = Math.min(2000, p.resources.stone + lootStone);
+        const lootParts: string[] = [];
+        if (lootFood  > 0) lootParts.push(`+${lootFood}🌽`);
+        if (lootGold  > 0) lootParts.push(`+${lootGold}⚜️`);
+        if (lootStone > 0) lootParts.push(`+${lootStone}🪨`);
         if (b.type === BuildingType.SETTLEMENT) {
-          this.hud.notify('🏚️ ¡Asentamiento enemigo destruido!', 'success');
+          this.hud.notify(`🏚️ ¡Asentamiento enemigo destruido! Botín: ${lootParts.join(' ')}`, 'success');
         } else {
-          this.hud.notify('💥 Edificio enemigo destruido', 'success');
+          this.hud.notify(`💥 Edificio destruido${lootParts.length ? ` · Botín: ${lootParts.join(' ')}` : ''}`, 'success');
         }
       } else {
         if (b.type === BuildingType.WONDER) {
@@ -501,6 +515,16 @@ class GameInstance {
     if (isNight !== this._wasNight) {
       this._wasNight = isNight;
       this.hud.notify(isNight ? '🌙 Anochece — visión reducida 40%' : '☀️ Amanece — visión restaurada', 'info');
+    }
+    // Storm start/end notifications
+    const isStorm = this.game.stormTimer > 0;
+    if (isStorm !== this._wasStorm) {
+      this._wasStorm = isStorm;
+      if (isStorm) {
+        this.hud.notify('🌪️ ¡Tormenta tropical! Visibilidad reducida 30s', 'warning');
+      } else {
+        this.hud.notify('🌤️ La tormenta pasó — visibilidad restaurada', 'info');
+      }
     }
 
     // Random events every 2–4 minutes of game time

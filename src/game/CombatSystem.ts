@@ -17,6 +17,11 @@ function terrainDefenseBonus(terrain: TerrainType | undefined): number {
   }
 }
 
+// Ambush: attacking from jungle cover grants a hidden-strike bonus
+function terrainAttackBonus(terrain: TerrainType | undefined): number {
+  return terrain === TerrainType.JUNGLE ? 4 : 0;
+}
+
 export interface DamageEvent {
   attacker:      Unit | null;
   target:        Unit;
@@ -73,7 +78,8 @@ export class CombatSystem {
         }
 
         if (unit.attackTimer <= 0) {
-          let dmg = unit.attack + Math.floor(Math.random() * 6) - 3;
+          const attackerTile = map.getTile(unit.col, unit.row);
+          let dmg = unit.attack + Math.floor(Math.random() * 6) - 3 + terrainAttackBonus(attackerTile?.terrain);
           const multiplier = getDamageMultiplier(unit.type, target.type);
           dmg = Math.round(dmg * multiplier);
           const tile = map.getTile(target.col, target.row);
