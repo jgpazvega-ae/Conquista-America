@@ -75,6 +75,7 @@ export class AIBuildingPlanner {
       [BuildingType.WATCHTOWER]: 0,
       [BuildingType.STOREHOUSE]: 0,
       [BuildingType.FORGE]: 0,
+      [BuildingType.WONDER]: 0,
     };
 
     for (const b of buildings) {

@@ -64,6 +64,20 @@ export const CIV_EMOJIS: Record<string, string> = {
   CONQUISTADOR: '⚔️',
 };
 
+export const WONDER_NAMES: Record<string, string> = {
+  AZTEC:        'Gran Tenochtitlán',
+  INCA:         'Machu Picchu',
+  MAYA:         'Chichén Itzá',
+  CONQUISTADOR: 'Fortaleza del Rey',
+};
+
+export const WONDER_EMOJIS: Record<string, string> = {
+  AZTEC:        '🏯',
+  INCA:         '⛰️',
+  MAYA:         '🔭',
+  CONQUISTADOR: '🏰',
+};
+
 export const STARTING_RESOURCES = {
   food:  400,
   gold:  200,

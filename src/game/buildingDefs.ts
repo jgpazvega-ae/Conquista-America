@@ -62,4 +62,14 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     buildRadius: 3,
     description: 'Mejora armas y armaduras. Aumenta ataque/defensa de unidades.',
   },
+  [BuildingType.WONDER]: {
+    type: BuildingType.WONDER,
+    name: 'Gran Maravilla',
+    emoji: '🏛️',
+    cost: { food: 250, gold: 500, stone: 350 },
+    buildTime: 120,
+    maxHp: 500,
+    buildRadius: 5,
+    description: 'Obra monumental de tu civilización. Complétala y defiéndela 3 minutos para alcanzar la gloria.',
+  },
 };

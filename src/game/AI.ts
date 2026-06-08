@@ -206,6 +206,11 @@ export class AISystem {
     const available = myUnits.filter(u => u.state === UnitState.IDLE || u.state === UnitState.MOVING);
     const toSend = Math.ceil(available.length * 0.8);
 
+    // Human wonder is highest-priority target — destroy before countdown expires
+    const humanWonder = game.allBuildings.find(
+      b => b.playerId === 0 && (b.type as string) === 'WONDER' && b.isAlive() && b.isComplete(),
+    );
+
     // Find enemy settlement as primary target (after 3+ min of game)
     const humanSettlement = game.allBuildings.find(
       b => b.playerId !== player.id && b.playerId === 0 &&
@@ -214,6 +219,18 @@ export class AISystem {
 
     for (let i = 0; i < Math.min(toSend, available.length); i++) {
       const unit = available[i];
+
+      // Wonder is active — all attacking units converge on it
+      if (humanWonder && game.wonderCountdown !== null) {
+        const d = Math.sqrt((unit.col - humanWonder.col) ** 2 + (unit.row - humanWonder.row) ** 2);
+        if (d <= unit.attackRange + 1.0) {
+          unit.attackBuilding(humanWonder);
+        } else {
+          const path = findPath(game.map, unit.gridPos(), { col: humanWonder.col, row: humanWonder.row }, 400);
+          if (path.length > 0) unit.moveTo(path);
+        }
+        continue;
+      }
 
       // After 3 min, 40% of units target the settlement directly
       if (humanSettlement && game.gameTime > 180 && i % 5 < 2) {
