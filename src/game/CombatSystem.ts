@@ -1,8 +1,11 @@
-import { UnitState, TerrainType } from './types';
+import { UnitState, TerrainType, UnitType } from './types';
 import type { Unit } from './Unit';
 import type { GameMap } from './Map';
 import { findPath } from './Pathfinding';
 import { getDamageMultiplier } from './UnitBalancing';
+
+const SPLASH_RADIUS = 1.8;  // tiles — radius of cannon splash
+const SPLASH_DAMAGE_RATIO = 0.55; // fraction of base damage dealt to splash targets
 
 function terrainDefenseBonus(terrain: TerrainType | undefined): number {
   switch (terrain) {
@@ -74,6 +77,19 @@ export class CombatSystem {
           unit.attackTimer = unit.attackCooldown;
           const isCrit = multiplier >= 1.5 || isFlanking;
           this.events.push({ attacker: unit, target, damage: actual, worldX: target.worldX, worldZ: target.worldZ, critical: isCrit });
+
+          // Cannon splash: deal reduced damage to all units near the primary target
+          if (unit.type === UnitType.CANNON) {
+            const splashDmg = Math.max(1, Math.round(dmg * SPLASH_DAMAGE_RATIO));
+            for (const other of allUnits) {
+              if (!other.isAlive() || other === target) continue;
+              const d = Math.sqrt((other.col - target.col) ** 2 + (other.row - target.row) ** 2);
+              if (d <= SPLASH_RADIUS) {
+                const splashActual = other.takeDamage(splashDmg);
+                this.events.push({ attacker: unit, target: other, damage: splashActual, worldX: other.worldX, worldZ: other.worldZ, critical: false });
+              }
+            }
+          }
         }
       }
 
