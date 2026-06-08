@@ -215,6 +215,13 @@ export class AudioManager {
     this.noise(0.15, 0.08, 250, 0.02);
   }
 
+  playRetreat() {
+    // Urgent descending horn: high → low two-note fall
+    this.osc(440, 'sawtooth', 0.18, 0.055 * this.effectsVol, 0,    340);
+    this.osc(330, 'sawtooth', 0.22, 0.055 * this.effectsVol, 0.20, 300);
+    this.osc(262, 'sawtooth', 0.20, 0.040 * this.effectsVol, 0.44, 220);
+  }
+
   // ── Volume control ───────────────────────────────────────────────────────────
 
   setEffectsVolume(v: number) {

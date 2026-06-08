@@ -29,6 +29,13 @@ export class CombatSystem {
   update(allUnits: Unit[], map: GameMap) {
     this.events = [];
 
+    // Build a map of target id → number of allied attackers for flanking bonus
+    const attackerCount = new Map<number, number>();
+    for (const unit of allUnits) {
+      if (!unit.isAlive() || unit.state !== UnitState.ATTACKING || !unit.attackTarget?.isAlive()) continue;
+      attackerCount.set(unit.attackTarget.id, (attackerCount.get(unit.attackTarget.id) ?? 0) + 1);
+    }
+
     for (const unit of allUnits) {
       if (!unit.isAlive()) continue;
 
@@ -60,9 +67,13 @@ export class CombatSystem {
           dmg = Math.round(dmg * multiplier);
           const tile = map.getTile(target.col, target.row);
           dmg = Math.max(1, dmg - terrainDefenseBonus(tile?.terrain));
+          // Flanking bonus: +25% damage when 2 or more allies attack the same target
+          const isFlanking = (attackerCount.get(target.id) ?? 1) >= 2;
+          if (isFlanking) dmg = Math.round(dmg * 1.25);
           const actual = target.takeDamage(dmg);
           unit.attackTimer = unit.attackCooldown;
-          this.events.push({ attacker: unit, target, damage: actual, worldX: target.worldX, worldZ: target.worldZ, critical: multiplier >= 1.5 });
+          const isCrit = multiplier >= 1.5 || isFlanking;
+          this.events.push({ attacker: unit, target, damage: actual, worldX: target.worldX, worldZ: target.worldZ, critical: isCrit });
         }
       }
 

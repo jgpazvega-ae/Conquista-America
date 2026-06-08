@@ -54,6 +54,7 @@ export class Game {
   newlyCompletedBuildings: Building[] = [];
   newlyDestroyedBuildings: Building[] = [];
   newlyDepletedNodes: ResourceNode[] = [];
+  newlyRetreatingUnits: Unit[] = [];
   status: GameStatus = 'PLAYING';
   paused = false;
   humanPlayerId = 0;
@@ -202,7 +203,21 @@ export class Game {
 
     this.gameTime += dt;
 
+    // Precompute settlement positions per player for proximity healing
+    const settlementsByPlayer = new Map<number, { col: number; row: number }[]>();
+    for (const b of this.allBuildings) {
+      if (b.type === BuildingType.SETTLEMENT && b.isAlive() && b.isComplete()) {
+        if (!settlementsByPlayer.has(b.playerId)) settlementsByPlayer.set(b.playerId, []);
+        settlementsByPlayer.get(b.playerId)!.push({ col: b.col, row: b.row });
+      }
+    }
+
     for (const unit of this.allUnits) {
+      // Check proximity to own settlement (within 4 tiles) for boosted healing
+      const settlements = settlementsByPlayer.get(unit.playerId) ?? [];
+      unit._nearSettlement = settlements.some(
+        s => Math.abs(unit.col - s.col) <= 4 && Math.abs(unit.row - s.row) <= 4,
+      );
       unit.update(dt, this.map);
     }
 
@@ -212,6 +227,7 @@ export class Game {
       unit.wantsRetreat = false;
       unit.attackTarget = null;
       unit.attackBuildingTarget = null;
+      this.newlyRetreatingUnits.push(unit);
       const base = this.allBuildings
         .filter(b => b.playerId === unit.playerId && b.isAlive())
         .sort((a, b) => {
@@ -233,6 +249,7 @@ export class Game {
     this.newlyCompletedBuildings = [];
     this.newlyDestroyedBuildings = [];
     this.newlyDepletedNodes = [];
+    this.newlyRetreatingUnits = [];
     for (const building of this.allBuildings) {
       if (!building.isComplete()) {
         const wasIncomplete = true;

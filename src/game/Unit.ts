@@ -74,8 +74,9 @@ export class Unit {
   private _deathTimer = -1;
 
   // Passive healing / retreat
-  _damageCooldown  = 0;   // seconds since last hit; healing begins when this reaches 0
-  _idleHealTimer   = 0;   // accumulates while healing; heals 2 HP per 0.5 s
+  _damageCooldown  = 0;     // seconds since last hit; healing begins when this reaches 0
+  _idleHealTimer   = 0;     // accumulates while healing
+  _nearSettlement  = false; // set each frame by Game.ts; boosts idle heal rate
   wantsRetreat     = false; // set by takeDamage when HP < 20%; cleared by Game
 
   constructor(
@@ -713,13 +714,15 @@ export class Unit {
     this.animT += dt;
 
     // Passive idle healing: 2 HP every 0.5 s after 5 s without damage
+    // (nearSettlement flag set externally by Game.ts each frame for +3 extra HP/tick)
     if (this._damageCooldown > 0) {
       this._damageCooldown -= dt;
     } else if (this.state === UnitState.IDLE && this.hp < this.maxHp) {
       this._idleHealTimer += dt;
+      const healPerTick = this._nearSettlement ? 5 : 2;
       while (this._idleHealTimer >= 0.5) {
         this._idleHealTimer -= 0.5;
-        this.hp = Math.min(this.maxHp, this.hp + 2);
+        this.hp = Math.min(this.maxHp, this.hp + healPerTick);
         this.updateHealthBar();
       }
     } else if (this.state !== UnitState.IDLE) {
