@@ -1,6 +1,7 @@
 import './styles.css';
 import * as THREE from 'three';
-import { CivilizationType, UnitState } from './game/types';
+import { CivilizationType, UnitState, UnitType } from './game/types';
+import { Unit } from './game/Unit';
 import { SaveSystem } from './game/SaveSystem';
 import { AuthScreen } from './ui/AuthScreen';
 import { CivSelectScreen } from './ui/CivSelect';
@@ -421,6 +422,11 @@ class GameInstance {
         this.audio.playBuild();
         const def = BUILDING_DEFS[b.type];
         this.hud.notify(`🏛️ ${def.name} completado`, 'success');
+        // Celebration particle burst at building location
+        const wx = b.col * TILE_SIZE;
+        const wz = b.row * TILE_SIZE;
+        this.renderer.effects.createExplosion(wx, 0.6, wz, 0.7);
+        this.renderer.effects.createDustCloud(wx, wz);
       }
     }
 
@@ -1049,6 +1055,63 @@ class GameInstance {
           setTimeout(() => {
             for (const u of player.aliveUnits) u.speed = Math.max(0.5, u.speed - 0.5);
           }, 45000);
+        },
+      },
+      {
+        emoji: '⚔️', name: 'Mercenarios',
+        desc: 'Un grupo de guerreros expertos se une a tu causa.',
+        type: 'success' as const,
+        apply: () => {
+          const settle = this.game.allBuildings.find(
+            b => b.playerId === this.game.humanPlayerId && b.type === BuildingType.SETTLEMENT && b.isAlive(),
+          );
+          if (!settle) return;
+          const count = Math.min(3, 2 + (this.game.difficulty === 'hard' ? 0 : 1));
+          const civDef = player.civDef;
+          const unitType = civDef.units[0]?.type as UnitType ?? UnitType.EAGLE_WARRIOR;
+          for (let i = 0; i < count; i++) {
+            const pos = this.game.map.findWalkableNear(settle.col, settle.row + 3, 5);
+            if (!pos) continue;
+            const u = new Unit(unitType, player.civType, player.id, pos[0], pos[1], CIV_COLORS[player.civType]);
+            u.gainXP(50); // spawn at level 2
+            player.addUnit(u);
+            this.game.allUnits.push(u);
+            this.game.newlySpawnedUnits.push(u);
+          }
+        },
+      },
+      {
+        emoji: '🌋', name: 'Terremoto',
+        desc: 'El suelo tiembla — edificios dañados en toda la región.',
+        type: 'warning' as const,
+        apply: () => {
+          for (const b of this.game.allBuildings) {
+            if (b.isAlive()) b.takeDamage(15 + Math.floor(Math.random() * 10));
+          }
+          this.camera.shake(0.45, 0.9);
+        },
+      },
+      {
+        emoji: '🩸', name: 'Sed de sangre',
+        desc: 'Tus guerreros entran en frenesí — ataque permanentemente mejorado.',
+        type: 'success' as const,
+        apply: () => {
+          for (const u of player.aliveUnits) u.attack += 4;
+          this.renderer.effects.createExplosion(0, 0, 0, 0); // dummy call to pre-warm
+        },
+      },
+      {
+        emoji: '🏳️', name: 'Deserción enemiga',
+        desc: 'Un soldado enemigo abandona sus filas y cae abatido.',
+        type: 'info' as const,
+        apply: () => {
+          const enemies = this.game.allUnits.filter(
+            u => u.playerId !== this.game.humanPlayerId && u.isAlive(),
+          );
+          if (enemies.length === 0) return;
+          const target = enemies[Math.floor(Math.random() * enemies.length)];
+          target.takeDamage(target.hp + 9999);
+          this.renderer.effects.createExplosion(target.worldX, 0.5, target.worldZ, 0.6);
         },
       },
     ];
