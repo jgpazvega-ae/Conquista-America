@@ -168,6 +168,15 @@ class GameInstance {
         const color = u.attackRange > 1.5 ? 0x88ccff : 0xffcc44; // blue for ranged, gold for melee
         this.renderer.showRangeRing(u.worldX, u.worldZ, rangeWorld, color);
       }
+      // Patrol path for single patrolling unit
+      this.renderer.clearPatrolPath();
+      if (sel.length === 1 && sel[0].patrolA && sel[0].patrolB) {
+        const u = sel[0];
+        this.renderer.showPatrolPath(
+          u.patrolA!.col * TILE_SIZE, u.patrolA!.row * TILE_SIZE,
+          u.patrolB!.col * TILE_SIZE, u.patrolB!.row * TILE_SIZE,
+        );
+      }
     };
     this.touch.onSelectionChange = () => this.hud.update(this.touch ? [] : []);
     this.input.onMoveOrder = () => {
@@ -388,6 +397,16 @@ class GameInstance {
         this.audio.playResourceDepleted();
         const typeLabel = node.type === ResourceType.FOOD ? 'Alimentos' : node.type === ResourceType.GOLD ? 'Oro' : 'Piedra';
         this.hud.notify(`⚠️ Yacimiento de ${typeLabel} agotado`, 'warning');
+      }
+    }
+
+    // Notify when a resource node regenerates and is visible
+    for (const node of this.game.newlyRegeneratedNodes) {
+      const fog = this.game.fog.getFog(this.game.humanPlayerId);
+      const vis = fog ? fog.getVisibility(node.col, node.row) : 1;
+      if (vis === 2 /* VISIBLE */) {
+        const typeLabel = node.type === ResourceType.FOOD ? 'Alimentos' : node.type === ResourceType.GOLD ? 'Oro' : 'Piedra';
+        this.hud.notify(`🌱 Yacimiento de ${typeLabel} regenerado`, 'success');
       }
     }
 
@@ -771,6 +790,7 @@ class GameInstance {
         this._panelBuilding = null;
         this.renderer.clearRallyMarker();
         this.renderer.clearRangeRing();
+        this.renderer.clearPatrolPath();
         this.prodPanel.hide();
         this.hud.update([]);
         return;
