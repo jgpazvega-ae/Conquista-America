@@ -46,6 +46,12 @@ export class CombatSystem {
       attackerCount.set(unit.attackTarget.id, (attackerCount.get(unit.attackTarget.id) ?? 0) + 1);
     }
 
+    // Build a set of players that have a level-3 unit alive (for leadership aura)
+    const playersWithLeader = new Set<number>();
+    for (const unit of allUnits) {
+      if (unit.isAlive() && unit.level >= 3) playersWithLeader.add(unit.playerId);
+    }
+
     for (const unit of allUnits) {
       if (!unit.isAlive()) continue;
 
@@ -96,10 +102,24 @@ export class CombatSystem {
             unit.chargeReady = false;
             isCharge = true;
           }
+          // Berserk: +25% damage during 12-second kill-streak buff
+          if (unit.berserkTimer > 0) dmg = Math.round(dmg * 1.25);
+          // Leadership aura: +5% damage when player has any level-3 unit alive
+          if (playersWithLeader.has(unit.playerId)) dmg = Math.round(dmg * 1.05);
+
           const actual = target.takeDamage(dmg);
           unit.attackTimer = unit.attackCooldown;
-          let isCrit = multiplier >= 1.5 || isFlanking || isCharge;
+          let isCrit = multiplier >= 1.5 || isFlanking || isCharge || unit.berserkTimer > 0;
           this.events.push({ attacker: unit, target, damage: actual, worldX: target.worldX, worldZ: target.worldZ, critical: isCrit });
+
+          // Kill streak tracking: 3 kills in a row without taking damage → 12s berserk
+          if (!target.isAlive()) {
+            unit.killStreak++;
+            if (unit.killStreak >= 3) {
+              unit.berserkTimer = 12;
+              unit.killStreak   = 0;
+            }
+          }
 
           // Cannon: splash damage + burning status effect (30% chance on direct hit)
           if (unit.type === UnitType.CANNON) {
