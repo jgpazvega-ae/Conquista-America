@@ -338,15 +338,16 @@ export class HUD {
     this.elHpBar.style.background = pct > 0.5 ? '#22dd44' : pct > 0.25 ? '#ddaa00' : '#dd2222';
     this.elHpText.textContent     = `${unit.hp}/${unit.maxHp}`;
 
-    const holdBadge   = unit.state === UnitState.HOLD ? `<span title="Posición de defensa (+2 def)" style="color:#88ccff">🛡️DEF</span>` : '';
-    const burnBadge   = unit.burning  > 0 ? `<span title="En llamas" style="color:#ff8822">🔥${Math.ceil(unit.burning)}s</span>`   : '';
-    const poisonBadge = unit.poisoned > 0 ? `<span title="Envenenado" style="color:#44dd44">☠️${Math.ceil(unit.poisoned)}s</span>` : '';
+    const holdBadge    = unit.state === UnitState.HOLD ? `<span title="Posición de defensa (+2 def)" style="color:#88ccff">🛡️DEF</span>` : '';
+    const burnBadge    = unit.burning     > 0 ? `<span title="En llamas" style="color:#ff8822">🔥${Math.ceil(unit.burning)}s</span>`       : '';
+    const poisonBadge  = unit.poisoned    > 0 ? `<span title="Envenenado" style="color:#44dd44">☠️${Math.ceil(unit.poisoned)}s</span>`       : '';
+    const berserkBadge = unit.berserkTimer > 0 ? `<span title="¡Frenesí! +25% daño" style="color:#ff6600">🔥FRENESÍ ${Math.ceil(unit.berserkTimer)}s</span>` : '';
     this.elUnitStats.innerHTML =
       `<span>⚔️ ${unit.attack}</span>` +
       `<span>🛡️ ${unit.defense}</span>` +
       `<span>💨 ${unit.speed.toFixed(1)}</span>` +
       `<span>🎯 ${unit.attackRange.toFixed(1)}</span>` +
-      holdBadge + burnBadge + poisonBadge;
+      holdBadge + burnBadge + poisonBadge + berserkBadge;
 
     // XP bar (only if unit can still level up)
     const xpEl = document.getElementById('unit-xp-row');

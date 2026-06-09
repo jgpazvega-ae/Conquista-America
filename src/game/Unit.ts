@@ -89,6 +89,10 @@ export class Unit {
   chargeReady     = false;
   private _chargeIdleTime = 0;
 
+  // Kill streak / berserk
+  killStreak  = 0;          // consecutive kills without taking damage
+  berserkTimer = 0;         // seconds of berserk buff remaining (3-kill streak → 12s)
+
   // Hero unit
   isHero   = false;
   heroName = '';
@@ -681,6 +685,7 @@ export class Unit {
     this.hp   = Math.max(0, this.hp - dmg);
     this._damageCooldown = 5;  // 5 s before healing starts
     this._idleHealTimer  = 0;
+    this.killStreak      = 0;  // reset streak on taking damage
     if (this.hp > 0 && this.hp < this.maxHp * 0.20 && !this.wantsRetreat) {
       this.wantsRetreat = true;
     }
@@ -724,7 +729,8 @@ export class Unit {
     }
     if (this.state === UnitState.DEAD) return;
 
-    this.attackTimer = Math.max(0, this.attackTimer - dt);
+    this.attackTimer  = Math.max(0, this.attackTimer - dt);
+    if (this.berserkTimer > 0) this.berserkTimer = Math.max(0, this.berserkTimer - dt);
     this.animT += dt;
 
     // Passive idle healing: 2 HP every 0.5 s after 5 s without damage

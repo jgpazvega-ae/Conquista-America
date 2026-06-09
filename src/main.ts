@@ -25,6 +25,19 @@ import { WorkerTask } from './game/Worker';
 import type { Difficulty } from './ui/CivSelect';
 import { activateCivPower } from './game/CivPowers';
 
+// ── Kill gold rewards ──────────────────────────────────────────────────────────
+function killGoldReward(type: UnitType, isHero: boolean): number {
+  if (isHero) return 30;
+  const table: Partial<Record<UnitType, number>> = {
+    [UnitType.CANNON]: 15,       [UnitType.CAVALRY]: 12,
+    [UnitType.CUACHIC]: 10,      [UnitType.CHAKANA_GUARD]: 10,
+    [UnitType.JAGUAR_KNIGHT]: 8, [UnitType.AHAU_WARRIOR]: 8,
+    [UnitType.ATLATL]: 6,        [UnitType.SLINGER]: 6,
+    [UnitType.ARCHER]: 6,        [UnitType.ARQUEBUSIER]: 7,
+  };
+  return table[type] ?? 5;
+}
+
 // ── Historical facts shown during loading ─────────────────────────────────────
 const LOADING_FACTS = [
   'Los Aztecas llamaban a su ciudad Tenochtitlán, fundada en 1325 en un islote del lago Texcoco.',
@@ -131,6 +144,7 @@ class GameInstance {
   private _statusParticleTimers = new Map<number, number>(); // unit.id → time since last status particle
   private _wasNight = false;
   private _wasStorm = false;
+  private _berserkUnits = new Set<number>(); // unit ids currently in berserk
 
   constructor(civ: CivilizationType, saveSystem: SaveSystem, difficulty: Difficulty = 'normal') {
     this.civ        = civ;
@@ -637,6 +651,14 @@ class GameInstance {
           const deathScale = evt.target.isHero ? 1.5 : evt.target.level >= 3 ? 1.1 : evt.target.level >= 2 ? 0.75 : 0.45;
           this.renderer.effects.createExplosion(evt.worldX, 0.5, evt.worldZ, deathScale);
           this.renderer.effects.createDustCloud(evt.worldX, evt.worldZ);
+          // Kill gold: human player earns gold for each enemy kill
+          if (evt.attacker?.playerId === this.game.humanPlayerId && evt.target.playerId !== this.game.humanPlayerId) {
+            const kg = killGoldReward(evt.target.type, evt.target.isHero);
+            this.game.humanPlayer.resources.gold = Math.min(2000, this.game.humanPlayer.resources.gold + kg);
+            if (evt.target.isHero) {
+              this.hud.notify(`⚔️ ¡Héroe enemigo abatido! +${kg}⚜️`, 'success');
+            }
+          }
           // Hero death notification
           if (evt.target.isHero && evt.target.playerId === this.game.humanPlayerId) {
             this.hud.notify(`☠️ ${evt.target.heroName} ha caído — regresará en 60s`, 'warning');
@@ -652,7 +674,7 @@ class GameInstance {
       }
     }
 
-    // Level-up audio detection for human player units
+    // Level-up audio detection for human player units; berserk entry detection
     for (const u of this.game.humanPlayer.aliveUnits) {
       const prev = this._unitLevels.get(u.id) ?? 1;
       if (u.level > prev) {
@@ -661,6 +683,16 @@ class GameInstance {
         this.renderer.effects.createLevelUpBurst(u.worldX, 1.0, u.worldZ);
       }
       this._unitLevels.set(u.id, u.level);
+
+      // Berserk: detect activation (berserkTimer just became positive)
+      const wasBerserk = this._berserkUnits.has(u.id);
+      if (u.berserkTimer > 0 && !wasBerserk) {
+        this._berserkUnits.add(u.id);
+        this.hud.notify(`🔥 ¡${u.def.name} entró en frenesí! +25% daño por 12s`, 'warning');
+        this.renderer.effects.createExplosion(u.worldX, 0.8, u.worldZ, 0.6);
+      } else if (u.berserkTimer <= 0 && wasBerserk) {
+        this._berserkUnits.delete(u.id);
+      }
     }
 
     // Hero respawn notifications

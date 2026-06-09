@@ -313,9 +313,15 @@ export class Game {
     }
     for (const building of this.allBuildings) {
       if (!building.isComplete()) {
-        const wasIncomplete = true;
-        building.updateBuild(dt);
-        if (building.isComplete() && wasIncomplete) {
+        // Idle workers within 2.5 tiles of an unfinished friendly building accelerate construction (+30% each)
+        const helpers = this.allWorkers.filter(w =>
+          w.playerId === building.playerId &&
+          (w.task as string) === 'IDLE' &&
+          Math.sqrt((w.col - building.col) ** 2 + (w.row - building.row) ** 2) <= 2.5,
+        );
+        const speedMult = 1 + helpers.length * 0.3;
+        building.updateBuild(dt * speedMult);
+        if (building.isComplete()) {
           this.newlyCompletedBuildings.push(building);
         }
       } else {
