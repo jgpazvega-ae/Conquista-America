@@ -658,6 +658,24 @@ input.toggle { width: 22px; height: 22px; accent-color: #d4880a; }
   50%       { box-shadow: 0 0 20px rgba(240,160,48,0.85); }
 }
 
+/* ══════════════════════════════════ PRODUCTION QUEUE HUD ══ */
+#prod-queue-hud {
+  position: absolute; bottom: 148px; left: 50%; transform: translateX(-50%);
+  z-index: 115; display: flex; gap: 6px; align-items: center;
+  pointer-events: none;
+}
+#prod-queue-hud.hidden { display: none; }
+.pq-item {
+  background: rgba(5,4,2,0.88); border: 1px solid rgba(200,160,60,0.35);
+  border-radius: 7px; padding: 3px 8px; display: flex; align-items: center;
+  gap: 5px; font-size: 11px; color: #e8d5a0; min-width: 68px;
+  backdrop-filter: blur(4px);
+}
+.pq-icon { font-size: 14px; line-height: 1; }
+.pq-bar-wrap { width: 36px; height: 4px; background: rgba(255,255,255,0.15); border-radius: 2px; overflow: hidden; }
+.pq-bar-fill { height: 100%; background: #22aa66; border-radius: 2px; transition: width 0.4s linear; }
+.pq-time { font-size: 9px; color: #aaa; min-width: 18px; text-align: right; font-variant-numeric: tabular-nums; }
+
 /* ═══════════════════════════════════════ HERO PANEL ══ */
 #hero-panel {
   position: absolute; right: 12px; bottom: 230px; z-index: 115;
