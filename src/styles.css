@@ -1092,6 +1092,22 @@ input.toggle { width: 22px; height: 22px; accent-color: #d4880a; }
   border-radius: 6px; font-variant-numeric: tabular-nums;
 }
 
+/* Auto-save flash indicator */
+#autosave-indicator {
+  position: absolute; top: 44px; right: 12px; z-index: 130;
+  background: rgba(5,10,5,0.88); border: 1px solid rgba(80,200,80,0.35);
+  border-radius: 6px; padding: 3px 10px;
+  font-size: 11px; color: #88ee88;
+  pointer-events: none;
+}
+#autosave-indicator.hidden { display: none; }
+.autosave-fade { animation: autosaveFade 2.5s ease forwards; }
+@keyframes autosaveFade {
+  0%   { opacity: 1; }
+  60%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 /* Hover tooltip */
 #hover-tooltip {
   position: absolute; z-index: 200;

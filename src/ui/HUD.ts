@@ -8,12 +8,23 @@ import { ResourceType } from '../game/ResourceNode';
 import { BuildingType } from '../game/buildings';
 import type { Renderer } from '../engine/Renderer';
 import { CIV_POWER_DEFS } from '../game/CivPowers';
-import { UnitState } from '../game/types';
+import { UnitState, TerrainType } from '../game/types';
 import { CIVILIZATIONS } from '../game/civilizations';
 
 function hex(n: number): string {
   return '#' + n.toString(16).padStart(6, '0');
 }
+
+const TERRAIN_INFO: Partial<Record<TerrainType, { name: string; emoji: string; desc: string }>> = {
+  [TerrainType.GRASS]:    { emoji: '🌿', name: 'Pradera',   desc: 'Terreno abierto. Sin bonificación.' },
+  [TerrainType.JUNGLE]:   { emoji: '🌴', name: 'Selva',     desc: '🛡️ +4 defensa · ⚔️ +4 ataque (emboscada)' },
+  [TerrainType.HIGHLAND]: { emoji: '⛰️', name: 'Altiplano', desc: '🛡️ +3 defensa' },
+  [TerrainType.MOUNTAIN]: { emoji: '🏔️', name: 'Montaña',  desc: '🛡️ +5 defensa · ⚠️ paso lento' },
+  [TerrainType.DESERT]:   { emoji: '🏜️', name: 'Desierto',  desc: '🛡️ −1 defensa · calor extremo' },
+  [TerrainType.BEACH]:    { emoji: '🏖️', name: 'Costa',    desc: 'Terreno arenoso.' },
+  [TerrainType.WATER]:    { emoji: '🌊', name: 'Agua',      desc: 'Infranqueable para unidades terrestres.' },
+  [TerrainType.SNOW]:     { emoji: '❄️', name: 'Nieve',    desc: 'Alturas heladas — movimiento reducido.' },
+};
 
 export class HUD {
   private game: Game;
@@ -709,11 +720,33 @@ export class HUD {
     }
   }
 
-  showHoverTooltip(unitId: number | null, buildingId: number | null, screenX: number, screenY: number) {
+  showHoverTooltip(unitId: number | null, buildingId: number | null, screenX: number, screenY: number, tileCol?: number, tileRow?: number, map?: GameMap) {
     const el = document.getElementById('hover-tooltip');
     if (!el) return;
 
     if (unitId === null && buildingId === null) {
+      // Show terrain info when hovering empty ground
+      if (tileCol !== undefined && tileRow !== undefined && map) {
+        const tile = map.getTile(tileCol, tileRow);
+        if (tile) {
+          const humanFog = this.game.fog.getFog(this.game.humanPlayerId);
+          const vis = humanFog?.getVisibility(tileCol, tileRow) ?? 2;
+          if (vis > 0) { // not UNEXPLORED
+            const info = TERRAIN_INFO[tile.terrain];
+            if (info) {
+              el.innerHTML = `<div class="ht-name">${info.emoji} ${info.name}</div><div class="ht-status">${info.desc}</div>`;
+              el.classList.remove('hidden');
+              const margin = 12;
+              let left = screenX + margin, top = screenY + margin;
+              if (left + 200 > window.innerWidth)  left = screenX - 200 - margin;
+              if (top  + 80  > window.innerHeight) top  = screenY - 80  - margin;
+              el.style.left = `${left}px`;
+              el.style.top  = `${top}px`;
+              return;
+            }
+          }
+        }
+      }
       el.classList.add('hidden');
       return;
     }
@@ -821,5 +854,15 @@ export class HUD {
       el.classList.remove('visible');
       setTimeout(() => el.remove(), 300);
     }, 3000);
+  }
+
+  flashAutoSave() {
+    const el = document.getElementById('autosave-indicator');
+    if (!el) return;
+    el.classList.remove('hidden', 'autosave-fade');
+    // Force reflow so the animation restarts
+    void el.offsetWidth;
+    el.classList.add('autosave-fade');
+    setTimeout(() => el.classList.add('hidden'), 2500);
   }
 }
