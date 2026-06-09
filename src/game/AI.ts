@@ -196,7 +196,7 @@ export class AISystem {
     }
   }
 
-  /** Attack-phase: send all available units in a coordinated wave. */
+  /** Attack-phase: send all available units in a coordinated wave with flanking. */
   private waveAttack(player: Player, game: Game) {
     const myUnits = player.aliveUnits;
     const enemies = game.allUnits.filter(u => u.playerId !== player.id && u.isAlive());
@@ -217,6 +217,20 @@ export class AISystem {
            (b.type as string) === 'SETTLEMENT' && b.isAlive(),
     );
 
+    // Flanking: compute perpendicular offset from AI base → enemy settlement
+    // Second half of the attack force approaches from a 90° angle (+8 tile offset)
+    const mySettlement = game.allBuildings.find(b => b.playerId === player.id && b.type === BuildingType.SETTLEMENT);
+    let flankDC = 0, flankDR = 0;
+    if (humanSettlement && mySettlement) {
+      const dx = humanSettlement.col - mySettlement.col;
+      const dz = humanSettlement.row - mySettlement.row;
+      const len = Math.sqrt(dx * dx + dz * dz) || 1;
+      // Perpendicular unit vector rotated 90°: (-dz, dx)
+      flankDC = Math.round((-dz / len) * 8);
+      flankDR = Math.round((dx  / len) * 8);
+    }
+    const flankSplit = Math.floor(toSend / 2); // first half = direct, second half = flank
+
     for (let i = 0; i < Math.min(toSend, available.length); i++) {
       const unit = available[i];
 
@@ -234,20 +248,31 @@ export class AISystem {
 
       // After 3 min, 40% of units target the settlement directly
       if (humanSettlement && game.gameTime > 180 && i % 5 < 2) {
+        // Flank group approaches from offset position before converging
+        const isFlankGroup = i >= flankSplit && (flankDC !== 0 || flankDR !== 0);
+        const targetCol = isFlankGroup ? humanSettlement.col + flankDC : humanSettlement.col;
+        const targetRow = isFlankGroup ? humanSettlement.row + flankDR : humanSettlement.row;
+        const near = game.map.findWalkableNear(targetCol, targetRow, 4) ?? [humanSettlement.col, humanSettlement.row];
         const d = Math.sqrt((unit.col - humanSettlement.col) ** 2 + (unit.row - humanSettlement.row) ** 2);
         if (d <= unit.attackRange + 1.0) {
           unit.attackBuilding(humanSettlement);
         } else {
-          const path = findPath(game.map, unit.gridPos(), { col: humanSettlement.col, row: humanSettlement.row }, 400);
+          const path = findPath(game.map, unit.gridPos(), { col: near[0], row: near[1] }, 400);
           if (path.length > 0) unit.moveTo(path);
         }
         continue;
       }
 
-      // Pick nearest enemy unit
+      // Pick nearest enemy unit (flank group targets from a side angle)
+      const isFlankGroup = i >= flankSplit && (flankDC !== 0 || flankDR !== 0);
       let best = enemies[0];
       let bestD = unit.distanceTo(best);
-      for (const e of enemies) { const d = unit.distanceTo(e); if (d < bestD) { bestD = d; best = e; } }
+      for (const e of enemies) {
+        const d = unit.distanceTo(e);
+        // Flank group slightly prefers enemies on the offset side
+        const flankBonus = isFlankGroup ? (e.col * flankDC + e.row * flankDR) * 0.01 : 0;
+        if (d - flankBonus < bestD) { bestD = d; best = e; }
+      }
 
       if (unit.distanceTo(best) <= unit.attackRange + 1.0) {
         unit.attackUnit(best);

@@ -202,6 +202,7 @@ export class HUD {
     this.updateBuildingHpBars();
     this.updateHeroPanel();
     this.updateWonderPanel();
+    this.updateProductionQueueHUD();
   }
 
   private updatePowerButton() {
@@ -320,6 +321,32 @@ export class HUD {
     if (fill) {
       fill.style.background = wc < 30 ? '#dd3333' : wc < 60 ? '#ddaa00' : '#22aa66';
     }
+  }
+
+  private updateProductionQueueHUD() {
+    const el = document.getElementById('prod-queue-hud');
+    if (!el) return;
+    const buildings = this.game.allBuildings.filter(
+      b => b.playerId === this.game.humanPlayerId && b.isComplete() && b.productionQueue.length > 0,
+    );
+    if (buildings.length === 0) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    const defs = (this.game as any).unitDefs ?? {};
+    el.innerHTML = buildings.map(b => {
+      const item = b.productionQueue[0];
+      const pct  = Math.min(100, (item.elapsed / item.totalTime) * 100);
+      const rem  = Math.ceil(item.totalTime - item.elapsed);
+      // Look up emoji from civ def
+      const civDef = this.game.humanPlayer.civDef;
+      const unitDef = civDef?.units?.find((u: {type: string}) => u.type === item.unitType);
+      const emoji = unitDef?.emoji ?? '⚔️';
+      const extra = b.productionQueue.length > 1 ? ` +${b.productionQueue.length - 1}` : '';
+      return `<div class="pq-item">` +
+        `<span class="pq-icon">${emoji}</span>` +
+        `<div class="pq-bar-wrap"><div class="pq-bar-fill" style="width:${pct}%"></div></div>` +
+        `<span class="pq-time">${rem}s${extra}</span>` +
+        `</div>`;
+    }).join('');
   }
 
   private showUnitInfo(unit: Unit) {
