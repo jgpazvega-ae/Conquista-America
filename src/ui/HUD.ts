@@ -9,6 +9,7 @@ import { BuildingType } from '../game/buildings';
 import type { Renderer } from '../engine/Renderer';
 import { CIV_POWER_DEFS } from '../game/CivPowers';
 import { UnitState } from '../game/types';
+import { CIVILIZATIONS } from '../game/civilizations';
 
 function hex(n: number): string {
   return '#' + n.toString(16).padStart(6, '0');
@@ -254,12 +255,14 @@ export class HUD {
       );
       const hpPct = settle?.isAlive() ? (settle.hp / settle.maxHp) * 100 : 0;
       const hpColor = hpPct > 50 ? '#22dd55' : hpPct > 25 ? '#ddaa00' : '#dd2222';
-      const pop = p.aliveUnits.length;
-      const label = p.isHuman ? '(Tú)' : CIV_NAMES[p.civType].slice(0, 6);
+      const pop    = p.aliveUnits.length;
+      const kills  = this.game.killsByPlayer.get(p.id) ?? 0;
+      const label  = p.isHuman ? '(Tú)' : CIV_NAMES[p.civType].slice(0, 6);
       return `<div class="sb-row">
         <span class="sb-emoji">${CIV_EMOJIS[p.civType]}</span>
         <span class="sb-name" style="color:${hex(CIV_COLORS[p.civType])}">${label}</span>
         <span class="sb-pop">👥${pop}</span>
+        <span class="sb-kills" title="Bajas">⚔️${kills}</span>
         <div class="sb-hp-wrap"><div class="sb-hp-fill" style="width:${hpPct}%;background:${hpColor}"></div></div>
       </div>`;
     }).join('');
@@ -551,6 +554,50 @@ export class HUD {
       ctx.lineWidth = 1;
       ctx.strokeRect(nx - rectW / 2, nz - rectH / 2, rectW, rectH);
     }
+
+    // Enemy threat arrow: pulsing red arrow on minimap edge when enemies approach settlement
+    const humanSettle = this.game.allBuildings.find(
+      b => b.playerId === this.game.humanPlayerId && b.type === BuildingType.SETTLEMENT && b.isAlive(),
+    );
+    if (humanSettle) {
+      const sc = humanSettle.col, sr = humanSettle.row;
+      const nearEnemies = this.game.allUnits.filter(u => {
+        if (u.playerId === this.game.humanPlayerId || !u.isAlive()) return false;
+        const d = Math.sqrt((u.col - sc) ** 2 + (u.row - sr) ** 2);
+        return d <= 15;
+      });
+      if (nearEnemies.length >= 2) {
+        const cx = nearEnemies.reduce((s, u) => s + u.col, 0) / nearEnemies.length;
+        const cz = nearEnemies.reduce((s, u) => s + u.row, 0) / nearEnemies.length;
+        const dx = cx - sc, dz = cz - sr;
+        const len = Math.sqrt(dx * dx + dz * dz) || 1;
+        const ndx = dx / len, ndz = dz / len;
+        // Arrow origin: settlement position on minimap
+        const ox = sc * tw + tw / 2, oz = sr * th + th / 2;
+        const pulse = 0.55 + 0.45 * Math.sin(Date.now() / 250);
+        ctx.save();
+        ctx.strokeStyle = `rgba(255,40,40,${pulse})`;
+        ctx.fillStyle   = `rgba(255,40,40,${pulse})`;
+        ctx.lineWidth = 2;
+        // Draw line from settlement toward enemy cluster (max 22px)
+        const arrowLen = Math.min(22, len * tw * 0.8);
+        const tx = ox + ndx * arrowLen, tz = oz + ndz * arrowLen;
+        ctx.beginPath();
+        ctx.moveTo(ox, oz);
+        ctx.lineTo(tx, tz);
+        ctx.stroke();
+        // Arrowhead
+        const hs = 5;
+        const perp = { x: -ndz, z: ndx };
+        ctx.beginPath();
+        ctx.moveTo(tx, tz);
+        ctx.lineTo(tx - ndx * hs + perp.x * hs * 0.5, tz - ndz * hs + perp.z * hs * 0.5);
+        ctx.lineTo(tx - ndx * hs - perp.x * hs * 0.5, tz - ndz * hs - perp.z * hs * 0.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+    }
   }
 
   addCombatPing(col: number, row: number) {
@@ -663,11 +710,24 @@ export class HUD {
       const hpColor = pct > 60 ? '#44dd66' : pct > 30 ? '#ddaa22' : '#dd3333';
       const owner = this.game.players[building.playerId];
       const ownerLabel = owner?.isHuman ? '(Tú)' : CIV_NAMES[owner?.civType ?? 0];
-      const status = !building.isComplete()
-        ? `🔨 ${Math.round(building.buildProgress * 100)}% construido`
-        : building.productionQueue?.length > 0
-          ? `⚙️ Produciendo (${building.productionQueue.length} en cola)`
-          : '✅ Inactivo';
+      let status: string;
+      if (!building.isComplete()) {
+        status = `🔨 ${Math.round(building.buildProgress * 100)}% construido`;
+      } else if (building.productionQueue?.length > 0) {
+        const item = building.productionQueue[0];
+        const rem  = Math.ceil(item.totalTime - item.elapsed);
+        const prPct = Math.min(100, (item.elapsed / item.totalTime) * 100);
+        const civDef = owner ? CIVILIZATIONS[owner.civType] : null;
+        const uDef   = civDef?.units.find(u => u.type === item.unitType);
+        const eName  = uDef?.name ?? item.unitType;
+        const eEmoji = uDef?.emoji ?? '⚔️';
+        const queue  = building.productionQueue.length > 1 ? ` (+${building.productionQueue.length - 1})` : '';
+        status = `${eEmoji} <b>${eName}</b>${queue} — ${rem}s` +
+          `<div style="width:100%;height:3px;background:rgba(255,255,255,0.12);border-radius:2px;margin-top:3px">` +
+          `<div style="width:${prPct}%;height:100%;background:#22aa66;border-radius:2px"></div></div>`;
+      } else {
+        status = '✅ Inactivo';
+      }
       html = `
         <div class="ht-name">${building.def?.name ?? building.type}</div>
         <div class="ht-civ">${ownerLabel}</div>
