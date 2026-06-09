@@ -219,6 +219,9 @@ export class Game {
     return this.players[this.humanPlayerId];
   }
 
+  get dayT(): number { return (this.gameTime % 480) / 480; }
+  get isNight(): boolean { const d = this.dayT; return d > 0.75 || d < 0.15; }
+
   getHeroRespawnTimer(playerId: number): number | undefined {
     return this._heroRespawnTimers.get(playerId);
   }
