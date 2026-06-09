@@ -49,6 +49,7 @@ export class Game {
   readonly objectives: ObjectiveSystem;
 
   damageEvents: DamageEvent[] = [];
+  readonly killsByPlayer = new Map<number, number>(); // playerId → total kills
   newlySpawnedUnits: Unit[] = [];
   newlyPlacedBuildings: Building[] = [];
   newlyCompletedBuildings: Building[] = [];
@@ -346,6 +347,13 @@ export class Game {
     }
 
     this.damageEvents = this.combat.update(this.allUnits, this.map);
+
+    // Track kills per player from this frame's damage events
+    for (const evt of this.damageEvents) {
+      if (!evt.target.isAlive() && evt.attacker) {
+        this.killsByPlayer.set(evt.attacker.playerId, (this.killsByPlayer.get(evt.attacker.playerId) ?? 0) + 1);
+      }
+    }
 
     this.updateTowerAttacks(dt);
     this.updateUnitBuildingAttacks(dt);
