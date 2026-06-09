@@ -953,6 +953,22 @@ class GameInstance {
         }
         return;
       }
+      // Tab: center camera on human hero
+      if (e.code === 'Tab') {
+        e.preventDefault();
+        const hero = this.game.getAllUnits().find(u => u.playerId === this.game.humanPlayerId && u.isHero && u.isAlive());
+        if (hero) {
+          for (const u of this.game.getAllUnits()) u.setSelected(false);
+          hero.setSelected(true);
+          this.camera.panTo(hero.worldX, hero.worldZ);
+          this.hud.update(this.input.getSelectedUnits());
+          this.hud.notify(`${hero.def.emoji} ${hero.heroName} localizado`, 'info');
+        } else {
+          const t = this.game.getHeroRespawnTimer(this.game.humanPlayerId);
+          this.hud.notify(t !== undefined ? `⏳ Héroe reaparecerá en ${Math.ceil(t)}s` : 'Sin héroe activo', 'info');
+        }
+        return;
+      }
       // F: focus camera on selected units (or all human units)
       if (e.code === 'KeyF') {
         const sel = this.input.getSelectedUnits();
@@ -961,6 +977,33 @@ class GameInstance {
           let sx = 0, sz = 0;
           for (const u of army) { sx += u.worldX; sz += u.worldZ; }
           this.camera.panTo(sx / army.length, sz / army.length);
+        }
+        return;
+      }
+      // G: focus fire — all selected units attack the nearest/weakest visible enemy
+      if (e.code === 'KeyG' && !e.ctrlKey && !e.altKey) {
+        const sel = this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId && u.isAlive());
+        if (sel.length === 0) return;
+        const enemies = this.game.getAllUnits().filter(u => u.playerId !== this.game.humanPlayerId && u.isAlive());
+        if (enemies.length === 0) { this.hud.notify('Sin enemigos en rango', 'info'); return; }
+        const maxSight = Math.max(...sel.map(u => u.sight));
+        const cx = sel.reduce((s, u) => s + u.col, 0) / sel.length;
+        const cz = sel.reduce((s, u) => s + u.row, 0) / sel.length;
+        let best: Unit | null = null;
+        let bestScore = Infinity;
+        for (const en of enemies) {
+          const dist = Math.sqrt((en.col - cx) ** 2 + (en.row - cz) ** 2);
+          if (dist > maxSight * 1.5) continue;
+          // Prefer low-HP targets close to the group
+          const score = (en.hp / en.maxHp) * 0.6 + (dist / maxSight) * 0.4;
+          if (score < bestScore) { bestScore = score; best = en; }
+        }
+        if (best) {
+          for (const u of sel) u.attackUnit(best);
+          this.hud.notify(`🎯 Fuego concentrado — ${best.def.emoji} ${best.def.name}`, 'info');
+          this.audio.playClick();
+        } else {
+          this.hud.notify('Sin enemigos en rango de visión', 'info');
         }
         return;
       }
