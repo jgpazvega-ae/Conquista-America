@@ -159,26 +159,63 @@ export class CombatSystem {
     const scanRange = unit.state === UnitState.ATTACK_MOVE
       ? unit.sight
       : unit.attackRange * (unit.state === UnitState.HOLD ? 1.0 : 1.2);
-    let nearestDist = scanRange;
-    let nearest: Unit | null = null;
+    let bestScore = Infinity;
+    let best: Unit | null = null;
 
     for (const other of allUnits) {
       if (!other.isAlive()) continue;
       if (other.playerId === unit.playerId) continue;
       const d = unit.distanceTo(other);
-      if (d < nearestDist) {
-        nearestDist = d;
-        nearest     = other;
-      }
+      if (d > scanRange) continue;
+      const score = this.targetScore(unit, other, d);
+      if (score < bestScore) { bestScore = score; best = other; }
     }
 
-    if (nearest) {
+    if (best) {
       if (unit.state === UnitState.HOLD) {
-        unit.attackTarget = nearest; // attack in place; state stays HOLD
+        unit.attackTarget = best;
       } else {
-        unit.attackUnit(nearest);
+        unit.attackUnit(best);
       }
     }
+  }
+
+  // Smart target scoring: lower score = higher priority.
+  // Biases target selection by attacker unit type.
+  private targetScore(unit: Unit, candidate: Unit, dist: number): number {
+    const hpPct = candidate.hp / candidate.maxHp;
+    let score = dist; // base: prefer closer targets
+
+    switch (unit.type) {
+      case UnitType.CAVALRY:
+        // Prefer low-HP enemies and ranged units (neutralize them quickly)
+        if (hpPct < 0.5) score *= 0.65;
+        if (candidate.attackRange > 2.0) score *= 0.75;
+        if (candidate.isHero) score *= 0.5;
+        break;
+      case UnitType.CANNON:
+        // Prefer attacking enemies, letting splash hit nearby groups
+        if (candidate.state === UnitState.ATTACKING) score *= 0.8;
+        if (hpPct < 0.4) score *= 0.85;
+        break;
+      case UnitType.ARCHER:
+      case UnitType.ATLATL:
+      case UnitType.SLINGER:
+      case UnitType.ARQUEBUSIER:
+        // Prefer melee units currently attacking allies (safe to kite them)
+        if (candidate.attackRange <= 1.5 && candidate.state === UnitState.ATTACKING) score *= 0.8;
+        if (candidate.isHero) score *= 0.7;
+        break;
+      case UnitType.JAGUAR_KNIGHT:
+      case UnitType.EAGLE_WARRIOR:
+      case UnitType.CUACHIC:
+      case UnitType.CHAKANA_GUARD:
+        // Elite melee: prioritize heroes and other elites
+        if (candidate.isHero) score *= 0.5;
+        if (hpPct < 0.35) score *= 0.75; // finish off wounded
+        break;
+    }
+    return score;
   }
 
   getAndClearEvents(): DamageEvent[] {

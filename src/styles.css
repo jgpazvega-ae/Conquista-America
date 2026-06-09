@@ -1065,6 +1065,12 @@ input.toggle { width: 22px; height: 22px; accent-color: #d4880a; }
 @keyframes treasury-pulse { from { opacity: 0.7; } to { opacity: 1; } }
 
 #minimap-container { cursor: crosshair; }
+#day-night-indicator {
+  font-size: 14px; cursor: default;
+  padding: 2px 5px; border-radius: 4px;
+  color: #ffe080;
+  transition: color 0.5s;
+}
 #speed-indicator {
   font-size: 12px; color: #f0c060; font-weight: 700;
   padding: 3px 9px;

@@ -204,6 +204,40 @@ export class HUD {
     this.updateHeroPanel();
     this.updateWonderPanel();
     this.updateProductionQueueHUD();
+    this.updateDayNightIndicator();
+  }
+
+  private _wasNightHUD = false;
+  private _nightWarnedHUD = false;
+
+  private updateDayNightIndicator() {
+    const el = document.getElementById('day-night-indicator');
+    if (!el) return;
+    const dayT    = this.game.dayT;
+    const isNight = this.game.isNight;
+    // Time until next night transition (dayT increasing toward 0.75)
+    const secsPerCycle = 480;
+    let icon: string;
+    let tip:  string;
+    if (isNight) {
+      // Seconds remaining in night: night ends at dayT=0.15 (wrapping from 0.75)
+      const nightEnd = dayT < 0.15 ? (0.15 - dayT) : (1.0 - dayT + 0.15);
+      const secs = Math.ceil(nightEnd * secsPerCycle);
+      icon = '🌙';
+      tip  = `Noche — visión −40% · ${secs}s hasta el amanecer`;
+      el.style.color = '#88bbff';
+    } else {
+      // Seconds remaining until night: night starts at dayT=0.75
+      const toNight = dayT < 0.75 ? (0.75 - dayT) : (1.0 - dayT + 0.75);
+      const secs = Math.ceil(toNight * secsPerCycle);
+      const nearNight = secs <= 30;
+      icon = nearNight ? '🌅' : '☀️';
+      tip  = nearNight ? `Anocheciendo en ${secs}s — visión −40%` : `Día · ${secs}s hasta la noche`;
+      el.style.color = nearNight ? '#ffaa44' : '#ffe080';
+    }
+    el.textContent = icon;
+    el.title = tip;
+    this._wasNightHUD = isNight;
   }
 
   private updatePowerButton() {

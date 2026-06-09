@@ -1059,6 +1059,28 @@ class GameInstance {
         }
         return;
       }
+      // R: retreat selected units to nearest friendly settlement
+      if (e.code === 'KeyR' && !e.ctrlKey && !e.altKey) {
+        const sel = this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId && u.isAlive());
+        if (sel.length === 0) return;
+        const home = this.game.allBuildings.find(
+          b => b.playerId === this.game.humanPlayerId && b.isAlive() && b.isComplete() && b.type === BuildingType.SETTLEMENT,
+        );
+        if (!home) return;
+        let n = 0;
+        for (const u of sel) {
+          u.attackTarget = null;
+          const near = this.game.map.findWalkableNear(home.col, home.row, 5);
+          if (!near) continue;
+          const path = findPath(this.game.map, u.gridPos(), { col: near[0], row: near[1] }, 300);
+          if (path.length > 0) { u.moveTo(path); n++; }
+        }
+        if (n > 0) {
+          this.hud.notify(`🏃 ${n} unidad${n > 1 ? 'es' : ''} en retirada`, 'info');
+          this.audio.playMove();
+        }
+        return;
+      }
       // Q: auto-assign idle workers to nearest resource
       if (e.code === 'KeyQ' && !e.ctrlKey && !e.altKey) {
         this.autoAssignWorkers();
