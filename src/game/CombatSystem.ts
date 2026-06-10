@@ -2,7 +2,7 @@ import { UnitState, TerrainType, UnitType } from './types';
 import type { Unit } from './Unit';
 import type { GameMap } from './Map';
 import { findPath } from './Pathfinding';
-import { getDamageMultiplier } from './UnitBalancing';
+import { getDamageMultiplier, FORMATIONS } from './UnitBalancing';
 
 const SPLASH_RADIUS = 1.8;  // tiles — radius of cannon splash
 const SPLASH_DAMAGE_RATIO = 0.55; // fraction of base damage dealt to splash targets
@@ -94,10 +94,18 @@ export class CombatSystem {
           const attackerTile = map.getTile(unit.col, unit.row);
           const baseAtk = unit.outOfAmmo ? Math.max(4, Math.round(unit.def.stats.attack * 0.4)) : unit.attack;
           let dmg = baseAtk + Math.floor(Math.random() * 6) - 3 + terrainAttackBonus(attackerTile?.terrain);
+          // Formation attack bonus (LOOSE: -10%, PHALANX: -20%, WEDGE: +25%)
+          if (unit.formation && FORMATIONS[unit.formation]) {
+            dmg = Math.max(1, Math.round(dmg * (1 + FORMATIONS[unit.formation].bonusAttack)));
+          }
           const multiplier = getDamageMultiplier(unit.type, target.type);
           dmg = Math.round(dmg * multiplier);
           const tile = map.getTile(target.col, target.row);
           dmg = Math.max(1, dmg - terrainDefenseBonus(tile?.terrain));
+          // Formation defense (LOOSE: -15% def, PHALANX: +30% def, WEDGE: +10% def)
+          if (target.formation && FORMATIONS[target.formation]) {
+            dmg = Math.max(1, Math.round(dmg * (1 - FORMATIONS[target.formation].bonusDefense)));
+          }
           // Hold position: +2 defense bonus for targets holding their ground
           if (target.state === UnitState.HOLD) dmg = Math.max(1, dmg - 2);
           // Close ranks: formation fighters shield each other
