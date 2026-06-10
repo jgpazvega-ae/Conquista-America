@@ -93,6 +93,11 @@ export class Unit {
   killStreak  = 0;          // consecutive kills without taking damage
   berserkTimer = 0;         // seconds of berserk buff remaining (3-kill streak → 12s)
 
+  // Morale (American Conquest style): 0-100; panic below 25, recover at 50
+  morale   = 100;
+  panicked = false;
+  private _moraleCooldown = 0; // seconds until morale starts regenerating
+
   // Hero unit
   isHero   = false;
   heroName = '';
@@ -646,7 +651,15 @@ export class Unit {
     return Math.sqrt(dx * dx + dz * dz);
   }
 
+  /** Reduce morale; heroes never waver. Panic is triggered by Game when morale ≤ 25. */
+  loseMorale(amount: number) {
+    if (this.isHero) return;
+    this.morale = Math.max(0, this.morale - amount);
+    this._moraleCooldown = 3;
+  }
+
   moveTo(path: GridPos[]) {
+    if (this.panicked) return; // routed troops ignore orders
     if (path.length === 0) return;
     this.path      = path;
     this.pathIndex = 0;
@@ -665,6 +678,7 @@ export class Unit {
   }
 
   attackUnit(target: Unit) {
+    if (this.panicked) return;
     this.attackTarget         = target;
     this.attackBuildingTarget = null;
     this.state                = UnitState.ATTACKING;
@@ -672,6 +686,7 @@ export class Unit {
   }
 
   attackBuilding(target: import('./Building').Building) {
+    if (this.panicked) return;
     this.attackBuildingTarget = target;
     this.attackTarget         = null;
     this.state                = UnitState.ATTACKING;
@@ -686,6 +701,7 @@ export class Unit {
     this._damageCooldown = 5;  // 5 s before healing starts
     this._idleHealTimer  = 0;
     this.killStreak      = 0;  // reset streak on taking damage
+    this.loseMorale(3);
     if (this.hp > 0 && this.hp < this.maxHp * 0.20 && !this.wantsRetreat) {
       this.wantsRetreat = true;
     }
@@ -732,6 +748,14 @@ export class Unit {
     this.attackTimer  = Math.max(0, this.attackTimer - dt);
     if (this.berserkTimer > 0) this.berserkTimer = Math.max(0, this.berserkTimer - dt);
     this.animT += dt;
+
+    // Morale regeneration: faster near own settlement; rally at 50 ends panic
+    if (this._moraleCooldown > 0) {
+      this._moraleCooldown -= dt;
+    } else if (this.morale < 100) {
+      this.morale = Math.min(100, this.morale + (this._nearSettlement ? 9 : 4) * dt);
+    }
+    if (this.panicked && this.morale >= 50) this.panicked = false;
 
     // Passive idle healing: 2 HP every 0.5 s after 5 s without damage
     // (nearSettlement flag set externally by Game.ts each frame for +3 extra HP/tick)
@@ -793,6 +817,10 @@ export class Unit {
       } else {
         this.rig.position.y = Math.sin(this.animT * 2.2) * 0.015;
         this.rig.rotation.z = 0;
+      }
+      // Panic: frantic trembling while routed
+      if (this.panicked) {
+        this.rig.rotation.z = Math.sin(this.animT * 28) * 0.10;
       }
       // Attack lunge forward
       if (this.attackAnim > 0) {
@@ -858,6 +886,7 @@ export class Unit {
 
   /** Issue an attack-move command: unit moves along path, auto-attacks anything in range. */
   attackMove(path: GridPos[]) {
+    if (this.panicked) return;
     this.path        = path;
     this.pathIndex   = 0;
     this.attackTarget = null;
