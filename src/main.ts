@@ -868,6 +868,11 @@ class GameInstance {
     if (this.game.humanPlayer.aliveUnits.some(u => u.attackBuildingTarget && u.attackRange <= 1.5)) {
       this.hintOnce('capture', '💡 ¿Sabías? Con Ctrl+clic derecho tus tropas cuerpo a cuerpo CAPTURAN el edificio intacto en vez de destruirlo.');
     }
+    if (this.game.humanPlayer.aliveUnits.some(u => u.outOfAmmo)) {
+      this.hintOnce('ammo', '💡 Sin munición: las unidades a distancia combaten cuerpo a cuerpo. Retíralas a tu asentamiento para reabastecer automáticamente.');
+    } else if (this.game.humanPlayer.aliveUnits.some(u => u.lowAmmo)) {
+      this.hintOnce('lowAmmo', '💡 Munición baja (🏹 en ámbar). Retira tus arqueros/ballesteros al asentamiento propio para reabastecer. Pulsa V para descarga sincronizada.');
+    }
 
     this.hud.update(selectedNow);
     this.renderer.render();
@@ -1222,6 +1227,23 @@ class GameInstance {
           }
         } else {
           this.hud.notify('Sin guarniciones que desalojar', 'info');
+        }
+        return;
+      }
+      // V: volley fire — selected ranged units with a live target fire simultaneously (2.5× burst)
+      if (e.code === 'KeyV' && !e.ctrlKey && !e.altKey) {
+        const ranged = this.input.getSelectedUnits().filter(u => u.ammo > 0 && u.attackTarget?.isAlive());
+        if (ranged.length > 0) {
+          for (const u of ranged) u.volleyReady = true;
+          this.hud.notify(`🔫 ¡DESCARGA! ${ranged.length} unidad${ranged.length > 1 ? 'es' : ''} — daño ×2.5`, 'warning');
+          this.audio.playShot();
+          this.hintOnce('volley', '💡 ¡Descarga sincronizada! Todas las unidades a distancia seleccionadas disparan a la vez con ×2.5 de daño. Recarga 50% más lenta.');
+        } else {
+          const outOfAmmo = this.input.getSelectedUnits().filter(u => u.outOfAmmo);
+          if (outOfAmmo.length > 0) {
+            this.hud.notify('🏹 Sin munición — retira tus unidades a un asentamiento propio para reabastecer', 'warning');
+            this.hintOnce('ammo', '💡 Sin munición: las unidades a distancia combaten cuerpo a cuerpo. Retíralas a tu asentamiento para reabastecer automáticamente.');
+          }
         }
         return;
       }
