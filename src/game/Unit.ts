@@ -98,6 +98,10 @@ export class Unit {
   panicked = false;
   private _moraleCooldown = 0; // seconds until morale starts regenerating
 
+  // Garrison: inside building id, or moving toward one to enter
+  garrisonedIn: number | null = null;
+  garrisonTarget: import('./Building').Building | null = null;
+
   // Hero unit
   isHero   = false;
   heroName = '';
@@ -666,6 +670,7 @@ export class Unit {
     this.state                = UnitState.MOVING;
     this.attackTarget         = null;
     this.attackBuildingTarget = null;
+    this.garrisonTarget       = null;
     this.patrolA = null; this.patrolB = null;
   }
 
@@ -681,6 +686,7 @@ export class Unit {
     if (this.panicked) return;
     this.attackTarget         = target;
     this.attackBuildingTarget = null;
+    this.garrisonTarget       = null;
     this.state                = UnitState.ATTACKING;
     this.attackAnim           = 1;
   }
@@ -890,6 +896,7 @@ export class Unit {
     this.path        = path;
     this.pathIndex   = 0;
     this.attackTarget = null;
+    this.garrisonTarget = null;
     this.state       = UnitState.ATTACK_MOVE;
   }
 

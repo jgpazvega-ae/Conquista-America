@@ -54,6 +54,7 @@ export class CombatSystem {
 
     for (const unit of allUnits) {
       if (!unit.isAlive()) continue;
+      if (unit.garrisonedIn !== null) continue; // garrisoned troops fight via Game.updateGarrisonFire
 
       // Process active combat (ATTACKING or HOLD with a target)
       const isHold = unit.state === UnitState.HOLD;
@@ -168,6 +169,7 @@ export class CombatSystem {
     for (const other of allUnits) {
       if (!other.isAlive()) continue;
       if (other.playerId === unit.playerId) continue;
+      if (other.garrisonedIn !== null) continue; // can't target troops inside buildings
       const d = unit.distanceTo(other);
       if (d > scanRange) continue;
       const score = this.targetScore(unit, other, d);

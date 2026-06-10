@@ -52,6 +52,17 @@ export class Building {
   private static readonly REPAIR_DELAY   = 10; // s before repair kicks in
   private static readonly REPAIR_RATE    = 3;  // HP per second
 
+  // Garrison (American Conquest style): troops inside shoot out and stay safe
+  garrison: import('./Unit').Unit[] = [];
+  get garrisonCapacity(): number {
+    switch (this.type) {
+      case BuildingType.SETTLEMENT: return 8;
+      case BuildingType.WATCHTOWER: return 4;
+      case BuildingType.TEMPLE:     return 3;
+      default:                      return 0;
+    }
+  }
+
   // Rally point for spawned units
   rallyCol: number | null = null;
   rallyRow: number | null = null;
