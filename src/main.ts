@@ -1414,6 +1414,28 @@ class GameInstance {
         this.triggerCivPower();
         return;
       }
+      // Z: rally ALL human units to the hero (or to settlement if hero is absent)
+      if (e.code === 'KeyZ' && !e.ctrlKey && !e.altKey) {
+        const hero = this.game.humanPlayer.aliveUnits.find(u => u.isHero);
+        const rallySrc = hero ?? this.game.allBuildings.find(
+          b => b.playerId === this.game.humanPlayerId && b.isAlive() && b.type === BuildingType.SETTLEMENT,
+        );
+        if (!rallySrc) return;
+        const rc = 'col' in rallySrc ? rallySrc.col : (rallySrc as import('./game/Unit').Unit).col;
+        const rr = 'row' in rallySrc ? rallySrc.row : (rallySrc as import('./game/Unit').Unit).row;
+        const near = this.game.map.findWalkableNear(rc, rr, 5);
+        if (!near) return;
+        let rallied = 0;
+        for (const u of this.game.humanPlayer.aliveUnits) {
+          if (u.isHero || u.garrisonedIn !== null) continue;
+          const path = findPath(this.game.map, u.gridPos(), { col: near[0], row: near[1] }, 400);
+          if (path.length > 0) { u.moveTo(path); rallied++; }
+        }
+        if (rallied > 0) {
+          this.hud.notify(`📯 ${rallied} unidad${rallied > 1 ? 'es' : ''} reuniéndose${hero ? ' con el héroe' : ' en el asentamiento'}`, 'success');
+        }
+        return;
+      }
       // X: toggle entrench — selected units dig in (+5 def, HOLD state; cancelled by movement)
       if (e.code === 'KeyX' && !e.ctrlKey && !e.altKey) {
         const sel = this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId && u.isAlive());

@@ -885,6 +885,8 @@ export class Game {
       bldg.takeDamage(rawDmg);
       if (!bldg.isAlive()) {
         this.newlyDestroyedBuildings.push(bldg);
+        // Award XP to the unit that delivers the killing blow to a building
+        unit.gainXP(15);
         // Cavalry raid: loot gold from the destroyed building's owner
         if (unit.type === UnitType.CAVALRY) {
           const raider = this.players[unit.playerId];
