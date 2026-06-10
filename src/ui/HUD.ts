@@ -60,6 +60,9 @@ export class HUD {
 
   onMinimapClick: ((worldX: number, worldZ: number) => void) | null = null;
   onPowerActivate: (() => void) | null = null;
+  onGroupStop:    (() => void) | null = null;
+  onGroupHold:    (() => void) | null = null;
+  onGroupRetreat: (() => void) | null = null;
   private _combatPings:    { col: number; row: number; ts: number }[] = [];
   private _lastSeenUnits:  Map<number, { col: number; row: number }> = new Map();
 
@@ -88,6 +91,10 @@ export class HUD {
     if (powerEmoji) powerEmoji.textContent = powerDef.emoji;
     if (powerBtn)   powerBtn.title = `${powerDef.name} — ${powerDef.description} (${powerDef.key})`;
     powerBtn?.addEventListener('click', () => this.onPowerActivate?.());
+
+    document.getElementById('grp-stop')?.addEventListener('click',    () => this.onGroupStop?.());
+    document.getElementById('grp-hold')?.addEventListener('click',    () => this.onGroupHold?.());
+    document.getElementById('grp-retreat')?.addEventListener('click', () => this.onGroupRetreat?.());
 
     this.minimapCanvas.addEventListener('click', (e) => {
       if (!this.minimapBuilt) return;
@@ -186,6 +193,10 @@ export class HUD {
       const alive = this.game.players.filter(p => p.id !== 0 && !p.isDefeated()).length;
       this.elStatus.textContent = alive > 0 ? `⚔️ Enemigos: ${alive}` : '';
     }
+
+    // Group action bar
+    const groupBar = document.getElementById('group-action-bar');
+    groupBar?.classList.toggle('hidden', selectedUnits.length <= 1);
 
     // Unit panel
     if (selectedUnits.length === 1) {
@@ -417,12 +428,13 @@ export class HUD {
     const burnBadge    = unit.burning     > 0 ? `<span title="En llamas" style="color:#ff8822">🔥${Math.ceil(unit.burning)}s</span>`       : '';
     const poisonBadge  = unit.poisoned    > 0 ? `<span title="Envenenado" style="color:#44dd44">☠️${Math.ceil(unit.poisoned)}s</span>`       : '';
     const berserkBadge = unit.berserkTimer > 0 ? `<span title="¡Frenesí! +25% daño" style="color:#ff6600">🔥FRENESÍ ${Math.ceil(unit.berserkTimer)}s</span>` : '';
+    const chargeBadge  = unit.chargeReady  ? `<span title="Carga de caballería lista — +60% daño en primer golpe" style="color:#ffe066">⚡CARGA</span>` : '';
     this.elUnitStats.innerHTML =
       `<span>⚔️ ${unit.attack}</span>` +
       `<span>🛡️ ${unit.defense}</span>` +
       `<span>💨 ${unit.speed.toFixed(1)}</span>` +
       `<span>🎯 ${unit.attackRange.toFixed(1)}</span>` +
-      holdBadge + burnBadge + poisonBadge + berserkBadge;
+      holdBadge + burnBadge + poisonBadge + berserkBadge + chargeBadge;
 
     // XP bar (only if unit can still level up)
     const xpEl = document.getElementById('unit-xp-row');

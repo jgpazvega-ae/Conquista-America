@@ -226,6 +226,45 @@ class GameInstance {
 
     this.hud.onPowerActivate = () => this.triggerCivPower();
 
+    this.hud.onGroupStop = () => {
+      for (const u of this.input.getSelectedUnits()) {
+        u.state = UnitState.IDLE;
+        u.path  = [];
+        u.attackTarget = null;
+      }
+    };
+
+    this.hud.onGroupHold = () => {
+      const sel = this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId);
+      if (sel.length === 0) return;
+      const allHold = sel.every(u => u.state === UnitState.HOLD);
+      for (const u of sel) {
+        u.path = [];
+        u.attackTarget = null;
+        u.state = allHold ? UnitState.IDLE : UnitState.HOLD;
+      }
+      this.hud.notify(allHold ? '🏃 Posición liberada' : '🛡️ Posición de defensa activada', 'info');
+    };
+
+    this.hud.onGroupRetreat = () => {
+      const home = this.game.allBuildings.find(
+        b => b.playerId === this.game.humanPlayerId && b.isAlive() && b.isComplete() && b.type === BuildingType.SETTLEMENT,
+      );
+      if (!home) return;
+      let n = 0;
+      for (const u of this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId && u.isAlive())) {
+        u.attackTarget = null;
+        const near = this.game.map.findWalkableNear(home.col, home.row, 5);
+        if (!near) continue;
+        const path = findPath(this.game.map, u.gridPos(), { col: near[0], row: near[1] }, 300);
+        if (path.length > 0) { u.moveTo(path); n++; }
+      }
+      if (n > 0) {
+        this.hud.notify(`🏃 ${n} unidad${n > 1 ? 'es' : ''} en retirada`, 'info');
+        this.audio.playMove();
+      }
+    };
+
     this.input.onAttackMove = (units, col, row) => {
       const map = this.game.map;
       for (const [i, unit] of units.entries()) {

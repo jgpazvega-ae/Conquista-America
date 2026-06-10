@@ -571,6 +571,20 @@ input.toggle { width: 22px; height: 22px; accent-color: #d4880a; }
   color: #e8d5a0;
 }
 
+/* Group action bar */
+#group-action-bar {
+  position: absolute; bottom: 120px; left: 16px;
+  display: flex; gap: 6px; z-index: 100;
+}
+.grp-btn {
+  background: rgba(14,8,2,0.92); border: 1px solid rgba(200,160,80,0.4);
+  border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 600;
+  color: #e8d5a0; cursor: pointer; white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.45); transition: background 0.15s, transform 0.1s;
+}
+.grp-btn:hover { background: rgba(30,18,6,0.97); border-color: rgba(200,160,80,0.7); }
+.grp-btn:active { transform: scale(0.94); }
+
 /* Mobile action bar */
 #mobile-actions {
   position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
