@@ -1,4 +1,4 @@
-import { UnitState } from './types';
+import { UnitState, UnitType } from './types';
 import type { Unit } from './Unit';
 import type { Player } from './Player';
 import type { Game } from './Game';
@@ -176,6 +176,34 @@ export class AISystem {
         if (near) {
           const path = findPath(game.map, capturer.gridPos(), { col: near[0], row: near[1] }, 300);
           if (path.length > 0) { capturer.path = path; capturer.pathIndex = 0; capturer.state = UnitState.MOVING; }
+        }
+      }
+    }
+
+    // Cavalry vanguard raids: after 90 s, send 2 idle cavalry to harass enemy secondary buildings
+    if (game.gameTime > 90) {
+      const idleCavalry = player.aliveUnits.filter(
+        u => u.type === UnitType.CAVALRY && u.state === UnitState.IDLE &&
+             u.garrisonedIn === null && !u.outOfAmmo,
+      );
+      if (idleCavalry.length >= 2) {
+        const raidTarget = game.allBuildings
+          .filter(b =>
+            b.playerId !== player.id && b.playerId >= 0 && b.isAlive() && b.isComplete() &&
+            b.type !== BuildingType.SETTLEMENT && b.type !== BuildingType.WONDER &&
+            b.type !== BuildingType.VILLAGE,
+          )
+          .sort((a, b) => a.hp - b.hp)[0]; // most-damaged first (easier target)
+        if (raidTarget) {
+          for (const raider of idleCavalry.slice(0, 2)) {
+            const d = Math.sqrt((raider.col - raidTarget.col) ** 2 + (raider.row - raidTarget.row) ** 2);
+            if (d <= raider.attackRange + 1.5) {
+              raider.attackBuilding(raidTarget);
+            } else {
+              const path = findPath(game.map, raider.gridPos(), { col: raidTarget.col, row: raidTarget.row }, 300);
+              if (path.length > 0) raider.moveTo(path);
+            }
+          }
         }
       }
     }
