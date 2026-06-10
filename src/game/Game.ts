@@ -82,12 +82,15 @@ export class Game {
   private _bonusTimer = 0;
   stormTimer = 0;            // seconds remaining in tropical storm
   private _approachTimer = 0; // throttle for enemy-approach notifications
+  private _villageIncomeTimer = 30; // seconds between village income ticks
+  villageIncomeEvents: { playerId: number; food: number; gold: number }[] = [];
 
   constructor(humanCiv: CivilizationType = CivilizationType.AZTEC) {
     this.map = new GameMap(12345);
     this.spawnPlayers(humanCiv);
     this.generateResourceNodes();
     this.spawnInitialBuildings();
+    this.spawnNeutralVillages();
     this.diplomacy.init();
     this.fog = new FogOfWarManager(this.players.length);
     this.objectives = new ObjectiveSystem(this);
@@ -201,6 +204,30 @@ export class Game {
         }
       }
     });
+  }
+
+  private spawnNeutralVillages() {
+    // 4 villages spread across the map, away from starting positions
+    const positions: [number, number][] = [
+      [33, 22], [15, 18], [50, 30], [28, 44],
+    ];
+    for (const [col, row] of positions) {
+      const pos = this.map.findWalkableNear(col, row, 6);
+      if (!pos) continue;
+      const def = BUILDING_DEFS[BuildingType.VILLAGE];
+      const village = new Building(
+        BuildingType.VILLAGE, def,
+        -1, // neutral — no player owns it
+        pos[0], pos[1],
+        0x8a9a60, // mossy grey-green neutral color
+        CivilizationType.AZTEC, // unused for village mesh
+      );
+      village.buildProgress = 1;
+      village.hp = village.maxHp;
+      (village as any).state = 'COMPLETE';
+      village.progressBar.visible = false;
+      this.allBuildings.push(village);
+    }
   }
 
   private generateResourceNodes() {
@@ -515,6 +542,27 @@ export class Game {
 
     this.objectives.update(this);
     updateCivPowers(this, dt);
+
+    // Village income: every 30s, each captured village pays out food+gold to its owner
+    this.villageIncomeEvents = [];
+    this._villageIncomeTimer -= dt;
+    if (this._villageIncomeTimer <= 0) {
+      this._villageIncomeTimer = 30;
+      const incomeByPlayer = new Map<number, { food: number; gold: number }>();
+      for (const b of this.allBuildings) {
+        if (b.type !== BuildingType.VILLAGE || b.playerId < 0 || !b.isAlive()) continue;
+        const curr = incomeByPlayer.get(b.playerId) ?? { food: 0, gold: 0 };
+        curr.food += 10; curr.gold += 6;
+        incomeByPlayer.set(b.playerId, curr);
+      }
+      for (const [pid, income] of incomeByPlayer) {
+        const p = this.players[pid];
+        if (!p) continue;
+        p.resources.food = Math.min(2000, p.resources.food + income.food);
+        p.resources.gold = Math.min(2000, p.resources.gold + income.gold);
+        this.villageIncomeEvents.push({ playerId: pid, food: income.food, gold: income.gold });
+      }
+    }
 
     // Tick wonder countdown
     if (this.wonderCountdown !== null && this.status === 'PLAYING') {

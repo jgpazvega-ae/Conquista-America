@@ -63,6 +63,7 @@ export class Building {
       case BuildingType.SETTLEMENT: return 8;
       case BuildingType.WATCHTOWER: return 4;
       case BuildingType.TEMPLE:     return 3;
+      case BuildingType.VILLAGE:    return 2;
       default:                      return 0;
     }
   }
@@ -118,10 +119,14 @@ export class Building {
     const stone2 = this.mat(new THREE.Color(this.stoneColor()).multiplyScalar(0.82).getHex(), 0.95);
     const trim   = new THREE.MeshStandardMaterial({ color: civColor, roughness: 0.7, emissive: civColor, emissiveIntensity: 0.06 });
 
-    switch (this.civType) {
-      case CivilizationType.CONQUISTADOR: this.buildSpanish(stone, stone2, trim); break;
-      case CivilizationType.INCA:         this.buildInca(stone, stone2, trim);   break;
-      default:                            this.buildMesoamerican(stone, stone2, trim); break;
+    if (this.type === BuildingType.VILLAGE) {
+      this.buildVillage();
+    } else {
+      switch (this.civType) {
+        case CivilizationType.CONQUISTADOR: this.buildSpanish(stone, stone2, trim); break;
+        case CivilizationType.INCA:         this.buildInca(stone, stone2, trim);   break;
+        default:                            this.buildMesoamerican(stone, stone2, trim); break;
+      }
     }
 
     // Ownership banner (high & colorful, readable from above)
@@ -279,6 +284,35 @@ export class Building {
     rose.position.set(0.15, 0.75, 0.46); this.structure.add(rose);
 
     this.addTypeMarker(trim, 1.45);
+  }
+
+  // ── Neutral village — thatch hut with a fire pit ────────────────────────────
+  private buildVillage() {
+    const thatch = this.mat(0x8a7040, 0.96);
+    const wall   = this.mat(0xc4aa70, 0.94);
+    const fire   = new THREE.MeshStandardMaterial({ color: 0xff6010, emissive: 0xff3000, emissiveIntensity: 1.0 });
+    const dark   = this.mat(0x2a1a0a, 0.98);
+
+    // Circular hut base
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.70, 0.76, 0.55, 10), wall);
+    base.castShadow = true; base.receiveShadow = true;
+    this.structure.add(base);
+    base.position.y = 0.28;
+
+    // Conical thatch roof
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(0.80, 0.70, 10), thatch);
+    roof.position.y = 0.90; roof.castShadow = true;
+    this.structure.add(roof);
+
+    // Doorway cutout (dark rectangle)
+    const door = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.34, 0.06), dark);
+    door.position.set(0, 0.22, 0.72); this.structure.add(door);
+
+    // Central fire pit
+    const pit = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.08, 8), dark);
+    pit.position.set(-0.55, 0.04, 0.30); this.structure.add(pit);
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.18, 6), fire);
+    flame.position.set(-0.55, 0.17, 0.30); this.structure.add(flame);
   }
 
   // Small marker so different building types are still distinguishable

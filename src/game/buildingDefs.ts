@@ -72,4 +72,14 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     buildRadius: 5,
     description: 'Obra monumental de tu civilización. Complétala y defiéndela 3 minutos para alcanzar la gloria.',
   },
+  [BuildingType.VILLAGE]: {
+    type: BuildingType.VILLAGE,
+    name: 'Aldea Neutral',
+    emoji: '🏡',
+    cost: { food: 0, gold: 0, stone: 0 },
+    buildTime: 0,
+    maxHp: 80,
+    buildRadius: 2,
+    description: 'Aldea preexistente. Captúrala con tropas cuerpo a cuerpo para recibir +10🌽 y +6⚜️ cada 30s.',
+  },
 };
