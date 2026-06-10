@@ -602,6 +602,9 @@ export class Game {
     if (player.upgrades.metallurgy)    unit.attack += 6;
     if (player.upgrades.logistics)     unit.speed  += 0.4;
     if (player.upgrades.fortification) { unit.maxHp += 50; unit.hp += 50; }
+    // Veteran culture: 5+ level-3 veterans in the army train recruits at level 2
+    const eliteCount = player.aliveUnits.filter(u => u.level >= 3 && !u.isHero).length;
+    if (eliteCount >= 5) unit.gainXP(50); // threshold for level 1→2 is 50 XP
     player.addUnit(unit);
     this.allUnits.push(unit);
     this.newlySpawnedUnits.push(unit);
