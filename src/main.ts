@@ -1306,6 +1306,23 @@ class GameInstance {
         this.triggerCivPower();
         return;
       }
+      // X: toggle entrench — selected units dig in (+5 def, HOLD state; cancelled by movement)
+      if (e.code === 'KeyX' && !e.ctrlKey && !e.altKey) {
+        const sel = this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId && u.isAlive());
+        if (sel.length === 0) return;
+        const willEntrench = !sel.every(u => u.entrenched);
+        for (const u of sel) {
+          if (willEntrench && u.entrenched) continue;
+          u.entrench();
+        }
+        if (willEntrench) {
+          this.hud.notify(`🏕️ ${sel.length} unidad${sel.length > 1 ? 'es' : ''} atrincherada${sel.length > 1 ? 's' : ''} — +7 def total · pulsa X o mueve para salir`, 'info');
+          this.hintOnce('entrench', '💡 Fortín (X): unidades en posición defensiva — +2 HOLD +5 fortín = +7 defensa total. Atrincherarse es ideal en alturas o pasos estrechos. Se cancela al mover.');
+        } else {
+          this.hud.notify('🏕️ Posición abandonada', 'info');
+        }
+        return;
+      }
       // + / = : speed up;  - : slow down
       if (e.key === '+' || e.key === '=') {
         this._gameSpeed = Math.min(3.0, parseFloat((this._gameSpeed + 0.5).toFixed(1)));

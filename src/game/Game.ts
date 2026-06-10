@@ -410,6 +410,20 @@ export class Game {
       }
     }
 
+    // Outnumber stress: being focused by 3+ enemies drains morale faster
+    const focusCount = new Map<number, number>(); // unitId → active enemy attacker count
+    for (const u of this.allUnits) {
+      if (!u.isAlive() || !u.attackTarget?.isAlive() || u.playerId === u.attackTarget.playerId) continue;
+      focusCount.set(u.attackTarget.id, (focusCount.get(u.attackTarget.id) ?? 0) + 1);
+    }
+    for (const [targetId, count] of focusCount) {
+      if (count < 3) continue;
+      const target = this.allUnits.find(u => u.id === targetId);
+      if (!target?.isAlive() || target.isHero) continue;
+      const drain = 4 * dt * (count - 2);
+      if (drain >= 0.05) target.loseMorale(drain);
+    }
+
     // Panic check: morale ≤ 25 breaks the unit unless its hero stands nearby
     const heroesByPlayer = new Map<number, Unit>();
     for (const u of this.allUnits) {
