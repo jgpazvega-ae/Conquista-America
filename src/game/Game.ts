@@ -89,6 +89,8 @@ export class Game {
   stormTimer = 0;            // seconds remaining in tropical storm
   private _approachTimer = 0; // throttle for enemy-approach notifications
   private _villageIncomeTimer = 30; // seconds between village income ticks
+  private _autobraceTimer = 0;
+  private _autobraceNotified = false;
   villageIncomeEvents: { playerId: number; food: number; gold: number }[] = [];
 
   constructor(humanCiv: CivilizationType = CivilizationType.AZTEC) {
@@ -649,6 +651,30 @@ export class Game {
         p.resources.gold = Math.min(2000, p.resources.gold + income.gold);
         this.villageIncomeEvents.push({ playerId: pid, food: income.food, gold: income.gold });
       }
+    }
+
+    // Auto-brace: spear units auto-switch to PHALANX when enemy cavalry closes within 6 tiles
+    this._autobraceTimer -= dt;
+    if (this._autobraceTimer <= 0) {
+      this._autobraceTimer = 2.0;
+      const spearTypes = new Set([UnitType.SPEARMAN, UnitType.QUECHUA, UnitType.ANTIS_WARRIOR, UnitType.CHAKANA_GUARD]);
+      const humanUnits = this.allUnits.filter(u => u.playerId === this.humanPlayerId && u.isAlive() && !u.panicked && u.garrisonedIn === null);
+      const enemyCavalry = this.allUnits.filter(u => u.playerId !== this.humanPlayerId && u.isAlive() && u.type === UnitType.CAVALRY);
+      let braceCount = 0;
+      for (const u of humanUnits) {
+        if (!spearTypes.has(u.type)) continue;
+        const cavNear = enemyCavalry.some(c => Math.abs(c.col - u.col) <= 6 && Math.abs(c.row - u.row) <= 6);
+        if (cavNear && u.formation !== 'PHALANX') {
+          u.setFormation('PHALANX');
+          braceCount++;
+        }
+      }
+      if (braceCount > 0 && !this._autobraceNotified) {
+        this._autobraceNotified = true;
+        this.pendingEventMessages.push(`💂 ${braceCount} lancero${braceCount > 1 ? 's' : ''} en posición defensiva — caballería detectada`);
+      }
+      // Reset flag when no cavalry threat remains
+      if (enemyCavalry.length === 0) this._autobraceNotified = false;
     }
 
     // Tick wonder countdown

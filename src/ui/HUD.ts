@@ -439,6 +439,7 @@ export class HUD {
     this.elHpText.textContent     = `${unit.hp}/${unit.maxHp}`;
 
     const holdBadge    = unit.state === UnitState.HOLD ? `<span title="Posición de defensa (+2 def)" style="color:#88ccff">🛡️DEF</span>` : '';
+    const woundBadge   = unit.hp < unit.maxHp * 0.25 ? `<span title="Herida grave — -20% ataque, -30% movimiento" style="color:#ff4444">🩸HERIDO</span>` : '';
     const burnBadge    = unit.burning     > 0 ? `<span title="En llamas" style="color:#ff8822">🔥${Math.ceil(unit.burning)}s</span>`       : '';
     const poisonBadge  = unit.poisoned    > 0 ? `<span title="Envenenado" style="color:#44dd44">☠️${Math.ceil(unit.poisoned)}s</span>`       : '';
     const berserkBadge = unit.berserkTimer > 0 ? `<span title="¡Frenesí! +25% daño" style="color:#ff6600">🔥FRENESÍ ${Math.ceil(unit.berserkTimer)}s</span>` : '';
@@ -481,7 +482,7 @@ export class HUD {
       `<span>🛡️ ${unit.defense}</span>` +
       `<span>💨 ${unit.speed.toFixed(1)}</span>` +
       `<span>🎯 ${unit.attackRange.toFixed(1)}</span>` +
-      holdBadge + entrenchedBadge + burnBadge + poisonBadge + berserkBadge + chargeBadge + formBadge + moraleBadge + ammoBadge + orderBadge + warCryBadge + nightBadge + reloadBadge;
+      woundBadge + holdBadge + entrenchedBadge + burnBadge + poisonBadge + berserkBadge + chargeBadge + formBadge + moraleBadge + ammoBadge + orderBadge + warCryBadge + nightBadge + reloadBadge;
 
     // XP bar (only if unit can still level up)
     const xpEl = document.getElementById('unit-xp-row');
