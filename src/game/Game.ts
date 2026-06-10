@@ -388,7 +388,7 @@ export class Game {
     }
 
     this.weatherChangeEvent = this.weather.update(dt);
-    this.damageEvents = this.combat.update(this.allUnits, this.map, this.weather);
+    this.damageEvents = this.combat.update(this.allUnits, this.map, this.weather, this.isNight);
 
     // Track kills per player from this frame's damage events
     for (const evt of this.damageEvents) {
@@ -752,7 +752,22 @@ export class Game {
 
       const rawDmg = Math.max(1, unit.attack - 5); // buildings have some armor
       bldg.takeDamage(rawDmg);
-      if (!bldg.isAlive()) this.newlyDestroyedBuildings.push(bldg);
+      if (!bldg.isAlive()) {
+        this.newlyDestroyedBuildings.push(bldg);
+        // Cavalry raid: loot gold from the destroyed building's owner
+        if (unit.type === UnitType.CAVALRY) {
+          const raider = this.players[unit.playerId];
+          const victim = this.players.find(p => p.id === bldg.playerId);
+          if (raider && victim) {
+            const stolen = Math.min(victim.resources.gold, 20 + Math.floor(Math.random() * 20));
+            if (stolen > 0) {
+              victim.resources.gold  -= stolen;
+              raider.resources.gold  += stolen;
+              this.pendingEventMessages.push(`🐎 ¡Raída de caballería! +${stolen} ⚜️ saqueados`);
+            }
+          }
+        }
+      }
       this.damageEvents.push({
         attacker: unit,
         target: unit as any,

@@ -593,7 +593,9 @@ class GameInstance {
     // Notify player when day/night phase transitions
     if (isNight !== this._wasNight) {
       this._wasNight = isNight;
-      this.hud.notify(isNight ? '🌙 Anochece — visión reducida 40%' : '☀️ Amanece — visión restaurada', 'info');
+      this.hud.notify(isNight ? '🌙 Anochece — visión -40% · combate +15% daño ambos bandos' : '☀️ Amanece — visión restaurada', 'info');
+      if (isNight) this.hintOnce('nightCombat', '💡 De noche: la visión cae un 40% pero el daño de combate sube 15% para ambos bandos. ¡Los ataques sorpresa nocturnos son devastadores!');
+      if (!isNight) this.hintOnce('highGround', '💡 El terreno importa en combate: las tierras altas y montañas dan bonificación de ataque. El desierto expone a tus arqueros.');
     }
     // Storm start/end notifications
     const isStorm = this.game.stormTimer > 0;
@@ -869,10 +871,12 @@ class GameInstance {
       this.hintOnce('weather', '💡 El clima afecta el combate: la lluvia inutiliza casi la pólvora, la sequía dobla el riesgo de incendio.');
     }
 
-    // Random events
+    // Random events (and cavalry raid messages)
     for (const msg of this.game.pendingEventMessages) {
-      this.hud.notify(msg, 'info');
-      this.audio.playBuild(); // light chime for events
+      const isRaid = msg.startsWith('🐎');
+      this.hud.notify(msg, isRaid ? 'success' : 'info');
+      this.audio.playBuild();
+      if (isRaid) this.hintOnce('cavalryRaid', '💡 Raída de caballería: tus jinetes saquean ⚜️ oro al destruir edificios enemigos. ¡Úsalos para cortar el suministro enemigo!');
     }
 
     const selectedNow = this.input.getSelectedUnits();
