@@ -330,20 +330,32 @@ export class AISystem {
       .sort((a, b) => (b.isHero ? 1 : 0) - (a.isHero ? 1 : 0));
     const toSend = Math.ceil(available.length * 0.8);
 
-    // Human wonder is highest-priority target — destroy before countdown expires
-    const humanWonder = game.allBuildings.find(
-      b => b.playerId === 0 && (b.type as string) === 'WONDER' && b.isAlive() && b.isComplete(),
-    );
+    // Nearest active wonder from any enemy — destroy before countdown expires
+    const mySettlementPos = game.allBuildings.find(b => b.playerId === player.id && b.type === BuildingType.SETTLEMENT);
+    const activeWonder = game.wonderCountdown !== null
+      ? game.allBuildings
+          .filter(b => b.playerId !== player.id && (b.type as string) === 'WONDER' && b.isAlive() && b.isComplete())
+          .sort((a, b) => {
+            const da = mySettlementPos ? (a.col - mySettlementPos.col) ** 2 + (a.row - mySettlementPos.row) ** 2 : 0;
+            const db = mySettlementPos ? (b.col - mySettlementPos.col) ** 2 + (b.row - mySettlementPos.row) ** 2 : 0;
+            return da - db;
+          })[0] ?? null
+      : null;
+    // Backwards-compat alias (used below as humanWonder)
+    const humanWonder = activeWonder;
 
-    // Find enemy settlement as primary target (after 3+ min of game)
-    const humanSettlement = game.allBuildings.find(
-      b => b.playerId !== player.id && b.playerId === 0 &&
-           (b.type as string) === 'SETTLEMENT' && b.isAlive(),
-    );
+    // Nearest enemy settlement — prioritise whoever is closest to us (true multi-faction warfare)
+    const humanSettlement = game.allBuildings
+      .filter(b => b.playerId !== player.id && b.playerId >= 0 && (b.type as string) === 'SETTLEMENT' && b.isAlive())
+      .sort((a, b) => {
+        const da = mySettlementPos ? (a.col - mySettlementPos.col) ** 2 + (a.row - mySettlementPos.row) ** 2 : 0;
+        const db = mySettlementPos ? (b.col - mySettlementPos.col) ** 2 + (b.row - mySettlementPos.row) ** 2 : 0;
+        return da - db;
+      })[0] ?? null;
 
     // Flanking: compute perpendicular offset from AI base → enemy settlement
     // Second half of the attack force approaches from a 90° angle (+8 tile offset)
-    const mySettlement = game.allBuildings.find(b => b.playerId === player.id && b.type === BuildingType.SETTLEMENT);
+    const mySettlement = mySettlementPos;
     let flankDC = 0, flankDR = 0;
     if (humanSettlement && mySettlement) {
       const dx = humanSettlement.col - mySettlement.col;

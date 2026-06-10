@@ -80,6 +80,8 @@ export class Building {
   mesh!: THREE.Group;
   private structure!: THREE.Group;
   progressBar!: THREE.Mesh;
+  private _fireMesh: THREE.Mesh | null = null;
+  private _fireT = 0; // flicker timer
 
   constructor(type: BuildingType, def: BuildingDef, playerId: number, col: number, row: number, civColor: number, civType: CivilizationType = CivilizationType.AZTEC) {
     this.id = nextBuildingId++;
@@ -154,6 +156,26 @@ export class Building {
 
   private mat(color: number, rough = 0.9) {
     return new THREE.MeshStandardMaterial({ color, roughness: rough });
+  }
+
+  /** Show/hide the flame effect based on current HP fraction. */
+  private _syncFire() {
+    const pct = this.hp / this.maxHp;
+    if (pct < 0.25 && this.isAlive()) {
+      if (!this._fireMesh) {
+        const fireMat = new THREE.MeshStandardMaterial({
+          color: 0xff4400, emissive: 0xff2200, emissiveIntensity: 2.0,
+          transparent: true, opacity: 0.85,
+        });
+        this._fireMesh = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.45, 6), fireMat);
+        this._fireMesh.position.set(0.2, 2.2, 0.2);
+        this._fireMesh.renderOrder = 12;
+        this.mesh.add(this._fireMesh);
+      }
+      this._fireMesh.visible = true;
+    } else if (this._fireMesh) {
+      this._fireMesh.visible = false;
+    }
   }
 
   private box(mat: THREE.Material, w: number, h: number, d: number, x: number, y: number, z: number, cast = true) {
@@ -433,6 +455,7 @@ export class Building {
   repairBy(amount: number) {
     if (this.state === BuildingState.DESTROYED || this.hp >= this.maxHp) return;
     this.hp = Math.min(this.maxHp, this.hp + amount);
+    this._syncFire();
     const pct = this.hp / this.maxHp;
     this.progressBar.visible = pct < 1;
     if (pct < 1) {
@@ -467,5 +490,16 @@ export class Building {
     } else if (this.hp < this.maxHp * 0.3) {
       this.state = BuildingState.DAMAGED;
     }
+    this._syncFire();
+  }
+
+  /** Animate the fire flicker — call once per frame from the renderer or Game.ts. */
+  tickFire(dt: number) {
+    if (!this._fireMesh?.visible) return;
+    this._fireT += dt;
+    const flicker = 0.75 + Math.sin(this._fireT * 18) * 0.25 + Math.sin(this._fireT * 31) * 0.12;
+    this._fireMesh.scale.setScalar(flicker);
+    this._fireMesh.position.y = 2.1 + Math.sin(this._fireT * 11) * 0.1;
+    (this._fireMesh.material as THREE.MeshStandardMaterial).emissiveIntensity = 1.5 + Math.sin(this._fireT * 22) * 0.5;
   }
 }
