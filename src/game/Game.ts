@@ -330,6 +330,7 @@ export class Game {
     }
     this.newlyCapturedBuildings = [];
     this.updateCaptures(dt);
+    this.updateFormations(dt);
 
     // Hero respawn timers
     for (const [playerId, timer] of this._heroRespawnTimers) {
@@ -552,6 +553,29 @@ export class Game {
         if (d < bestBldgDist) { bestBldgDist = d; bestBldg = b; }
       }
       if (bestBldg) unit.attackBuilding(bestBldg);
+    }
+  }
+
+  private _formationTimer = 0;
+
+  /** Close ranks: a unit with 3+ allies within 3 tiles fights in formation. Throttled to ~1 Hz. */
+  private updateFormations(dt: number) {
+    this._formationTimer += dt;
+    if (this._formationTimer < 0.8) return;
+    this._formationTimer = 0;
+
+    const active = this.allUnits.filter(u => u.isAlive() && u.garrisonedIn === null);
+    for (const u of active) {
+      let allies = 0;
+      for (const o of active) {
+        if (o === u || o.playerId !== u.playerId) continue;
+        const dc = u.col - o.col, dr = u.row - o.row;
+        if (dc * dc + dr * dr <= 9) {
+          allies++;
+          if (allies >= 3) break;
+        }
+      }
+      u.inFormation = allies >= 3;
     }
   }
 
