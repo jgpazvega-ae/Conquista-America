@@ -157,6 +157,29 @@ export class AISystem {
     if (!settlement) return;
     const cx = settlement.col, cz = settlement.row;
 
+    // One idle melee unit goes to capture the nearest uncaptured/enemy village
+    const uncapturedVillage = game.allBuildings
+      .filter(b => b.type === BuildingType.VILLAGE && b.isAlive() && b.isComplete() && b.playerId !== player.id)
+      .sort((a, b) => {
+        const da = (a.col - cx) ** 2 + (a.row - cz) ** 2;
+        const db = (b.col - cx) ** 2 + (b.row - cz) ** 2;
+        return da - db;
+      })[0];
+    if (uncapturedVillage) {
+      const capturer = player.aliveUnits.find(
+        u => u.state === UnitState.IDLE && u.garrisonedIn === null &&
+             u.attackRange <= 1.5 && u.captureTarget === null && !u.outOfAmmo,
+      );
+      if (capturer) {
+        capturer.captureTarget = uncapturedVillage;
+        const near = game.map.findWalkableNear(uncapturedVillage.col, uncapturedVillage.row, 2);
+        if (near) {
+          const path = findPath(game.map, capturer.gridPos(), { col: near[0], row: near[1] }, 300);
+          if (path.length > 0) { capturer.path = path; capturer.pathIndex = 0; capturer.state = UnitState.MOVING; }
+        }
+      }
+    }
+
     for (const unit of player.aliveUnits) {
       if (unit.garrisonedIn !== null) continue;
       // Route out-of-ammo ranged units back to settlement to resupply
