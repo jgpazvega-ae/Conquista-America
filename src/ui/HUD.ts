@@ -812,6 +812,11 @@ export class HUD {
       } else {
         status = '✅ Inactivo';
       }
+      const captureLine = building.captureProgress > 0
+        ? `<div class="ht-status" style="color:#ffaa44">🚩 Captura: ${Math.round(building.captureProgress)}%` +
+          `<div style="width:100%;height:3px;background:rgba(255,255,255,0.12);border-radius:2px;margin-top:3px">` +
+          `<div style="width:${building.captureProgress}%;height:100%;background:#ffaa44;border-radius:2px"></div></div></div>`
+        : '';
       const garrisonLine = building.garrisonCapacity > 0 && building.isComplete()
         ? `<div class="ht-status">🏰 Guarnición: ${building.garrison.length}/${building.garrisonCapacity}${building.garrison.length > 0 ? ' · U para desalojar' : ' · clic der. con tropas'}</div>`
         : '';
@@ -821,6 +826,7 @@ export class HUD {
         <div class="ht-hp-wrap"><div class="ht-hp-fill" style="width:${pct}%;background:${hpColor}"></div></div>
         <div class="ht-stats"><span>❤️${building.hp}/${building.maxHp}</span></div>
         <div class="ht-status">${status}</div>
+        ${captureLine}
         ${garrisonLine}`;
     }
 
