@@ -804,6 +804,20 @@ class GameInstance {
       }
     }
 
+    // Diplomatic war declarations (American Conquest: dramatic first-attack announcement)
+    for (const decl of this.game.newWarDeclarations) {
+      if (decl.toPlayerId === this.game.humanPlayerId) {
+        const civNames: Record<string, string> = {
+          AZTEC: 'Los Aztecas', MAYA: 'Los Mayas', INCA: 'Los Incas', CONQUISTADOR: 'Los Conquistadores',
+        };
+        const aggressor = this.game.players[decl.fromPlayerId];
+        const civName = civNames[aggressor?.civType ?? ''] ?? 'El enemigo';
+        this.hud.notify(`⚔️ ¡${civName} te han declarado la guerra!`, 'warning');
+        this.camera.shake(0.5, 0.8);
+        this.audio.playDeath(); // dramatic signal
+      }
+    }
+
     // Village income notifications for the human player
     for (const inc of this.game.villageIncomeEvents) {
       if (inc.playerId === this.game.humanPlayerId) {

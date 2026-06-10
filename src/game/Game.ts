@@ -65,6 +65,7 @@ export class Game {
   newlyPanickedUnits: Unit[] = [];
   newlyGarrisonedUnits: Unit[] = [];
   newlyCapturedBuildings: { building: Building; fromPlayerId: number; toPlayerId: number }[] = [];
+  newWarDeclarations: { fromPlayerId: number; toPlayerId: number }[] = [];
   private _heroRespawnTimers = new Map<number, number>(); // playerId → seconds until respawn
   status: GameStatus = 'PLAYING';
   victoryType: 'MILITARY' | 'ECONOMIC' | 'WONDER' = 'MILITARY';
@@ -371,6 +372,7 @@ export class Game {
       }
     }
     this.newlyCapturedBuildings = [];
+    this.newWarDeclarations = [];
     this.updateCaptures(dt);
     this.updateFormations(dt);
 
@@ -408,6 +410,10 @@ export class Game {
         building.updateProduction(dt);
         building.updateRepair(dt);
         building.tickFire(dt);
+        // Garrison-assisted repair: each garrisoned unit heals building at 3 HP/s
+        if (building.garrison.length > 0 && building.hp < building.maxHp) {
+          building.repairBy(building.garrison.length * 3 * dt);
+        }
         if (building.finishedUnit !== null) {
           this.spawnProducedUnit(building);
         }
@@ -905,7 +911,10 @@ export class Game {
     const storehouses = this.allBuildings.filter(
       b => b.playerId === playerId && b.type === BuildingType.STOREHOUSE && b.isComplete(),
     ).length;
-    return 25 + storehouses * 5;
+    const villages = this.allBuildings.filter(
+      b => b.playerId === playerId && b.type === BuildingType.VILLAGE && b.isAlive(),
+    ).length;
+    return 25 + storehouses * 5 + villages * 5;
   }
 
   applyUpgrade(upgrade: keyof import('./Player').PlayerUpgrades, playerId: number): boolean {
