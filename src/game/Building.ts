@@ -429,6 +429,24 @@ export class Building {
     }
   }
 
+  /** Apply worker-assisted repair: +amount HP and sync the HP bar immediately. */
+  repairBy(amount: number) {
+    if (this.state === BuildingState.DESTROYED || this.hp >= this.maxHp) return;
+    this.hp = Math.min(this.maxHp, this.hp + amount);
+    const pct = this.hp / this.maxHp;
+    this.progressBar.visible = pct < 1;
+    if (pct < 1) {
+      this.progressBar.scale.x = pct;
+      this.progressBar.position.x = (pct - 1) * 0.44;
+      (this.progressBar.material as THREE.MeshBasicMaterial).color.setHex(
+        pct > 0.5 ? 0x55dd44 : pct > 0.25 ? 0xddaa00 : 0xdd2222
+      );
+    }
+    if (this.hp >= this.maxHp * 0.3 && this.state === BuildingState.DAMAGED) {
+      this.state = BuildingState.COMPLETE;
+    }
+  }
+
   takeDamage(amount: number) {
     if (this.state === BuildingState.DESTROYED) return;
     this._timeSinceHit = 0; // reset repair timer on hit

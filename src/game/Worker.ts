@@ -13,6 +13,7 @@ export enum WorkerTask {
   GATHERING_GOLD = 'GATHERING_GOLD',
   GATHERING_STONE = 'GATHERING_STONE',
   RETURNING = 'RETURNING',
+  REPAIRING = 'REPAIRING',
 }
 
 export class Worker {
@@ -31,6 +32,7 @@ export class Worker {
   pathIndex: number = 0;
   carrying: 'food' | 'gold' | 'stone' | null = null;
   carryAmount: number = 0;
+  repairTarget: import('./Building').Building | null = null;
 
   mesh!: THREE.Group;
   private rig!: THREE.Group;
@@ -87,6 +89,7 @@ export class Worker {
 
   setTask(task: WorkerTask, targetCol?: number, targetRow?: number) {
     this.task = task;
+    this.repairTarget = null; // clear any pending repair when taking a new task
     if (targetCol !== undefined && targetRow !== undefined) {
       this.targetCol = targetCol;
       this.targetRow = targetRow;
@@ -109,6 +112,14 @@ export class Worker {
         else this.carrying = 'stone';
         this.updateResourceIndicator();
         this.task = WorkerTask.IDLE;
+      }
+    } else if (this.task === WorkerTask.REPAIRING && this.repairTarget) {
+      const b = this.repairTarget;
+      if (!b.isAlive() || b.hp >= b.maxHp) {
+        this.task = WorkerTask.IDLE;
+        this.repairTarget = null;
+      } else {
+        b.repairBy(15 * dt); // 15 HP/s — ~5× faster than the 3 HP/s auto-repair
       }
     }
 
@@ -150,7 +161,8 @@ export class Worker {
       this.row = target.row;
       this.pathIndex++;
       if (this.pathIndex >= this.path.length) {
-        this.task = WorkerTask.IDLE;
+        // If we had a repair target queued, start repairing now that we've arrived
+        this.task = this.repairTarget?.isAlive() ? WorkerTask.REPAIRING : WorkerTask.IDLE;
       }
     } else {
       this.worldX += (dx / dist) * step;

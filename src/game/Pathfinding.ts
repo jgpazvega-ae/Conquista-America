@@ -1,5 +1,17 @@
 import type { GridPos } from './types';
 import type { GameMap } from './Map';
+import { TerrainType } from './types';
+
+/** Movement cost multiplier per terrain type — mirrors the speed penalty in Unit.ts */
+function terrainMoveCost(map: GameMap, col: number, row: number): number {
+  switch (map.getTile(col, row)?.terrain) {
+    case TerrainType.JUNGLE:   return 1.61; // 1/0.62
+    case TerrainType.MOUNTAIN: return 2.08; // 1/0.48
+    case TerrainType.HIGHLAND: return 1.39; // 1/0.72
+    case TerrainType.DESERT:   return 1.14; // 1/0.88
+    default:                   return 1.0;
+  }
+}
 
 // Binary min-heap for the A* open list — O(log n) instead of O(n) linear scan
 class MinHeap {
@@ -116,7 +128,7 @@ export function findPath(
       if (closed[nk]) continue;
 
       const diag = nc !== current.col && nr !== current.row;
-      const g = current.g + (diag ? 1.414 : 1.0);
+      const g = current.g + (diag ? 1.414 : 1.0) * terrainMoveCost(map, nc, nr);
       let node = nodeGrid.get(nk);
 
       if (!node) {
