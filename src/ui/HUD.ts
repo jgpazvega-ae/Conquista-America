@@ -10,6 +10,7 @@ import type { Renderer } from '../engine/Renderer';
 import { CIV_POWER_DEFS } from '../game/CivPowers';
 import { UnitState, TerrainType } from '../game/types';
 import { CIVILIZATIONS } from '../game/civilizations';
+import { WEATHER_ICONS, WEATHER_NAMES, WEATHER_TIPS } from '../game/WeatherSystem';
 
 function hex(n: number): string {
   return '#' + n.toString(16).padStart(6, '0');
@@ -35,7 +36,8 @@ export class HUD {
   private elFoodRate  = document.getElementById('res-food-rate');
   private elGoldRate  = document.getElementById('res-gold-rate');
   private elStoneRate = document.getElementById('res-stone-rate');
-  private elStatus = document.getElementById('game-status')!;
+  private elStatus  = document.getElementById('game-status')!;
+  private elWeather = document.getElementById('weather-badge');
   private elCivBadge = document.getElementById('civ-badge')!;
   private unitPanel  = document.getElementById('unit-panel')!;
   private elPortrait = document.getElementById('unit-portrait')!;
@@ -147,6 +149,13 @@ export class HUD {
     this.elFood.closest('.res')?.classList.toggle('res-low', player.resources.food < 50);
     this.elGold.closest('.res')?.classList.toggle('res-low', player.resources.gold < 30);
     this.elStone.closest('.res')?.classList.toggle('res-low', player.resources.stone < 30);
+
+    // Weather badge
+    if (this.elWeather) {
+      const w = this.game.weather;
+      this.elWeather.textContent = `${WEATHER_ICONS[w.state]} ${WEATHER_NAMES[w.state]}`;
+      this.elWeather.title = WEATHER_TIPS[w.state] || WEATHER_NAMES[w.state];
+    }
 
     // Treasury (economic victory) progress bar: visible once gold > 150
     if (this.elTreasuryWrap && this.elTreasuryFill) {
