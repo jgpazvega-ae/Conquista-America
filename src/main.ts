@@ -827,6 +827,17 @@ class GameInstance {
       }
     }
 
+    // Civilization elimination announcements (American Conquest: dramatic defeat message)
+    const civNames: Record<string, string> = {
+      AZTEC: 'Los Aztecas', MAYA: 'Los Mayas', INCA: 'Los Incas', CONQUISTADOR: 'Los Conquistadores',
+    };
+    for (const p of this.game.newlyEliminatedPlayers) {
+      const name = civNames[p.civType] ?? 'El enemigo';
+      this.hud.notify(`⚰️ ¡${name} han sido eliminados de la batalla!`, 'success');
+      this.camera.shake(0.6, 1.0);
+      this.audio.playVictory();
+    }
+
     // Village income notifications for the human player
     for (const inc of this.game.villageIncomeEvents) {
       if (inc.playerId === this.game.humanPlayerId) {
