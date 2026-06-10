@@ -5,6 +5,7 @@ import type { UnitDef } from './civilizations';
 import { getUnitDef } from './civilizations';
 import { TILE_SIZE } from './constants';
 import type { GameMap } from './Map';
+import { FORMATIONS } from './UnitBalancing';
 
 let nextId = 1;
 
@@ -120,6 +121,11 @@ export class Unit {
   // Volley fire: V-key sets this to bypass attackTimer once for a burst shot
   volleyReady = false;
 
+  // Formation order: 'LOOSE' | 'PHALANX' | 'WEDGE' | null
+  formation: string | null = null;
+  private _defSpeed = 0;           // canonical speed without formation modifier
+  private _formationSpeedMul = 1.0;
+
   // Hero unit
   isHero   = false;
   heroName = '';
@@ -139,6 +145,7 @@ export class Unit {
     this.attack            = s.attack;
     this.defense           = s.defense;
     this.speed             = s.speed;
+    this._defSpeed         = s.speed;
     this.attackRange       = s.attackRange;
     this.sight             = s.sight;
     this.attackCooldown    = s.attackCooldown;
@@ -956,6 +963,14 @@ export class Unit {
     this.state       = UnitState.ATTACK_MOVE;
   }
 
+  /** Set tactical formation. Adjusts unit speed; attack/defense bonuses applied in CombatSystem. */
+  setFormation(name: string | null) {
+    this.formation = (name && FORMATIONS[name]) ? name : null;
+    const f = this.formation ? FORMATIONS[this.formation] : null;
+    this._formationSpeedMul = f ? Math.max(0.2, 1 + f.bonusSpeed) : 1.0;
+    this.speed = Math.max(0.5, this._defSpeed * this._formationSpeedMul);
+  }
+
   /** Award XP and level up if threshold reached. */
   gainXP(amount: number) {
     if (this.level >= 3) return;
@@ -994,6 +1009,7 @@ export class Unit {
     this.attack   = Math.round(this.attack   * 1.35);
     this.defense  = Math.round(this.defense  * 1.5);
     this.speed   += 0.2;
+    this._defSpeed = this.speed; // sync canonical speed with hero boost
     // Distinctive double gold ring
     const matOuter = new THREE.MeshBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0.90, depthTest: false });
     const matInner = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.50, depthTest: false });
