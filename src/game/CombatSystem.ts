@@ -68,8 +68,10 @@ export class CombatSystem {
           continue;
         }
 
+        // Out-of-ammo ranged units fight as weak melee
+        const effRange = unit.outOfAmmo ? 1.5 : unit.attackRange;
         const dist = unit.distanceTo(target);
-        if (dist > unit.attackRange + 1.5) {
+        if (dist > effRange + 1.5) {
           if (isHold) {
             // HOLD units don't chase — drop the target and wait
             unit.attackTarget = null;
@@ -84,9 +86,14 @@ export class CombatSystem {
           continue;
         }
 
-        if (unit.attackTimer <= 0) {
+        // Volley fire (V key) bypasses the attack timer for a burst shot
+        const isVolley = unit.volleyReady && unit.ammo > 0;
+        if (isVolley) unit.volleyReady = false;
+
+        if (isVolley || unit.attackTimer <= 0) {
           const attackerTile = map.getTile(unit.col, unit.row);
-          let dmg = unit.attack + Math.floor(Math.random() * 6) - 3 + terrainAttackBonus(attackerTile?.terrain);
+          const baseAtk = unit.outOfAmmo ? Math.max(4, Math.round(unit.def.stats.attack * 0.4)) : unit.attack;
+          let dmg = baseAtk + Math.floor(Math.random() * 6) - 3 + terrainAttackBonus(attackerTile?.terrain);
           const multiplier = getDamageMultiplier(unit.type, target.type);
           dmg = Math.round(dmg * multiplier);
           const tile = map.getTile(target.col, target.row);
@@ -111,10 +118,15 @@ export class CombatSystem {
           if (unit.berserkTimer > 0) dmg = Math.round(dmg * 1.25);
           // Leadership aura: +5% damage when player has any level-3 unit alive
           if (playersWithLeader.has(unit.playerId)) dmg = Math.round(dmg * 1.05);
+          // Volley: synchronized burst for 2.5× damage, longer reload
+          if (isVolley) dmg = Math.round(dmg * 2.5);
 
           const actual = target.takeDamage(dmg);
-          unit.attackTimer = unit.attackCooldown;
-          let isCrit = multiplier >= 1.5 || isFlanking || isCharge || unit.berserkTimer > 0;
+          unit.attackTimer = unit.attackCooldown * (isVolley ? 1.5 : 1.0);
+          // Ammo consumption (volley costs 2 rounds)
+          if (unit.ammo > 0) unit.ammo = Math.max(0, unit.ammo - (isVolley ? 2 : 1));
+
+          let isCrit = multiplier >= 1.5 || isFlanking || isCharge || unit.berserkTimer > 0 || isVolley;
           this.events.push({ attacker: unit, target, damage: actual, worldX: target.worldX, worldZ: target.worldZ, critical: isCrit });
 
           // Kill streak tracking: 3 kills in a row without taking damage → 12s berserk
@@ -161,10 +173,12 @@ export class CombatSystem {
 
   private tryAutoAggro(unit: Unit, allUnits: Unit[], map: GameMap) {
     if (unit.panicked) return; // routed troops don't fight back
+    // Out-of-ammo ranged: only scan at melee range
+    const baseRange = unit.outOfAmmo ? 1.5 : unit.attackRange;
     // ATTACK_MOVE: full sight range; IDLE: 1.2x attack range; HOLD: attack range only (no movement)
     const scanRange = unit.state === UnitState.ATTACK_MOVE
-      ? unit.sight
-      : unit.attackRange * (unit.state === UnitState.HOLD ? 1.0 : 1.2);
+      ? (unit.outOfAmmo ? 2.5 : unit.sight)
+      : baseRange * (unit.state === UnitState.HOLD ? 1.0 : 1.2);
     let bestScore = Infinity;
     let best: Unit | null = null;
 
