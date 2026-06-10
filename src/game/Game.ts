@@ -58,6 +58,7 @@ export class Game {
   newlyRetreatingUnits: Unit[] = [];
   newlyRegeneratedNodes: import('./ResourceNode').ResourceNode[] = [];
   newlyRespawnedHeroes: Unit[] = [];
+  newlyPanickedUnits: Unit[] = [];
   private _heroRespawnTimers = new Map<number, number>(); // playerId → seconds until respawn
   status: GameStatus = 'PLAYING';
   victoryType: 'MILITARY' | 'ECONOMIC' | 'WONDER' = 'MILITARY';
@@ -297,6 +298,7 @@ export class Game {
     this.newlyRetreatingUnits = [];
     this.newlyRegeneratedNodes = [];
     this.newlyRespawnedHeroes = [];
+    this.newlyPanickedUnits = [];
 
     // Hero respawn timers
     for (const [playerId, timer] of this._heroRespawnTimers) {
@@ -355,6 +357,55 @@ export class Game {
     for (const evt of this.damageEvents) {
       if (!evt.target.isAlive() && evt.attacker) {
         this.killsByPlayer.set(evt.attacker.playerId, (this.killsByPlayer.get(evt.attacker.playerId) ?? 0) + 1);
+      }
+    }
+
+    // Morale shock: allies near a fallen comrade lose morale (hero deaths hit harder)
+    for (const evt of this.damageEvents) {
+      if (evt.target.isAlive()) continue;
+      const dead   = evt.target;
+      const radius = dead.isHero ? 10 : 6;
+      const loss   = dead.isHero ? 25 : 12;
+      for (const ally of this.allUnits) {
+        if (!ally.isAlive() || ally.playerId !== dead.playerId || ally === dead) continue;
+        const d = Math.sqrt((ally.col - dead.col) ** 2 + (ally.row - dead.row) ** 2);
+        if (d <= radius) ally.loseMorale(loss);
+      }
+    }
+
+    // Panic check: morale ≤ 25 breaks the unit unless its hero stands nearby
+    const heroesByPlayer = new Map<number, Unit>();
+    for (const u of this.allUnits) {
+      if (u.isHero && u.isAlive()) heroesByPlayer.set(u.playerId, u);
+    }
+    for (const u of this.allUnits) {
+      if (!u.isAlive() || u.isHero || u.panicked || u.morale > 25) continue;
+      const hero = heroesByPlayer.get(u.playerId);
+      if (hero && u.distanceTo(hero) <= 8) {
+        u.morale = 35; // the hero steadies the line
+        continue;
+      }
+      u.panicked = true;
+      u.attackTarget = null;
+      u.attackBuildingTarget = null;
+      this.newlyPanickedUnits.push(u);
+      // Rout: flee toward the nearest friendly building
+      const refuge = this.allBuildings
+        .filter(b => b.playerId === u.playerId && b.isAlive())
+        .sort((a, b) =>
+          ((u.col - a.col) ** 2 + (u.row - a.row) ** 2) -
+          ((u.col - b.col) ** 2 + (u.row - b.row) ** 2),
+        )[0];
+      if (refuge) {
+        const near = this.map.findWalkableNear(refuge.col, refuge.row, 3);
+        if (near) {
+          const path = findPath(this.map, u.gridPos(), { col: near[0], row: near[1] }, 300);
+          if (path.length > 0) {
+            u.path      = path;
+            u.pathIndex = 0;
+            u.state     = UnitState.MOVING;
+          }
+        }
       }
     }
 
