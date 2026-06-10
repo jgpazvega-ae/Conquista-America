@@ -78,6 +78,7 @@ export class Unit {
   _damageCooldown  = 0;     // seconds since last hit; healing begins when this reaches 0
   _idleHealTimer   = 0;     // accumulates while healing
   _nearSettlement  = false; // set each frame by Game.ts; boosts idle heal rate
+  _nearSupplyDepot = false; // true when within 4 tiles of a friendly complete Storehouse
   wantsRetreat     = false; // set by takeDamage when HP < 20%; cleared by Game
 
   // Status effects (damage over time)
@@ -871,8 +872,8 @@ export class Unit {
       // While ATTACKING: chargeReady persists until consumed in CombatSystem
     }
 
-    // Ammo resupply: 1 round per 1.5 s when standing near own settlement
-    if (this.ammo >= 0 && this.ammo < this.maxAmmo && this._nearSettlement) {
+    // Ammo resupply: 1 round per 1.5 s when near own settlement OR a Storehouse supply depot
+    if (this.ammo >= 0 && this.ammo < this.maxAmmo && (this._nearSettlement || this._nearSupplyDepot)) {
       this._ammoRechargeTimer += dt;
       if (this._ammoRechargeTimer >= 1.5) {
         this._ammoRechargeTimer -= 1.5;

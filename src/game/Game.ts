@@ -277,19 +277,30 @@ export class Game {
 
     this.gameTime += dt;
 
-    // Precompute settlement positions per player for proximity healing
+    // Precompute settlement and storehouse positions per player for proximity effects
     const settlementsByPlayer = new Map<number, { col: number; row: number }[]>();
+    const storehousesByPlayer = new Map<number, { col: number; row: number }[]>();
     for (const b of this.allBuildings) {
-      if (b.type === BuildingType.SETTLEMENT && b.isAlive() && b.isComplete()) {
+      if (!b.isAlive() || !b.isComplete()) continue;
+      if (b.type === BuildingType.SETTLEMENT) {
         if (!settlementsByPlayer.has(b.playerId)) settlementsByPlayer.set(b.playerId, []);
         settlementsByPlayer.get(b.playerId)!.push({ col: b.col, row: b.row });
+      }
+      if (b.type === BuildingType.STOREHOUSE) {
+        if (!storehousesByPlayer.has(b.playerId)) storehousesByPlayer.set(b.playerId, []);
+        storehousesByPlayer.get(b.playerId)!.push({ col: b.col, row: b.row });
       }
     }
 
     for (const unit of this.allUnits) {
-      // Check proximity to own settlement (within 4 tiles) for boosted healing
+      // Check proximity to own settlement (within 4 tiles) for boosted healing & morale
       const settlements = settlementsByPlayer.get(unit.playerId) ?? [];
       unit._nearSettlement = settlements.some(
+        s => Math.abs(unit.col - s.col) <= 4 && Math.abs(unit.row - s.row) <= 4,
+      );
+      // Storehouses act as field supply depots — within 4 tiles replenishes ammo
+      const storehouses = storehousesByPlayer.get(unit.playerId) ?? [];
+      unit._nearSupplyDepot = storehouses.some(
         s => Math.abs(unit.col - s.col) <= 4 && Math.abs(unit.row - s.row) <= 4,
       );
       unit.update(dt, this.map);
