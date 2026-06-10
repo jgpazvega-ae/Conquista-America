@@ -93,6 +93,8 @@ export class CombatSystem {
           dmg = Math.max(1, dmg - terrainDefenseBonus(tile?.terrain));
           // Hold position: +2 defense bonus for targets holding their ground
           if (target.state === UnitState.HOLD) dmg = Math.max(1, dmg - 2);
+          // Close ranks: formation fighters shield each other
+          if (target.inFormation) dmg = Math.max(1, dmg - 2);
           // Routed targets are cut down more easily
           if (target.panicked) dmg = Math.round(dmg * 1.25);
           // Flanking bonus: +25% damage when 2 or more allies attack the same target

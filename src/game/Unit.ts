@@ -108,6 +108,10 @@ export class Unit {
   // Formation march: group moves are capped to the slowest member's speed
   formationSpeedCap: number | null = null;
 
+  // Close ranks: 3+ allies within 3 tiles → +2 defense, faster morale recovery.
+  // Recomputed periodically by Game.updateFormations.
+  inFormation = false;
+
   // Hero unit
   isHero   = false;
   heroName = '';
@@ -769,7 +773,9 @@ export class Unit {
     if (this._moraleCooldown > 0) {
       this._moraleCooldown -= dt;
     } else if (this.morale < 100) {
-      this.morale = Math.min(100, this.morale + (this._nearSettlement ? 9 : 4) * dt);
+      let regen = this._nearSettlement ? 9 : 4;
+      if (this.inFormation) regen *= 1.5; // close ranks steady the nerves
+      this.morale = Math.min(100, this.morale + regen * dt);
     }
     if (this.panicked && this.morale >= 50) this.panicked = false;
 
