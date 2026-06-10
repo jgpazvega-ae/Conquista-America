@@ -146,7 +146,9 @@ export class HUD {
     }
 
     // Low resource warnings — pulse the resource chip red
-    this.elFood.closest('.res')?.classList.toggle('res-low', player.resources.food < 50);
+    const foodEl = this.elFood.closest('.res');
+    foodEl?.classList.toggle('res-low', player.resources.food < 50 && player.resources.food >= 10);
+    foodEl?.classList.toggle('res-critical', player.resources.food < 10);
     this.elGold.closest('.res')?.classList.toggle('res-low', player.resources.gold < 30);
     this.elStone.closest('.res')?.classList.toggle('res-low', player.resources.stone < 30);
 
