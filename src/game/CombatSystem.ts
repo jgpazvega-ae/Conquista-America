@@ -3,6 +3,7 @@ import type { Unit } from './Unit';
 import type { GameMap } from './Map';
 import { findPath } from './Pathfinding';
 import { getDamageMultiplier, FORMATIONS } from './UnitBalancing';
+import type { WeatherSystem } from './WeatherSystem';
 
 const SPLASH_RADIUS = 1.8;  // tiles — radius of cannon splash
 const SPLASH_DAMAGE_RATIO = 0.55; // fraction of base damage dealt to splash targets
@@ -36,7 +37,7 @@ export interface DamageEvent {
 export class CombatSystem {
   private events: DamageEvent[] = [];
 
-  update(allUnits: Unit[], map: GameMap) {
+  update(allUnits: Unit[], map: GameMap, weather?: WeatherSystem) {
     this.events = [];
 
     // Build a map of target id → number of allied attackers for flanking bonus
@@ -128,6 +129,8 @@ export class CombatSystem {
           if (playersWithLeader.has(unit.playerId)) dmg = Math.round(dmg * 1.05);
           // Volley: synchronized burst for 2.5× damage, longer reload
           if (isVolley) dmg = Math.round(dmg * 2.5);
+          // Weather: rain/storm reduces gunpowder & all-ranged effectiveness
+          if (weather) dmg = Math.max(1, Math.round(dmg * weather.damageMultiplier(unit.type)));
 
           const actual = target.takeDamage(dmg);
           unit.attackTimer = unit.attackCooldown * (isVolley ? 1.5 : 1.0);
@@ -148,14 +151,15 @@ export class CombatSystem {
 
           // Cannon: splash damage + burning status effect (30% chance on direct hit)
           if (unit.type === UnitType.CANNON) {
-            if (Math.random() < 0.30 && target.isAlive()) target.burning = Math.max(target.burning, 4);
+            const burnMult = weather ? weather.burnChanceMult : 1.0;
+            if (Math.random() < 0.30 * burnMult && target.isAlive()) target.burning = Math.max(target.burning, 4);
             const splashDmg = Math.max(1, Math.round(dmg * SPLASH_DAMAGE_RATIO));
             for (const other of allUnits) {
               if (!other.isAlive() || other === target) continue;
               const d = Math.sqrt((other.col - target.col) ** 2 + (other.row - target.row) ** 2);
               if (d <= SPLASH_RADIUS) {
                 const splashActual = other.takeDamage(splashDmg);
-                if (Math.random() < 0.15) other.burning = Math.max(other.burning, 3);
+                if (Math.random() < 0.15 * burnMult) other.burning = Math.max(other.burning, 3);
                 this.events.push({ attacker: unit, target: other, damage: splashActual, worldX: other.worldX, worldZ: other.worldZ, critical: false });
               }
             }

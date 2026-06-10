@@ -19,6 +19,8 @@ import { CIV_COLORS, TILE_SIZE, WONDER_NAMES } from './constants';
 import type { DamageEvent } from './CombatSystem';
 import { BuildingType } from './buildings';
 import { BUILDING_DEFS } from './buildingDefs';
+import { WeatherSystem } from './WeatherSystem';
+import type { WeatherState } from './WeatherSystem';
 
 // Positions aligned to the real-geography map:
 // Mexico (top-center), Yucatan (top-right), Peru/Andes (mid-left), Caribbean (mid-right)
@@ -42,6 +44,8 @@ export class Game {
   private combat        = new CombatSystem();
   private aiSystem      = new AISystem();
   private resourceSys   = new ResourceSystem();
+  readonly weather      = new WeatherSystem();
+  weatherChangeEvent: WeatherState | null = null; // set when weather changes this frame
   private economy       = new EconomyManager();
   getEconomyStats(playerId: number) { return this.economy.getStats(playerId); }
   private diplomacy     = new DiplomacyManager();
@@ -383,7 +387,8 @@ export class Game {
       if (node.justRegenerated) this.newlyRegeneratedNodes.push(node);
     }
 
-    this.damageEvents = this.combat.update(this.allUnits, this.map);
+    this.weatherChangeEvent = this.weather.update(dt);
+    this.damageEvents = this.combat.update(this.allUnits, this.map, this.weather);
 
     // Track kills per player from this frame's damage events
     for (const evt of this.damageEvents) {

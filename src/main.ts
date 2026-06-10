@@ -855,6 +855,20 @@ class GameInstance {
       this._lastSettlementHp = humanSettlement.hp;
     }
 
+    // Weather change notification
+    if (this.game.weatherChangeEvent) {
+      const icons: Record<string, string> = { CLEAR: '☀️', RAIN: '🌧️', STORM: '⛈️', DROUGHT: '🏜️' };
+      const tips: Record<string, string> = {
+        CLEAR:   'El tiempo despeja. Sin modificadores.',
+        RAIN:    'Lluvia — arcabuceros y cañones al 50% de daño. Incendios apagados.',
+        STORM:   'Tormenta — todas las unidades a distancia al 60% de daño.',
+        DROUGHT: 'Sequía — riesgo de incendio ×2. ¡Cuidado con los cañones!',
+      };
+      const w = this.game.weatherChangeEvent;
+      this.hud.notify(`${icons[w]} ${tips[w]}`, w === 'CLEAR' ? 'info' : 'warning');
+      this.hintOnce('weather', '💡 El clima afecta el combate: la lluvia inutiliza casi la pólvora, la sequía dobla el riesgo de incendio.');
+    }
+
     // Random events
     for (const msg of this.game.pendingEventMessages) {
       this.hud.notify(msg, 'info');
