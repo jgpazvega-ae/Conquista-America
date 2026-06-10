@@ -237,6 +237,13 @@ export class InputHandler {
           unit.state = UnitState.IDLE;
         }
       });
+      // Formation march: the whole group keeps pace with its slowest member
+      if (moved > 1) {
+        const minSpeed = Math.min(...myUnits.map(u => u.speed));
+        for (const u of myUnits) {
+          if (u.state === UnitState.MOVING) u.formationSpeedCap = minSpeed;
+        }
+      }
       // Show move marker at centroid of ordered destinations
       if (moved > 0) {
         this.renderer.showMoveMarker(sumX / moved, sumZ / moved);

@@ -105,6 +105,9 @@ export class Unit {
   // Capture: enemy building this melee unit is seizing
   captureTarget: import('./Building').Building | null = null;
 
+  // Formation march: group moves are capped to the slowest member's speed
+  formationSpeedCap: number | null = null;
+
   // Hero unit
   isHero   = false;
   heroName = '';
@@ -675,6 +678,7 @@ export class Unit {
     this.attackBuildingTarget = null;
     this.garrisonTarget       = null;
     this.captureTarget        = null;
+    this.formationSpeedCap    = null;
     this.patrolA = null; this.patrolB = null;
   }
 
@@ -692,6 +696,7 @@ export class Unit {
     this.attackBuildingTarget = null;
     this.garrisonTarget       = null;
     this.captureTarget        = null;
+    this.formationSpeedCap    = null;
     this.state                = UnitState.ATTACKING;
     this.attackAnim           = 1;
   }
@@ -862,6 +867,7 @@ export class Unit {
   private updateMovement(dt: number, map: GameMap) {
     if (this.pathIndex >= this.path.length) {
       this.state = UnitState.IDLE;
+      this.formationSpeedCap = null;
       return;
     }
 
@@ -881,13 +887,17 @@ export class Unit {
       case TerrainType.HIGHLAND: terrainMult = 0.72; break;
       case TerrainType.DESERT:   terrainMult = 0.88; break;
     }
-    const step = this.speed * TILE_SIZE * dt * terrainMult;
+    const effSpeed = this.formationSpeedCap !== null ? Math.min(this.speed, this.formationSpeedCap) : this.speed;
+    const step = effSpeed * TILE_SIZE * dt * terrainMult;
 
     if (dist <= step) {
       this.worldX = tx; this.worldZ = tz;
       this.col = target.col; this.row = target.row;
       this.pathIndex++;
-      if (this.pathIndex >= this.path.length) this.state = UnitState.IDLE;
+      if (this.pathIndex >= this.path.length) {
+        this.state = UnitState.IDLE;
+        this.formationSpeedCap = null;
+      }
     } else {
       this.worldX += (dx / dist) * step;
       this.worldZ += (dz / dist) * step;
