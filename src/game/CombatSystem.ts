@@ -18,9 +18,15 @@ function terrainDefenseBonus(terrain: TerrainType | undefined): number {
   }
 }
 
-// Ambush: attacking from jungle cover grants a hidden-strike bonus
+// Terrain attack bonuses: high ground, cover, and exposure
 function terrainAttackBonus(terrain: TerrainType | undefined): number {
-  return terrain === TerrainType.JUNGLE ? 4 : 0;
+  switch (terrain) {
+    case TerrainType.JUNGLE:   return 4;   // ambush from dense cover
+    case TerrainType.HIGHLAND: return 3;   // high-ground advantage
+    case TerrainType.MOUNTAIN: return 2;   // firing downhill
+    case TerrainType.DESERT:   return -2;  // exposed, blinded by glare
+    default:                   return 0;
+  }
 }
 
 export interface DamageEvent {
@@ -37,7 +43,7 @@ export interface DamageEvent {
 export class CombatSystem {
   private events: DamageEvent[] = [];
 
-  update(allUnits: Unit[], map: GameMap, weather?: WeatherSystem) {
+  update(allUnits: Unit[], map: GameMap, weather?: WeatherSystem, isNight?: boolean) {
     this.events = [];
 
     // Build a map of target id → number of allied attackers for flanking bonus
@@ -133,6 +139,8 @@ export class CombatSystem {
           if (isVolley) dmg = Math.round(dmg * 2.5);
           // Weather: rain/storm reduces gunpowder & all-ranged effectiveness
           if (weather) dmg = Math.max(1, Math.round(dmg * weather.damageMultiplier(unit.type)));
+          // Night: +15% damage on both sides — darkness breeds surprise and chaos
+          if (isNight) dmg = Math.round(dmg * 1.15);
 
           const actual = target.takeDamage(dmg);
           unit.attackTimer = unit.attackCooldown * (isVolley ? 1.5 : 1.0);
