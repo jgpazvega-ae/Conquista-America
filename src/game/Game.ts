@@ -68,7 +68,9 @@ export class Game {
   newWarDeclarations: { fromPlayerId: number; toPlayerId: number }[] = [];
   newlyLeveledUpUnits: Unit[] = [];
   newlyEliminatedPlayers: Player[] = [];
+  newlyVisibleEnemyHeroes: Unit[] = [];
   private _hadSettlement = new Set<number>(); // track which players ever had a settlement
+  private _visibleEnemyHeroIds = new Set<number>(); // enemy hero ids currently visible to human
   private _heroRespawnTimers = new Map<number, number>(); // playerId → seconds until respawn
   status: GameStatus = 'PLAYING';
   victoryType: 'MILITARY' | 'ECONOMIC' | 'WONDER' = 'MILITARY';
@@ -350,6 +352,7 @@ export class Game {
     this.newlyGarrisonedUnits = [];
     this.newlyLeveledUpUnits = [];
     this.newlyEliminatedPlayers = [];
+    this.newlyVisibleEnemyHeroes = [];
 
     // Collect units that leveled up this frame (justLeveledUp reset below)
     for (const u of this.allUnits) {
@@ -365,6 +368,24 @@ export class Game {
       } else if (this._hadSettlement.has(p.id) && !this.newlyEliminatedPlayers.some(e => e.id === p.id)) {
         this._hadSettlement.delete(p.id);
         this.newlyEliminatedPlayers.push(p);
+      }
+    }
+
+    // Enemy hero detection: notify human when an enemy hero enters their field of view
+    {
+      const humanFog = this.fog.getFog(this.humanPlayerId);
+      if (humanFog) {
+        const nowVisible = new Set<number>();
+        for (const u of this.allUnits) {
+          if (!u.isHero || !u.isAlive() || u.playerId === this.humanPlayerId) continue;
+          if (humanFog.canSeeUnit(u, this.humanPlayerId)) {
+            nowVisible.add(u.id);
+            if (!this._visibleEnemyHeroIds.has(u.id)) {
+              this.newlyVisibleEnemyHeroes.push(u);
+            }
+          }
+        }
+        this._visibleEnemyHeroIds = nowVisible;
       }
     }
 
@@ -499,6 +520,15 @@ export class Game {
     if (this.stormTimer > 0) {
       for (const u of this.allUnits) {
         if (u.isAlive() && !u.isHero) u.loseMorale(0.5 * dt);
+      }
+    }
+
+    // Starvation: food < 10 → troops are hungry, morale breaks (AC mechanic: supply lines matter)
+    for (const p of this.players) {
+      if (p.resources.food < 10) {
+        for (const u of p.aliveUnits) {
+          if (!u.isHero) u.loseMorale(1.5 * dt);
+        }
       }
     }
 

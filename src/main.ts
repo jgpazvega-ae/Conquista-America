@@ -143,6 +143,7 @@ class GameInstance {
   private _totalResourcesSpent = 0; // food+gold+stone combined
   private _treasuryWarned75 = false; // notified player at 75% of economic victory
   private _buildingSmokeTimers = new Map<number, number>(); // building.id → seconds since last puff
+  private _starvWarnTimer = 0; // throttle starvation notifications (30s cooldown)
   private _statusParticleTimers = new Map<number, number>(); // unit.id → time since last status particle
   private _wasNight = false;
   private _wasStorm = false;
@@ -463,6 +464,7 @@ class GameInstance {
 
     this.updateFpsCounter(rawDt);
     if (this._tradeCooldown > 0) this._tradeCooldown = Math.max(0, this._tradeCooldown - rawDt);
+    if (this._starvWarnTimer > 0) this._starvWarnTimer = Math.max(0, this._starvWarnTimer - rawDt);
     this.game.update(dt);
 
     // Register any units produced this frame
@@ -836,6 +838,18 @@ class GameInstance {
       this.hud.notify(`⚰️ ¡${name} han sido eliminados de la batalla!`, 'success');
       this.camera.shake(0.6, 1.0);
       this.audio.playVictory();
+    }
+
+    // Enemy hero spotted: high-priority alert
+    for (const hero of this.game.newlyVisibleEnemyHeroes) {
+      this.hud.notify(`👁️ ¡HÉROE ENEMIGO AVISTADO! — ${hero.heroName ?? hero.type}`, 'warning');
+      this.camera.shake(0.4, 0.7);
+    }
+
+    // Starvation warning: throttled to avoid spam
+    if (this.game.humanPlayer.resources.food < 10 && this._starvWarnTimer <= 0) {
+      this.hud.notify('🍂 ¡HAMBRE! Las tropas pierden moral — construye un Almacén o entrena menos unidades', 'warning');
+      this._starvWarnTimer = 30;
     }
 
     // Village income notifications for the human player
