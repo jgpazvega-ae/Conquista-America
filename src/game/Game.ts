@@ -66,6 +66,7 @@ export class Game {
   newlyGarrisonedUnits: Unit[] = [];
   newlyCapturedBuildings: { building: Building; fromPlayerId: number; toPlayerId: number }[] = [];
   newWarDeclarations: { fromPlayerId: number; toPlayerId: number }[] = [];
+  newlyLeveledUpUnits: Unit[] = [];
   private _heroRespawnTimers = new Map<number, number>(); // playerId → seconds until respawn
   status: GameStatus = 'PLAYING';
   victoryType: 'MILITARY' | 'ECONOMIC' | 'WONDER' = 'MILITARY';
@@ -345,6 +346,12 @@ export class Game {
     this.newlyRespawnedHeroes = [];
     this.newlyPanickedUnits = [];
     this.newlyGarrisonedUnits = [];
+    this.newlyLeveledUpUnits = [];
+
+    // Collect units that leveled up this frame (justLeveledUp reset below)
+    for (const u of this.allUnits) {
+      if (u.justLeveledUp) { this.newlyLeveledUpUnits.push(u); u.justLeveledUp = false; }
+    }
 
     // Garrison: units ordered into a building enter when they get close
     for (const u of this.allUnits) {
@@ -467,6 +474,13 @@ export class Game {
       if (!target?.isAlive() || target.isHero) continue;
       const drain = 4 * dt * (count - 2);
       if (drain >= 0.05) target.loseMorale(drain);
+    }
+
+    // Storm morale drain: tropical storms demoralize troops (American Conquest mechanic)
+    if (this.stormTimer > 0) {
+      for (const u of this.allUnits) {
+        if (u.isAlive() && !u.isHero) u.loseMorale(0.5 * dt);
+      }
     }
 
     // Panic check: morale ≤ 25 breaks the unit unless its hero stands nearby
