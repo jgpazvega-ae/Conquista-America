@@ -146,6 +146,14 @@ class GameInstance {
   private _wasNight = false;
   private _wasStorm = false;
   private _berserkUnits = new Set<number>(); // unit ids currently in berserk
+  private _hintsShown = new Set<string>(); // one-time contextual tutorial hints
+
+  /** Show a tutorial hint at most once per match. */
+  private hintOnce(key: string, msg: string) {
+    if (this._hintsShown.has(key)) return;
+    this._hintsShown.add(key);
+    this.hud.notify(msg, 'info');
+  }
 
   constructor(civ: CivilizationType, saveSystem: SaveSystem, difficulty: Difficulty = 'normal') {
     this.civ        = civ;
@@ -791,6 +799,7 @@ class GameInstance {
     if (humanGarrisons.length > 0) {
       this.hud.notify(`🏰 ${humanGarrisons.length} unidad${humanGarrisons.length > 1 ? 'es' : ''} en guarnición`, 'success');
       this.audio.playBuild();
+      this.hintOnce('garrison', '💡 Las unidades a distancia disparan desde dentro con +2 de alcance. Un edificio guarnecido no puede ser capturado.');
     }
 
     // Morale breaks: warn when own troops rout; celebrate when the enemy flees
@@ -803,6 +812,7 @@ class GameInstance {
           : '😱 ¡Una unidad huye despavorida! Moral rota',
         'warning',
       );
+      this.hintOnce('morale', '💡 La moral cae con las bajas cercanas. Mantén a tus tropas agrupadas (⚔️FILA) o junto al héroe para sostener la línea.');
     }
     const enemyPanics = this.game.newlyPanickedUnits.length - humanPanics.length;
     if (enemyPanics >= 3) {
@@ -851,7 +861,15 @@ class GameInstance {
       this.audio.playBuild(); // light chime for events
     }
 
-    this.hud.update(this.input.getSelectedUnits());
+    const selectedNow = this.input.getSelectedUnits();
+    if (selectedNow.length >= 4) {
+      this.hintOnce('formation', '💡 Filas cerradas: 3+ aliados a 3 casillas dan +2 defensa y moral un 50% más rápida (insignia ⚔️FILA).');
+    }
+    if (this.game.humanPlayer.aliveUnits.some(u => u.attackBuildingTarget && u.attackRange <= 1.5)) {
+      this.hintOnce('capture', '💡 ¿Sabías? Con Ctrl+clic derecho tus tropas cuerpo a cuerpo CAPTURAN el edificio intacto en vez de destruirlo.');
+    }
+
+    this.hud.update(selectedNow);
     this.renderer.render();
 
     // End game detection
