@@ -1271,7 +1271,9 @@ class GameInstance {
           if (path.length > 0) { u.moveTo(path); n++; }
         }
         if (n > 0) {
-          this.hud.notify(`🏃 ${n} unidad${n > 1 ? 'es' : ''} en retirada`, 'info');
+          // Retreat formation: switch to LOOSE for faster escape
+          for (const u of sel) u.setFormation('LOOSE');
+          this.hud.notify(`🏃 ${n} unidad${n > 1 ? 'es' : ''} en retirada (💨 formación suelta)`, 'info');
           this.audio.playMove();
         }
         return;

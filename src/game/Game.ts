@@ -461,6 +461,10 @@ export class Game {
     for (const evt of this.damageEvents) {
       if (!evt.target.isAlive() && evt.attacker) {
         this.killsByPlayer.set(evt.attacker.playerId, (this.killsByPlayer.get(evt.attacker.playerId) ?? 0) + 1);
+        // Kill morale boost: victory euphoria (+5 morale, capped at 70)
+        if (!evt.attacker.isHero && evt.attacker.morale < 70) {
+          evt.attacker.morale = Math.min(70, evt.attacker.morale + 5);
+        }
       }
     }
 
@@ -918,7 +922,8 @@ export class Game {
     this._bonusTimer = 0;
 
     for (const player of this.players) {
-      const hasTemple = this.allBuildings.some(
+      // Collect temple and forge positions for proximity checks
+      const temples = this.allBuildings.filter(
         b => b.playerId === player.id && b.type === BuildingType.TEMPLE && b.isComplete()
       );
       const hasForge = this.allBuildings.some(
@@ -926,8 +931,15 @@ export class Game {
       );
 
       for (const unit of player.aliveUnits) {
-        if (hasTemple && unit.hp < unit.maxHp) {
-          unit.hp = Math.min(unit.maxHp, unit.hp + 2);
+        // Temple global HP regen + proximity morale aura (American Conquest: temples inspire troops)
+        if (temples.length > 0) {
+          if (unit.hp < unit.maxHp) unit.hp = Math.min(unit.maxHp, unit.hp + 2);
+          const nearTemple = temples.some(
+            t => Math.sqrt((unit.col - t.col) ** 2 + (unit.row - t.row) ** 2) <= 6
+          );
+          if (nearTemple && unit.morale < 80 && !unit.panicked) {
+            unit.morale = Math.min(80, unit.morale + 5);
+          }
         }
         if (hasForge) {
           // Mark unit as forge-buffed for combat (attack up to 125% of base)
