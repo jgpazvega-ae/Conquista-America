@@ -812,12 +812,16 @@ export class HUD {
       } else {
         status = '✅ Inactivo';
       }
+      const garrisonLine = building.garrisonCapacity > 0 && building.isComplete()
+        ? `<div class="ht-status">🏰 Guarnición: ${building.garrison.length}/${building.garrisonCapacity}${building.garrison.length > 0 ? ' · U para desalojar' : ' · clic der. con tropas'}</div>`
+        : '';
       html = `
         <div class="ht-name">${building.def?.name ?? building.type}</div>
         <div class="ht-civ">${ownerLabel}</div>
         <div class="ht-hp-wrap"><div class="ht-hp-fill" style="width:${pct}%;background:${hpColor}"></div></div>
         <div class="ht-stats"><span>❤️${building.hp}/${building.maxHp}</span></div>
-        <div class="ht-status">${status}</div>`;
+        <div class="ht-status">${status}</div>
+        ${garrisonLine}`;
     }
 
     el.innerHTML = html;
