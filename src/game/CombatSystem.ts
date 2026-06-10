@@ -124,12 +124,13 @@ export class CombatSystem {
           // Flanking bonus: +25% damage when 2 or more allies attack the same target
           const isFlanking = (attackerCount.get(target.id) ?? 1) >= 2;
           if (isFlanking) dmg = Math.round(dmg * 1.25);
-          // Cavalry charge: +60% on first strike after 3s idle
+          // Cavalry charge: +60% on first strike after 3s idle + morale shock on target
           let isCharge = false;
           if (unit.type === UnitType.CAVALRY && unit.chargeReady) {
             dmg = Math.round(dmg * 1.6);
             unit.chargeReady = false;
             isCharge = true;
+            if (!target.isHero) target.loseMorale(15); // charge breaks enemy morale
           }
           // Berserk: +25% damage during 12-second kill-streak buff
           if (unit.berserkTimer > 0) dmg = Math.round(dmg * 1.25);

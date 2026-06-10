@@ -1,5 +1,6 @@
 import { MAP_COLS, MAP_ROWS } from './constants';
 import { TerrainType } from './types';
+import { BuildingType } from './buildings';
 import type { Unit } from './Unit';
 import type { Building } from './Building';
 import type { Game } from './Game';
@@ -42,10 +43,12 @@ export class FogOfWar {
       this.revealAroundPoint(Math.round(unit.col), Math.round(unit.row), Math.ceil(unit.sight * sightMultiplier), game.map);
     }
 
-    // Buildings reveal terrain
+    // Buildings reveal terrain (watchtowers get boosted sight to match their attack range)
     const myBuildings = game.allBuildings.filter(b => b.playerId === playerId && b.isAlive());
     for (const building of myBuildings) {
-      const sightRange = building.isComplete() ? 4 : 2;
+      const sightRange = building.type === BuildingType.WATCHTOWER && building.isComplete()
+        ? 7
+        : building.isComplete() ? 4 : 2;
       this.revealAroundPoint(building.col, building.row, sightRange, game.map);
     }
 
