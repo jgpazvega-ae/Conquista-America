@@ -11,6 +11,7 @@ import { WorkerTask } from './Worker';
 import { ResourceType } from './ResourceNode';
 import { CIV_COLORS } from './constants';
 import { TRAIN_COSTS } from './unitProduction';
+import { STRATEGY_BY_CIV } from './AIStrategy';
 
 const AI_BUILD_INTERVAL    = 14.0;
 const AI_WORKER_INTERVAL   = 5.0;
@@ -409,21 +410,24 @@ export class AISystem {
     const hasSettlement = game.allBuildings.some(b => b.playerId === player.id && b.type === BuildingType.SETTLEMENT);
     if (!hasSettlement) return;
 
-    const buildingCounts = {
-      [BuildingType.BARRACKS]: game.allBuildings.filter(b => b.playerId === player.id && b.type === BuildingType.BARRACKS).length,
-      [BuildingType.WATCHTOWER]: game.allBuildings.filter(b => b.playerId === player.id && b.type === BuildingType.WATCHTOWER).length,
-      [BuildingType.STOREHOUSE]: game.allBuildings.filter(b => b.playerId === player.id && b.type === BuildingType.STOREHOUSE).length,
-    };
+    const strategy = STRATEGY_BY_CIV[player.civType];
 
+    // Count each owned building type
+    const ownedBuildings = game.allBuildings.filter(b => b.playerId === player.id);
+    const countOf = (t: BuildingType) => ownedBuildings.filter(b => b.type === t).length;
+
+    // Walk the civ's preferred build order; pick the first type we need more of
     let buildType: BuildingType | null = null;
-    if (buildingCounts[BuildingType.BARRACKS] === 0) {
-      buildType = BuildingType.BARRACKS;
-    } else if (buildingCounts[BuildingType.WATCHTOWER] < buildingCounts[BuildingType.BARRACKS]) {
-      buildType = BuildingType.WATCHTOWER;
-    } else if (buildingCounts[BuildingType.STOREHOUSE] < 2) {
-      buildType = BuildingType.STOREHOUSE;
+    for (const desired of strategy.buildOrder) {
+      if (desired === BuildingType.SETTLEMENT || desired === BuildingType.WONDER || desired === BuildingType.VILLAGE) continue;
+      const cap = desired === BuildingType.STOREHOUSE ? 2
+               : desired === BuildingType.WATCHTOWER  ? Math.max(1, countOf(BuildingType.BARRACKS))
+               : 1; // one of each other type
+      if (countOf(desired) < cap) { buildType = desired; break; }
     }
-
+    // Fallback: always ensure at least 1 barracks and 1 storehouse
+    if (!buildType && countOf(BuildingType.BARRACKS) === 0)  buildType = BuildingType.BARRACKS;
+    if (!buildType && countOf(BuildingType.STOREHOUSE) < 2)  buildType = BuildingType.STOREHOUSE;
     if (!buildType) return;
 
     const def = BUILDING_DEFS[buildType];
@@ -454,7 +458,9 @@ export class AISystem {
     if (settlement.productionQueue.length >= 3) return; // don't over-queue
     if (player.aliveUnits.length >= game.getPopCap(player.id)) return; // pop cap
 
-    // Pick a random unit type from civ's roster that we can afford
+    // Build a weighted pool: preferred composition types have 3× weight
+    const strategy = STRATEGY_BY_CIV[player.civType];
+    const preferredTypes = new Set(strategy.unitComposition);
     const affordable = civDef.units.filter(u => {
       const cost = TRAIN_COSTS[u.type];
       if (!cost) return false;
@@ -464,7 +470,9 @@ export class AISystem {
     });
     if (affordable.length === 0) return;
 
-    const pick = affordable[Math.floor(Math.random() * affordable.length)];
+    // Weighted selection: preferred units appear 3× more often in the pool
+    const pool = affordable.flatMap(u => preferredTypes.has(u.type) ? [u, u, u] : [u]);
+    const pick = pool[Math.floor(Math.random() * pool.length)];
     const cost = TRAIN_COSTS[pick.type]!;
     if (settlement.trainUnit(pick.type)) {
       player.resources.food  -= cost.food;
