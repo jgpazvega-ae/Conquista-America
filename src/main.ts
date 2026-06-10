@@ -756,6 +756,22 @@ class GameInstance {
       }
     }
 
+    // Morale breaks: warn when own troops rout; celebrate when the enemy flees
+    const humanPanics = this.game.newlyPanickedUnits.filter(u => u.playerId === this.game.humanPlayerId);
+    if (humanPanics.length > 0) {
+      this.audio.playRetreat();
+      this.hud.notify(
+        humanPanics.length > 1
+          ? `😱 ¡${humanPanics.length} unidades huyen despavoridas! Moral rota`
+          : '😱 ¡Una unidad huye despavorida! Moral rota',
+        'warning',
+      );
+    }
+    const enemyPanics = this.game.newlyPanickedUnits.length - humanPanics.length;
+    if (enemyPanics >= 3) {
+      this.hud.notify(`🏳️ ¡El enemigo se desbanda! ${enemyPanics} unidades en fuga`, 'success');
+    }
+
     // Retreat sound: play once per frame if any human unit retreated this frame
     const humanRetreats = this.game.newlyRetreatingUnits.filter(u => u.playerId === this.game.humanPlayerId);
     if (humanRetreats.length > 0) {

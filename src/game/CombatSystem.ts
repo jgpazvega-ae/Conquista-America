@@ -92,6 +92,8 @@ export class CombatSystem {
           dmg = Math.max(1, dmg - terrainDefenseBonus(tile?.terrain));
           // Hold position: +2 defense bonus for targets holding their ground
           if (target.state === UnitState.HOLD) dmg = Math.max(1, dmg - 2);
+          // Routed targets are cut down more easily
+          if (target.panicked) dmg = Math.round(dmg * 1.25);
           // Flanking bonus: +25% damage when 2 or more allies attack the same target
           const isFlanking = (attackerCount.get(target.id) ?? 1) >= 2;
           if (isFlanking) dmg = Math.round(dmg * 1.25);
@@ -155,6 +157,7 @@ export class CombatSystem {
   }
 
   private tryAutoAggro(unit: Unit, allUnits: Unit[], map: GameMap) {
+    if (unit.panicked) return; // routed troops don't fight back
     // ATTACK_MOVE: full sight range; IDLE: 1.2x attack range; HOLD: attack range only (no movement)
     const scanRange = unit.state === UnitState.ATTACK_MOVE
       ? unit.sight

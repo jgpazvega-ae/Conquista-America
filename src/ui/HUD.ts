@@ -429,12 +429,17 @@ export class HUD {
     const poisonBadge  = unit.poisoned    > 0 ? `<span title="Envenenado" style="color:#44dd44">☠️${Math.ceil(unit.poisoned)}s</span>`       : '';
     const berserkBadge = unit.berserkTimer > 0 ? `<span title="¡Frenesí! +25% daño" style="color:#ff6600">🔥FRENESÍ ${Math.ceil(unit.berserkTimer)}s</span>` : '';
     const chargeBadge  = unit.chargeReady  ? `<span title="Carga de caballería lista — +60% daño en primer golpe" style="color:#ffe066">⚡CARGA</span>` : '';
+    const moraleBadge  = unit.panicked
+      ? `<span title="¡Moral rota! La unidad huye y no acepta órdenes hasta recuperarse" style="color:#ff5544">😱PÁNICO</span>`
+      : unit.morale < 50
+      ? `<span title="Moral baja — cerca del pánico. Se recupera lejos del combate o junto al héroe" style="color:#ffaa44">😰${Math.round(unit.morale)}</span>`
+      : '';
     this.elUnitStats.innerHTML =
       `<span>⚔️ ${unit.attack}</span>` +
       `<span>🛡️ ${unit.defense}</span>` +
       `<span>💨 ${unit.speed.toFixed(1)}</span>` +
       `<span>🎯 ${unit.attackRange.toFixed(1)}</span>` +
-      holdBadge + burnBadge + poisonBadge + berserkBadge + chargeBadge;
+      holdBadge + burnBadge + poisonBadge + berserkBadge + chargeBadge + moraleBadge;
 
     // XP bar (only if unit can still level up)
     const xpEl = document.getElementById('unit-xp-row');
