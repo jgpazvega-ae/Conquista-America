@@ -222,7 +222,9 @@ export class HUD {
         byType.get(u.def.name)!.count++;
       }
       const parts = [...byType.entries()].map(([, v]) => `${v.emoji}×${v.count}`).join(' ');
-      this.elSelCount.textContent = `${selectedUnits.length} unidades  ${parts}`;
+      const avgMorale = Math.round(selectedUnits.reduce((s, u) => s + u.morale, 0) / selectedUnits.length);
+      const moraleColor = avgMorale < 40 ? '#dd4422' : avgMorale < 65 ? '#ddaa00' : '#22dd44';
+      this.elSelCount.innerHTML = `${selectedUnits.length} unidades  ${parts}  <span style="color:${moraleColor}">❤ ${avgMorale}%</span>`;
     } else {
       this.unitPanel.classList.add('hidden');
       this.elSelCount.classList.add('hidden');
@@ -427,7 +429,8 @@ export class HUD {
     this.elPortrait.style.background = `rgba(${(civColor >> 16) & 0xff}, ${(civColor >> 8) & 0xff}, ${civColor & 0xff}, 0.25)`;
     this.elPortrait.style.borderColor = hex(civColor);
 
-    this.elUnitName.textContent = unit.isHero ? `${unit.heroName} ★` : unit.def.name;
+    const champSuffix = !unit.isHero && unit.level >= 3 ? ' ★★' : '';
+    this.elUnitName.textContent = unit.isHero ? `${unit.heroName} ★` : `${unit.def.name}${champSuffix}`;
     this.elUnitCiv.textContent  = unit.isHero ? `Héroe — ${CIV_NAMES[unit.civType]}` : CIV_NAMES[unit.civType];
 
     const pct = unit.hp / unit.maxHp;
@@ -493,7 +496,7 @@ export class HUD {
           `<span class="xp-num">${unit.xp}/${needed}</span>`;
         xpEl.classList.remove('hidden');
       } else {
-        xpEl.innerHTML = `<span class="xp-label">★★ Máx.</span>`;
+        xpEl.innerHTML = `<span class="xp-label" style="color:#ff9933">★★ Campeón</span>`;
         xpEl.classList.remove('hidden');
       }
     }
