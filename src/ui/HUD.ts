@@ -442,12 +442,21 @@ export class HUD {
       : unit.ammo >= 0
       ? `<span title="Munición restante (V = descarga sincronizada ×2.5)" style="color:#aaddff">🏹${unit.ammo}/${unit.maxAmmo}</span>`
       : '';
+    const FORM_LABELS: Record<string, string> = { LOOSE: '💨SUELTA', PHALANX: '🛡️FALANGE', WEDGE: '⚔️CUÑA' };
+    const FORM_TIPS:   Record<string, string> = {
+      LOOSE:   'Formación suelta — +20% veloc., -10% atk, -15% def · F4 para cancelar',
+      PHALANX: 'Falange — -30% veloc., -20% atk, +30% def · F4 para cancelar',
+      WEDGE:   'Cuña — +25% atk, +10% def · F4 para cancelar',
+    };
+    const orderBadge = unit.formation
+      ? `<span title="${FORM_TIPS[unit.formation] ?? ''}" style="color:#bbffee">${FORM_LABELS[unit.formation] ?? unit.formation}</span>`
+      : '';
     this.elUnitStats.innerHTML =
       `<span>⚔️ ${unit.attack}</span>` +
       `<span>🛡️ ${unit.defense}</span>` +
       `<span>💨 ${unit.speed.toFixed(1)}</span>` +
       `<span>🎯 ${unit.attackRange.toFixed(1)}</span>` +
-      holdBadge + burnBadge + poisonBadge + berserkBadge + chargeBadge + formBadge + moraleBadge + ammoBadge;
+      holdBadge + burnBadge + poisonBadge + berserkBadge + chargeBadge + formBadge + moraleBadge + ammoBadge + orderBadge;
 
     // XP bar (only if unit can still level up)
     const xpEl = document.getElementById('unit-xp-row');

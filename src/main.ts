@@ -1230,6 +1230,24 @@ class GameInstance {
         }
         return;
       }
+      // F1-F3: formation orders; F4: clear formation
+      if (e.code === 'F1' || e.code === 'F2' || e.code === 'F3' || e.code === 'F4') {
+        e.preventDefault();
+        const sel = this.input.getSelectedUnits().filter(u => u.isAlive());
+        if (sel.length > 0) {
+          const orders: Record<string, string | null> = { F1: 'LOOSE', F2: 'PHALANX', F3: 'WEDGE', F4: null };
+          const labels: Record<string, string> = {
+            F1: '💨 Formación suelta — veloz, frágil',
+            F2: '🛡️ Falange — máxima defensa',
+            F3: '⚔️ Cuña — máximo ataque',
+            F4: 'Formación libre',
+          };
+          for (const u of sel) u.setFormation(orders[e.code] ?? null);
+          this.hud.notify(labels[e.code] ?? '', 'info');
+          this.hintOnce('formation_order', '💡 Formaciones (F1/F2/F3): SUELTA=+veloc., FALANGE=+def., CUÑA=+atk. Cancela con F4. El ícono aparece en el panel de unidad.');
+        }
+        return;
+      }
       // V: volley fire — selected ranged units with a live target fire simultaneously (2.5× burst)
       if (e.code === 'KeyV' && !e.ctrlKey && !e.altKey) {
         const ranged = this.input.getSelectedUnits().filter(u => u.ammo > 0 && u.attackTarget?.isAlive());

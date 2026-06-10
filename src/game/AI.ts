@@ -29,6 +29,7 @@ interface AIState {
   phase:        'gathering' | 'attacking' | 'defending';
   phaseTimer:   number;
   defendTimer:  number; // how long we've been in defending phase
+  volleyTimer:  number; // countdown to next AI volley fire
 }
 
 export class AISystem {
@@ -46,6 +47,7 @@ export class AISystem {
           upgradeTimer: Math.random() * 20,
           phase: 'gathering', phaseTimer: Math.random() * 15,
           defendTimer: 0,
+          volleyTimer: 12 + Math.random() * 8,
         };
         this.aiStates.set(player.id, state);
       }
@@ -102,6 +104,16 @@ export class AISystem {
         }
       } else {
         this.waveAttack(player, game);
+        // AI volley fire: every 12-20s during attack, trigger synchronized burst
+        state.volleyTimer -= dt;
+        if (state.volleyTimer <= 0) {
+          state.volleyTimer = 12 + Math.random() * 8;
+          for (const u of player.aliveUnits) {
+            if (u.ammo > 0 && u.state === UnitState.ATTACKING && u.attackTarget?.isAlive()) {
+              u.volleyReady = true;
+            }
+          }
+        }
         const allDead = game.allUnits.filter(u => u.playerId !== player.id && u.isAlive()).length === 0;
         if (state.phaseTimer >= ATTACK_DURATION || allDead) {
           state.phase = 'gathering';
@@ -140,7 +152,17 @@ export class AISystem {
     const cx = settlement.col, cz = settlement.row;
 
     for (const unit of player.aliveUnits) {
-      if (unit.state !== UnitState.IDLE || unit.garrisonedIn !== null) continue;
+      if (unit.garrisonedIn !== null) continue;
+      // Route out-of-ammo ranged units back to settlement to resupply
+      if (unit.outOfAmmo && unit.state !== UnitState.MOVING) {
+        const near = game.map.findWalkableNear(cx, cz, 3);
+        if (near) {
+          const path = findPath(game.map, unit.gridPos(), { col: near[0], row: near[1] }, 200);
+          if (path.length > 0) unit.moveTo(path);
+        }
+        continue;
+      }
+      if (unit.state !== UnitState.IDLE) continue;
       const d = Math.sqrt((unit.col - cx) ** 2 + (unit.row - cz) ** 2);
       if (d > 6) {
         const tc = cx + Math.floor(Math.random() * 5) - 2;
@@ -229,9 +251,23 @@ export class AISystem {
     const enemies = game.allUnits.filter(u => u.playerId !== player.id && u.isAlive());
     if (myUnits.length === 0 || enemies.length === 0) return;
 
+    // Route out-of-ammo ranged units back to own settlement to resupply
+    const settlement = game.allBuildings.find(b => b.playerId === player.id && b.type === BuildingType.SETTLEMENT);
+    if (settlement) {
+      for (const u of myUnits) {
+        if (u.outOfAmmo && u.garrisonedIn === null && u.state !== UnitState.MOVING) {
+          const near = game.map.findWalkableNear(settlement.col, settlement.row, 3);
+          if (near) {
+            const path = findPath(game.map, u.gridPos(), { col: near[0], row: near[1] }, 200);
+            if (path.length > 0) u.moveTo(path);
+          }
+        }
+      }
+    }
+
     // Send 80% of forces; keep 20% near settlement as garrison
     const available = myUnits.filter(
-      u => (u.state === UnitState.IDLE || u.state === UnitState.MOVING) && u.garrisonedIn === null,
+      u => (u.state === UnitState.IDLE || u.state === UnitState.MOVING) && u.garrisonedIn === null && !u.outOfAmmo,
     );
     const toSend = Math.ceil(available.length * 0.8);
 
