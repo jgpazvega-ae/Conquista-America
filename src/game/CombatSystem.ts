@@ -115,6 +115,8 @@ export class CombatSystem {
           }
           // Hold position: +2 defense bonus for targets holding their ground
           if (target.state === UnitState.HOLD) dmg = Math.max(1, dmg - 2);
+          // Entrenched: dug into cover (+5 defense on top of HOLD bonus)
+          if (target.entrenched) dmg = Math.max(1, dmg - 5);
           // Close ranks: formation fighters shield each other
           if (target.inFormation) dmg = Math.max(1, dmg - 2);
           // Routed targets are cut down more easily

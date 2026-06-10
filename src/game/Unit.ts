@@ -99,6 +99,9 @@ export class Unit {
   panicked = false;
   private _moraleCooldown = 0; // seconds until morale starts regenerating
 
+  // Entrench (X key): dig in for +5 defense; cleared on any movement order
+  entrenched = false;
+
   // Garrison: inside building id, or moving toward one to enter
   garrisonedIn: number | null = null;
   garrisonTarget: import('./Building').Building | null = null;
@@ -709,6 +712,7 @@ export class Unit {
   moveTo(path: GridPos[]) {
     if (this.panicked) return; // routed troops ignore orders
     if (path.length === 0) return;
+    this.entrenched = false;
     this.path      = path;
     this.pathIndex = 0;
     this.state                = UnitState.MOVING;
@@ -730,6 +734,7 @@ export class Unit {
 
   attackUnit(target: Unit) {
     if (this.panicked) return;
+    this.entrenched           = false;
     this.attackTarget         = target;
     this.attackBuildingTarget = null;
     this.garrisonTarget       = null;
@@ -741,6 +746,7 @@ export class Unit {
 
   attackBuilding(target: import('./Building').Building) {
     if (this.panicked) return;
+    this.entrenched           = false;
     this.attackBuildingTarget = target;
     this.attackTarget         = null;
     this.state                = UnitState.ATTACKING;
@@ -893,6 +899,11 @@ export class Unit {
       if (this.panicked) {
         this.rig.rotation.z = Math.sin(this.animT * 28) * 0.10;
       }
+      // Entrenched: low crouching stance
+      if (this.entrenched) {
+        this.rig.position.y = -0.08 + Math.sin(this.animT * 1.2) * 0.008;
+        this.rig.rotation.z = 0;
+      }
       // Attack lunge forward
       if (this.attackAnim > 0) {
         this.attackAnim   = Math.max(0, this.attackAnim - dt * 3);
@@ -963,12 +974,33 @@ export class Unit {
   /** Issue an attack-move command: unit moves along path, auto-attacks anything in range. */
   attackMove(path: GridPos[]) {
     if (this.panicked) return;
+    this.entrenched  = false;
     this.path        = path;
     this.pathIndex   = 0;
     this.attackTarget = null;
     this.garrisonTarget = null;
     this.captureTarget  = null;
     this.state       = UnitState.ATTACK_MOVE;
+  }
+
+  /**
+   * Toggle entrench: digs the unit into cover (+5 defense, HOLD state).
+   * Any movement order cancels the entrench.
+   */
+  entrench() {
+    if (this.entrenched) {
+      this.entrenched = false;
+      if (this.state === UnitState.HOLD) this.state = UnitState.IDLE;
+    } else {
+      this.entrenched = true;
+      this.state = UnitState.HOLD;
+      this.path = [];
+      this.pathIndex = 0;
+      this.attackTarget = null;
+      this.attackBuildingTarget = null;
+      this.garrisonTarget = null;
+      this.captureTarget = null;
+    }
   }
 
   /** Set tactical formation. Adjusts unit speed; attack/defense bonuses applied in CombatSystem. */
