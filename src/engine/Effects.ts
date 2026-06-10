@@ -12,9 +12,18 @@ interface Particle extends THREE.Mesh {
   };
 }
 
+interface Projectile {
+  mesh: THREE.Mesh;
+  sx: number; sy: number; sz: number;
+  tx: number; ty: number; tz: number;
+  t: number; dur: number;
+  trailTimer: number;
+}
+
 export class EffectManager {
   private scene: THREE.Scene;
   private particles: Particle[] = [];
+  private projectiles: Projectile[] = [];
 
   // Shared geometries
   private sphere = new THREE.SphereGeometry(1, 8, 7);
@@ -98,6 +107,60 @@ export class EffectManager {
       { additive: true, grow: 1.5, opacity: 0.9 });
   }
 
+  createProjectile(sx: number, sz: number, tx: number, tz: number, color = 0xffdd44) {
+    const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95,
+      blending: THREE.AdditiveBlending, depthWrite: false });
+    const mesh = new THREE.Mesh(this.sphere, mat);
+    mesh.scale.setScalar(0.09);
+    this.scene.add(mesh);
+    const dist = Math.sqrt((tx - sx) ** 2 + (tz - sz) ** 2);
+    this.projectiles.push({ mesh, sx, sy: 0.6, sz, tx, ty: 0.6, tz, t: 0, dur: Math.max(0.12, dist * 0.04), trailTimer: 0 });
+  }
+
+  /** Golden star burst for unit level-up. */
+  createLevelUpBurst(x: number, y: number, z: number) {
+    // Rising gold sparks
+    for (let i = 0; i < 14; i++) {
+      const angle = (i / 14) * Math.PI * 2;
+      const speed = 2.5 + Math.random() * 2;
+      const v = new THREE.Vector3(Math.cos(angle) * speed, 3 + Math.random() * 2, Math.sin(angle) * speed);
+      this.spawn(this.sphere, i % 2 === 0 ? 0xffdd00 : 0xffffff, x, y, z,
+        0.07 + Math.random() * 0.06, v, 0.7 + Math.random() * 0.3,
+        { additive: true, gravity: 4, spin: 8, opacity: 1 });
+    }
+    // Central flash
+    this.spawn(this.sphere, 0xffffaa, x, y + 0.5, z, 0.35,
+      new THREE.Vector3(0, 0, 0), 0.25, { additive: true, grow: 2.5, opacity: 1 });
+    // Floating star shards
+    for (let i = 0; i < 6; i++) {
+      const v = new THREE.Vector3((Math.random()-0.5)*3, 4+Math.random()*3, (Math.random()-0.5)*3);
+      this.spawn(this.shard, 0xffd700, x, y, z, 0.06, v, 0.9,
+        { additive: true, gravity: -1, spin: 10, opacity: 0.9 });
+    }
+  }
+
+  createBurningEffect(x: number, y: number, z: number) {
+    const colors = [0xff6600, 0xffaa22, 0xff3300];
+    for (let i = 0; i < 3; i++) {
+      const v = new THREE.Vector3((Math.random() - 0.5) * 1.5, 1.5 + Math.random() * 2, (Math.random() - 0.5) * 1.5);
+      this.spawn(this.sphere, colors[i % colors.length],
+        x + (Math.random() - 0.5) * 0.6, 0.6, z + (Math.random() - 0.5) * 0.6,
+        0.07 + Math.random() * 0.05, v, 0.35 + Math.random() * 0.25,
+        { additive: true, gravity: -1.5, grow: 0.4, opacity: 0.9 });
+    }
+  }
+
+  createPoisonEffect(x: number, y: number, z: number) {
+    const colors = [0x44cc44, 0x228822, 0x66ff44];
+    for (let i = 0; i < 4; i++) {
+      const v = new THREE.Vector3((Math.random() - 0.5) * 1.2, 0.8 + Math.random() * 0.8, (Math.random() - 0.5) * 1.2);
+      this.spawn(this.sphere, colors[i % colors.length],
+        x + (Math.random() - 0.5) * 0.8, 0.4, z + (Math.random() - 0.5) * 0.8,
+        0.1 + Math.random() * 0.08, v, 0.6 + Math.random() * 0.4,
+        { gravity: -0.8, grow: 0.8, opacity: 0.55 });
+    }
+  }
+
   createMuzzleFlash(x: number, y: number, z: number) {
     this.spawn(this.sphere, 0xffee99, x, y, z, 0.2, new THREE.Vector3(0, 0, 0), 0.1,
       { additive: true, grow: 2, opacity: 1 });
@@ -108,6 +171,32 @@ export class EffectManager {
   }
 
   update(dt: number) {
+    // Projectiles: lerp from source to target, leave spark trail
+    for (let i = this.projectiles.length - 1; i >= 0; i--) {
+      const p = this.projectiles[i];
+      p.t += dt;
+      p.trailTimer += dt;
+      const frac = Math.min(p.t / p.dur, 1);
+      p.mesh.position.set(
+        p.sx + (p.tx - p.sx) * frac,
+        p.sy + Math.sin(frac * Math.PI) * 0.6, // slight arc
+        p.sz + (p.tz - p.sz) * frac,
+      );
+      // Leave a spark every 0.04 s
+      if (p.trailTimer >= 0.04) {
+        p.trailTimer = 0;
+        const { x, z } = p.mesh.position;
+        this.spawn(this.sphere, 0xffcc44, x, p.sy, z, 0.04,
+          new THREE.Vector3((Math.random()-0.5)*0.5, Math.random()*0.5, (Math.random()-0.5)*0.5),
+          0.18, { additive: true, gravity: 2, opacity: 0.8 });
+      }
+      if (frac >= 1) {
+        this.scene.remove(p.mesh);
+        (p.mesh.material as THREE.Material).dispose();
+        this.projectiles.splice(i, 1);
+      }
+    }
+
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       const d = p.userData;

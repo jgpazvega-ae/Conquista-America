@@ -28,9 +28,13 @@ const ROOF_TILE   = 0xa3402a;
 export class Building {
   readonly id: number;
   readonly type: BuildingType;
-  readonly playerId: number;
+  playerId: number; // mutable: buildings can be captured (American Conquest style)
   readonly def: BuildingDef;
   readonly civType: CivilizationType;
+
+  // Capture: melee units adjacent to an ungarrisoned enemy building raise this to 100
+  captureProgress = 0;
+  private _bannerMats: THREE.MeshStandardMaterial[] = [];
 
   col: number;
   row: number;
@@ -47,9 +51,37 @@ export class Building {
   // Attack capability (watchtower)
   attackTimer: number = 0;
 
+  // Passive self-repair: seconds since last hit; repair starts after 10 s
+  private _timeSinceHit = 0;
+  private static readonly REPAIR_DELAY   = 10; // s before repair kicks in
+  private static readonly REPAIR_RATE    = 3;  // HP per second
+
+  // Garrison (American Conquest style): troops inside shoot out and stay safe
+  garrison: import('./Unit').Unit[] = [];
+  get garrisonCapacity(): number {
+    switch (this.type) {
+      case BuildingType.SETTLEMENT: return 8;
+      case BuildingType.WATCHTOWER: return 4;
+      case BuildingType.TEMPLE:     return 3;
+      case BuildingType.VILLAGE:    return 2;
+      default:                      return 0;
+    }
+  }
+
+  // Rally point for spawned units
+  rallyCol: number | null = null;
+  rallyRow: number | null = null;
+
+  setRally(col: number, row: number) {
+    this.rallyCol = col;
+    this.rallyRow = row;
+  }
+
   mesh!: THREE.Group;
   private structure!: THREE.Group;
   progressBar!: THREE.Mesh;
+  private _fireMesh: THREE.Mesh | null = null;
+  private _fireT = 0; // flicker timer
 
   constructor(type: BuildingType, def: BuildingDef, playerId: number, col: number, row: number, civColor: number, civType: CivilizationType = CivilizationType.AZTEC) {
     this.id = nextBuildingId++;
@@ -89,17 +121,22 @@ export class Building {
     const stone2 = this.mat(new THREE.Color(this.stoneColor()).multiplyScalar(0.82).getHex(), 0.95);
     const trim   = new THREE.MeshStandardMaterial({ color: civColor, roughness: 0.7, emissive: civColor, emissiveIntensity: 0.06 });
 
-    switch (this.civType) {
-      case CivilizationType.CONQUISTADOR: this.buildSpanish(stone, stone2, trim); break;
-      case CivilizationType.INCA:         this.buildInca(stone, stone2, trim);   break;
-      default:                            this.buildMesoamerican(stone, stone2, trim); break;
+    if (this.type === BuildingType.VILLAGE) {
+      this.buildVillage();
+    } else {
+      switch (this.civType) {
+        case CivilizationType.CONQUISTADOR: this.buildSpanish(stone, stone2, trim); break;
+        case CivilizationType.INCA:         this.buildInca(stone, stone2, trim);   break;
+        default:                            this.buildMesoamerican(stone, stone2, trim); break;
+      }
     }
 
     // Ownership banner (high & colorful, readable from above)
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.0, 6), this.mat(0x5a4a32, 0.9));
     pole.position.set(0.7, 1.5, 0.7); this.structure.add(pole);
-    const banner = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.32),
-      new THREE.MeshStandardMaterial({ color: civColor, side: THREE.DoubleSide, emissive: civColor, emissiveIntensity: 0.18, roughness: 0.6 }));
+    const bannerMat = new THREE.MeshStandardMaterial({ color: civColor, side: THREE.DoubleSide, emissive: civColor, emissiveIntensity: 0.18, roughness: 0.6 });
+    this._bannerMats.push(bannerMat);
+    const banner = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.32), bannerMat);
     banner.position.set(0.5, 1.82, 0.7); this.structure.add(banner);
 
     // Progress bar
@@ -119,6 +156,26 @@ export class Building {
 
   private mat(color: number, rough = 0.9) {
     return new THREE.MeshStandardMaterial({ color, roughness: rough });
+  }
+
+  /** Show/hide the flame effect based on current HP fraction. */
+  private _syncFire() {
+    const pct = this.hp / this.maxHp;
+    if (pct < 0.25 && this.isAlive()) {
+      if (!this._fireMesh) {
+        const fireMat = new THREE.MeshStandardMaterial({
+          color: 0xff4400, emissive: 0xff2200, emissiveIntensity: 2.0,
+          transparent: true, opacity: 0.85,
+        });
+        this._fireMesh = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.45, 6), fireMat);
+        this._fireMesh.position.set(0.2, 2.2, 0.2);
+        this._fireMesh.renderOrder = 12;
+        this.mesh.add(this._fireMesh);
+      }
+      this._fireMesh.visible = true;
+    } else if (this._fireMesh) {
+      this._fireMesh.visible = false;
+    }
   }
 
   private box(mat: THREE.Material, w: number, h: number, d: number, x: number, y: number, z: number, cast = true) {
@@ -251,6 +308,35 @@ export class Building {
     this.addTypeMarker(trim, 1.45);
   }
 
+  // ── Neutral village — thatch hut with a fire pit ────────────────────────────
+  private buildVillage() {
+    const thatch = this.mat(0x8a7040, 0.96);
+    const wall   = this.mat(0xc4aa70, 0.94);
+    const fire   = new THREE.MeshStandardMaterial({ color: 0xff6010, emissive: 0xff3000, emissiveIntensity: 1.0 });
+    const dark   = this.mat(0x2a1a0a, 0.98);
+
+    // Circular hut base
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.70, 0.76, 0.55, 10), wall);
+    base.castShadow = true; base.receiveShadow = true;
+    this.structure.add(base);
+    base.position.y = 0.28;
+
+    // Conical thatch roof
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(0.80, 0.70, 10), thatch);
+    roof.position.y = 0.90; roof.castShadow = true;
+    this.structure.add(roof);
+
+    // Doorway cutout (dark rectangle)
+    const door = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.34, 0.06), dark);
+    door.position.set(0, 0.22, 0.72); this.structure.add(door);
+
+    // Central fire pit
+    const pit = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.08, 8), dark);
+    pit.position.set(-0.55, 0.04, 0.30); this.structure.add(pit);
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.18, 6), fire);
+    flame.position.set(-0.55, 0.17, 0.30); this.structure.add(flame);
+  }
+
   // Small marker so different building types are still distinguishable
   private addTypeMarker(trim: THREE.Material, y: number) {
     switch (this.type) {
@@ -296,6 +382,20 @@ export class Building {
   isComplete(): boolean { return this.state === BuildingState.COMPLETE; }
   isAlive(): boolean { return this.state !== BuildingState.DESTROYED; }
 
+  /** Transfer ownership after a successful capture: new banner color, fresh state. */
+  transferTo(newPlayerId: number, newCivColor: number) {
+    this.playerId = newPlayerId;
+    this.captureProgress = 0;
+    this._prodQueue = [];
+    this.finishedUnit = null;
+    this.rallyCol = null;
+    this.rallyRow = null;
+    for (const m of this._bannerMats) {
+      m.color.setHex(newCivColor);
+      m.emissive.setHex(newCivColor);
+    }
+  }
+
   trainUnit(unitType: UnitType): boolean {
     if (!this.isComplete()) return false;
     if (this._prodQueue.length >= this.MAX_QUEUE) return false;
@@ -330,14 +430,76 @@ export class Building {
     return this._prodQueue[0].elapsed / this._prodQueue[0].totalTime;
   }
 
+  updateRepair(dt: number) {
+    if (this.state === BuildingState.DESTROYED) return;
+    if (this.hp >= this.maxHp) { this._timeSinceHit = 0; return; }
+    this._timeSinceHit += dt;
+    if (this._timeSinceHit < Building.REPAIR_DELAY) return;
+    this.hp = Math.min(this.maxHp, this.hp + Building.REPAIR_RATE * dt);
+    // Re-sync HP bar
+    const pct = this.hp / this.maxHp;
+    this.progressBar.visible = pct < 1;
+    if (pct < 1) {
+      this.progressBar.scale.x = pct;
+      this.progressBar.position.x = (pct - 1) * 0.44;
+      (this.progressBar.material as THREE.MeshBasicMaterial).color.setHex(
+        pct > 0.5 ? 0x55dd44 : pct > 0.25 ? 0xddaa00 : 0xdd2222
+      );
+    }
+    if (this.hp >= this.maxHp * 0.3 && this.state === BuildingState.DAMAGED) {
+      this.state = BuildingState.COMPLETE;
+    }
+  }
+
+  /** Apply worker-assisted repair: +amount HP and sync the HP bar immediately. */
+  repairBy(amount: number) {
+    if (this.state === BuildingState.DESTROYED || this.hp >= this.maxHp) return;
+    this.hp = Math.min(this.maxHp, this.hp + amount);
+    this._syncFire();
+    const pct = this.hp / this.maxHp;
+    this.progressBar.visible = pct < 1;
+    if (pct < 1) {
+      this.progressBar.scale.x = pct;
+      this.progressBar.position.x = (pct - 1) * 0.44;
+      (this.progressBar.material as THREE.MeshBasicMaterial).color.setHex(
+        pct > 0.5 ? 0x55dd44 : pct > 0.25 ? 0xddaa00 : 0xdd2222
+      );
+    }
+    if (this.hp >= this.maxHp * 0.3 && this.state === BuildingState.DAMAGED) {
+      this.state = BuildingState.COMPLETE;
+    }
+  }
+
   takeDamage(amount: number) {
     if (this.state === BuildingState.DESTROYED) return;
+    this._timeSinceHit = 0; // reset repair timer on hit
     this.hp = Math.max(0, this.hp - amount);
+    // Show HP bar when damaged
+    if (this.hp > 0 && this.hp < this.maxHp) {
+      const pct = this.hp / this.maxHp;
+      this.progressBar.visible = true;
+      this.progressBar.scale.x = pct;
+      this.progressBar.position.x = (pct - 1) * 0.44;
+      (this.progressBar.material as THREE.MeshBasicMaterial).color.setHex(
+        pct > 0.5 ? 0x55dd44 : pct > 0.25 ? 0xddaa00 : 0xdd2222
+      );
+    }
     if (this.hp <= 0) {
       this.state = BuildingState.DESTROYED;
       this.mesh.visible = false;
     } else if (this.hp < this.maxHp * 0.3) {
       this.state = BuildingState.DAMAGED;
     }
+    this._syncFire();
+  }
+
+  /** Animate the fire flicker — call once per frame from the renderer or Game.ts. */
+  tickFire(dt: number) {
+    if (!this._fireMesh?.visible) return;
+    this._fireT += dt;
+    const flicker = 0.75 + Math.sin(this._fireT * 18) * 0.25 + Math.sin(this._fireT * 31) * 0.12;
+    this._fireMesh.scale.setScalar(flicker);
+    this._fireMesh.position.y = 2.1 + Math.sin(this._fireT * 11) * 0.1;
+    (this._fireMesh.material as THREE.MeshStandardMaterial).emissiveIntensity = 1.5 + Math.sin(this._fireT * 22) * 0.5;
   }
 }

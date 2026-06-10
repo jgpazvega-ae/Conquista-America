@@ -1,10 +1,11 @@
 import * as THREE from 'three';
-import { UnitType, CivilizationType, UnitState } from './types';
+import { UnitType, CivilizationType, UnitState, TerrainType } from './types';
 import type { GridPos } from './types';
 import type { UnitDef } from './civilizations';
 import { getUnitDef } from './civilizations';
 import { TILE_SIZE } from './constants';
 import type { GameMap } from './Map';
+import { FORMATIONS } from './UnitBalancing';
 
 let nextId = 1;
 
@@ -41,7 +42,21 @@ export class Unit {
   path: GridPos[] = [];
   pathIndex: number = 0;
   attackTarget: Unit | null = null;
+  attackBuildingTarget: import('./Building').Building | null = null;
   attackTimer: number = 0;
+
+  // Patrol
+  patrolA: GridPos | null = null;
+  patrolB: GridPos | null = null;
+  patrolFlip = false;
+
+  // XP / leveling
+  xp:    number = 0;
+  level: number = 1;
+
+  // Civilization power buffs
+  incaBuff  = false;
+  conquBuff = false;
 
   moveX: number = 0;
   moveZ: number = 0;
@@ -53,10 +68,75 @@ export class Unit {
   private rightArm: THREE.Group | null = null;
   healthBar!: THREE.Mesh;
   selectionRing!: THREE.Mesh;
+  private _levelRing: THREE.Mesh | null = null;
   private selected    = false;
   private animT       = Math.random() * 10;
   private attackAnim  = 0;
-  private _deathTimer = -1; // -1 = not dying; ≥0 = falling animation
+  private _deathTimer = -1;
+
+  // Passive healing / retreat
+  _damageCooldown  = 0;     // seconds since last hit; healing begins when this reaches 0
+  _idleHealTimer   = 0;     // accumulates while healing
+  _nearSettlement  = false; // set each frame by Game.ts; boosts idle heal rate
+  _nearSupplyDepot = false; // true when within 4 tiles of a friendly complete Storehouse
+  wantsRetreat     = false; // set by takeDamage when HP < 20%; cleared by Game
+
+  // Status effects (damage over time)
+  burning  = 0;  // remaining burn duration (s); 2 HP every 0.5 s
+  poisoned = 0;  // remaining poison duration (s); 2 HP every 1 s
+  private _burnTick   = 0;
+  private _poisonTick = 0;
+
+  // Cavalry charge: ready after 3s idle; consumed on first attack
+  chargeReady     = false;
+  private _chargeIdleTime = 0;
+
+  // Kill streak / berserk
+  killStreak  = 0;          // consecutive kills without taking damage
+  berserkTimer = 0;         // seconds of berserk buff remaining (3-kill streak → 12s)
+
+  // Morale (American Conquest style): 0-100; panic below 25, recover at 50
+  morale   = 100;
+  panicked = false;
+  private _moraleCooldown = 0; // seconds until morale starts regenerating
+
+  // Entrench (X key): dig in for +5 defense; cleared on any movement order
+  entrenched = false;
+
+  // Garrison: inside building id, or moving toward one to enter
+  garrisonedIn: number | null = null;
+  garrisonTarget: import('./Building').Building | null = null;
+
+  // Capture: enemy building this melee unit is seizing
+  captureTarget: import('./Building').Building | null = null;
+
+  // Formation march: group moves are capped to the slowest member's speed
+  formationSpeedCap: number | null = null;
+
+  // Close ranks: 3+ allies within 3 tiles → +2 defense, faster morale recovery.
+  // Recomputed periodically by Game.updateFormations.
+  inFormation = false;
+
+  // Ammo (ranged units only; -1 = melee, never depletes)
+  ammo    = -1;
+  maxAmmo = 0;
+  private _ammoRechargeTimer = 0;
+
+  // Volley fire: V-key sets this to bypass attackTimer once for a burst shot
+  volleyReady = false;
+
+  // Formation order: 'LOOSE' | 'PHALANX' | 'WEDGE' | null
+  formation: string | null = null;
+  private _defSpeed = 0;           // canonical speed without formation modifier
+  private _formationSpeedMul = 1.0;
+
+  // Hero unit
+  isHero   = false;
+  heroName = '';
+
+  // Hero war cry: Y-key buff that boosts nearby allies
+  warCryCooldown = 0;  // seconds remaining before war cry can be used again
+  buffAttackTimer = 0; // seconds of +25% attack buff remaining (from allied hero war cry)
 
   constructor(
     type: UnitType, civ: CivilizationType, playerId: number,
@@ -73,6 +153,7 @@ export class Unit {
     this.attack            = s.attack;
     this.defense           = s.defense;
     this.speed             = s.speed;
+    this._defSpeed         = s.speed;
     this.attackRange       = s.attackRange;
     this.sight             = s.sight;
     this.attackCooldown    = s.attackCooldown;
@@ -83,7 +164,22 @@ export class Unit {
     this.worldZ = row * TILE_SIZE;
 
     this.buildMesh(civColor);
+
+    if (this.def.isRanged) {
+      const AMMO: Partial<Record<UnitType, number>> = {
+        [UnitType.ARCHER]:      28,
+        [UnitType.ATLATL]:      25,
+        [UnitType.SLINGER]:     30,
+        [UnitType.ARQUEBUSIER]: 15,
+        [UnitType.CANNON]:      10,
+      };
+      this.maxAmmo = AMMO[this.type] ?? 20;
+      this.ammo    = this.maxAmmo;
+    }
   }
+
+  get outOfAmmo(): boolean { return this.ammo === 0; }
+  get lowAmmo():   boolean { return this.ammo > 0 && this.ammo <= Math.ceil(this.maxAmmo * 0.25); }
 
   // ── Mesh construction ────────────────────────────────────────────────────────
   private buildMesh(civColor: number) {
@@ -607,23 +703,69 @@ export class Unit {
     return Math.sqrt(dx * dx + dz * dz);
   }
 
+  /** Reduce morale; heroes never waver. Panic is triggered by Game when morale ≤ 25. */
+  loseMorale(amount: number) {
+    if (this.isHero) return;
+    this.morale = Math.max(0, this.morale - amount);
+    this._moraleCooldown = 3;
+  }
+
   moveTo(path: GridPos[]) {
+    if (this.panicked) return; // routed troops ignore orders
     if (path.length === 0) return;
+    this.entrenched = false;
     this.path      = path;
     this.pathIndex = 0;
-    this.state     = UnitState.MOVING;
-    this.attackTarget = null;
+    this.state                = UnitState.MOVING;
+    this.attackTarget         = null;
+    this.attackBuildingTarget = null;
+    this.garrisonTarget       = null;
+    this.captureTarget        = null;
+    this.formationSpeedCap    = null;
+    this.patrolA = null; this.patrolB = null;
+  }
+
+  setPatrol(a: GridPos, b: GridPos) {
+    this.patrolA   = a;
+    this.patrolB   = b;
+    this.patrolFlip = false;
+    this.attackTarget         = null;
+    this.attackBuildingTarget = null;
   }
 
   attackUnit(target: Unit) {
-    this.attackTarget = target;
-    this.state        = UnitState.ATTACKING;
-    this.attackAnim   = 1;
+    if (this.panicked) return;
+    this.entrenched           = false;
+    this.attackTarget         = target;
+    this.attackBuildingTarget = null;
+    this.garrisonTarget       = null;
+    this.captureTarget        = null;
+    this.formationSpeedCap    = null;
+    this.state                = UnitState.ATTACKING;
+    this.attackAnim           = 1;
   }
+
+  attackBuilding(target: import('./Building').Building) {
+    if (this.panicked) return;
+    this.entrenched           = false;
+    this.attackBuildingTarget = target;
+    this.attackTarget         = null;
+    this.state                = UnitState.ATTACKING;
+    this.attackAnim           = 1;
+  }
+
+  triggerAttackAnim() { this.attackAnim = 1; }
 
   takeDamage(amount: number): number {
     const dmg = Math.max(1, amount - this.defense);
     this.hp   = Math.max(0, this.hp - dmg);
+    this._damageCooldown = 5;  // 5 s before healing starts
+    this._idleHealTimer  = 0;
+    this.killStreak      = 0;  // reset streak on taking damage
+    this.loseMorale(3);
+    if (this.hp > 0 && this.hp < this.maxHp * 0.20 && !this.wantsRetreat) {
+      this.wantsRetreat = true;
+    }
     this.updateHealthBar();
     if (this.hp <= 0) this.die();
     return dmg;
@@ -664,18 +806,103 @@ export class Unit {
     }
     if (this.state === UnitState.DEAD) return;
 
-    this.attackTimer = Math.max(0, this.attackTimer - dt);
+    this.attackTimer  = Math.max(0, this.attackTimer - dt);
+    if (this.berserkTimer > 0) this.berserkTimer = Math.max(0, this.berserkTimer - dt);
     this.animT += dt;
 
-    if (this.state === UnitState.MOVING) this.updateMovement(dt, map);
+    // Morale regeneration: faster near own settlement; rally at 50 ends panic
+    if (this._moraleCooldown > 0) {
+      this._moraleCooldown -= dt;
+    } else if (this.morale < 100) {
+      let regen = this._nearSettlement ? 9 : 4;
+      if (this.inFormation) regen *= 1.5; // close ranks steady the nerves
+      this.morale = Math.min(100, this.morale + regen * dt);
+    }
+    if (this.panicked && this.morale >= 50) this.panicked = false;
+
+    // Passive idle healing: 2 HP every 0.5 s after 5 s without damage
+    // (nearSettlement flag set externally by Game.ts each frame for +3 extra HP/tick)
+    if (this._damageCooldown > 0) {
+      this._damageCooldown -= dt;
+    } else if (this.state === UnitState.IDLE && this.hp < this.maxHp) {
+      this._idleHealTimer += dt;
+      const healPerTick = this._nearSettlement ? 5 : 2;
+      while (this._idleHealTimer >= 0.5) {
+        this._idleHealTimer -= 0.5;
+        this.hp = Math.min(this.maxHp, this.hp + healPerTick);
+        this.updateHealthBar();
+      }
+    } else if (this.state !== UnitState.IDLE) {
+      this._idleHealTimer = 0;
+    }
+
+    // Status effect DoT
+    if (this.burning > 0) {
+      this.burning = Math.max(0, this.burning - dt);
+      this._burnTick += dt;
+      while (this._burnTick >= 0.5) {
+        this._burnTick -= 0.5;
+        this.hp = Math.max(1, this.hp - 2);
+        this.updateHealthBar();
+      }
+    }
+    if (this.poisoned > 0) {
+      this.poisoned = Math.max(0, this.poisoned - dt);
+      this._poisonTick += dt;
+      while (this._poisonTick >= 1) {
+        this._poisonTick -= 1;
+        this.hp = Math.max(1, this.hp - 2);
+        this.updateHealthBar();
+      }
+    }
+
+    // Hero war cry cooldown and attack buff
+    if (this.warCryCooldown > 0) this.warCryCooldown = Math.max(0, this.warCryCooldown - dt);
+    if (this.buffAttackTimer > 0) this.buffAttackTimer = Math.max(0, this.buffAttackTimer - dt);
+
+    // Cavalry charge tracking
+    if (this.type === UnitType.CAVALRY) {
+      if (this.state === UnitState.IDLE || this.state === UnitState.HOLD) {
+        this._chargeIdleTime += dt;
+        if (this._chargeIdleTime >= 3) this.chargeReady = true;
+      } else if (this.state === UnitState.MOVING || this.state === UnitState.ATTACK_MOVE) {
+        this._chargeIdleTime = 0;
+        this.chargeReady = false;
+      }
+      // While ATTACKING: chargeReady persists until consumed in CombatSystem
+    }
+
+    // Ammo resupply: 1 round per 1.5 s when near own settlement OR a Storehouse supply depot
+    if (this.ammo >= 0 && this.ammo < this.maxAmmo && (this._nearSettlement || this._nearSupplyDepot)) {
+      this._ammoRechargeTimer += dt;
+      if (this._ammoRechargeTimer >= 1.5) {
+        this._ammoRechargeTimer -= 1.5;
+        this.ammo++;
+      }
+    } else {
+      this._ammoRechargeTimer = 0;
+    }
+
+    if (this.state === UnitState.MOVING || this.state === UnitState.ATTACK_MOVE) {
+      this.updateMovement(dt, map);
+    }
 
     if (this.rig) {
       // Bob / lean while moving, gentle breath at idle
-      if (this.state === UnitState.MOVING) {
+      if (this.state === UnitState.MOVING || this.state === UnitState.ATTACK_MOVE) {
         this.rig.position.y = Math.abs(Math.sin(this.animT * 11)) * 0.07;
         this.rig.rotation.z = Math.sin(this.animT * 11) * 0.04;
       } else {
         this.rig.position.y = Math.sin(this.animT * 2.2) * 0.015;
+        this.rig.rotation.z = 0;
+      }
+      // Panic: frantic trembling while routed
+      if (this.panicked) {
+        this.rig.rotation.z = Math.sin(this.animT * 28) * 0.10;
+      }
+      // Entrenched: low crouching stance
+      if (this.entrenched) {
+        this.rig.position.y = -0.08 + Math.sin(this.animT * 1.2) * 0.008;
         this.rig.rotation.z = 0;
       }
       // Attack lunge forward
@@ -689,7 +916,7 @@ export class Unit {
 
     // Arm swing when walking
     if (this.leftArm && this.rightArm) {
-      if (this.state === UnitState.MOVING) {
+      if (this.state === UnitState.MOVING || this.state === UnitState.ATTACK_MOVE) {
         const swing = Math.sin(this.animT * 11) * 0.42;
         this.leftArm.rotation.x  =  swing;
         this.rightArm.rotation.x = -swing;
@@ -704,8 +931,12 @@ export class Unit {
     this.mesh.position.z = this.worldZ;
   }
 
-  private updateMovement(dt: number, _map: GameMap) {
-    if (this.pathIndex >= this.path.length) { this.state = UnitState.IDLE; return; }
+  private updateMovement(dt: number, map: GameMap) {
+    if (this.pathIndex >= this.path.length) {
+      this.state = UnitState.IDLE;
+      this.formationSpeedCap = null;
+      return;
+    }
 
     const target = this.path[this.pathIndex];
     const tx = target.col * TILE_SIZE;
@@ -713,17 +944,143 @@ export class Unit {
     const dx = tx - this.worldX;
     const dz = tz - this.worldZ;
     const dist = Math.sqrt(dx * dx + dz * dz);
-    const step = this.speed * TILE_SIZE * dt;
+
+    // Terrain-based speed modifier
+    const tile = map.getTile(this.col, this.row);
+    let terrainMult = 1.0;
+    switch (tile?.terrain) {
+      case TerrainType.JUNGLE:   terrainMult = 0.62; break;
+      case TerrainType.MOUNTAIN: terrainMult = 0.48; break;
+      case TerrainType.HIGHLAND: terrainMult = 0.72; break;
+      case TerrainType.DESERT:   terrainMult = 0.88; break;
+    }
+    const effSpeed = this.formationSpeedCap !== null ? Math.min(this.speed, this.formationSpeedCap) : this.speed;
+    const step = effSpeed * TILE_SIZE * dt * terrainMult;
 
     if (dist <= step) {
       this.worldX = tx; this.worldZ = tz;
       this.col = target.col; this.row = target.row;
       this.pathIndex++;
-      if (this.pathIndex >= this.path.length) this.state = UnitState.IDLE;
+      if (this.pathIndex >= this.path.length) {
+        this.state = UnitState.IDLE;
+        this.formationSpeedCap = null;
+      }
     } else {
       this.worldX += (dx / dist) * step;
       this.worldZ += (dz / dist) * step;
       this.mesh.rotation.y = Math.atan2(dx, dz);
     }
+  }
+
+  /** Issue an attack-move command: unit moves along path, auto-attacks anything in range. */
+  attackMove(path: GridPos[]) {
+    if (this.panicked) return;
+    this.entrenched  = false;
+    this.path        = path;
+    this.pathIndex   = 0;
+    this.attackTarget = null;
+    this.garrisonTarget = null;
+    this.captureTarget  = null;
+    this.state       = UnitState.ATTACK_MOVE;
+  }
+
+  /**
+   * Toggle entrench: digs the unit into cover (+5 defense, HOLD state).
+   * Any movement order cancels the entrench.
+   */
+  entrench() {
+    if (this.entrenched) {
+      this.entrenched = false;
+      if (this.state === UnitState.HOLD) this.state = UnitState.IDLE;
+    } else {
+      this.entrenched = true;
+      this.state = UnitState.HOLD;
+      this.path = [];
+      this.pathIndex = 0;
+      this.attackTarget = null;
+      this.attackBuildingTarget = null;
+      this.garrisonTarget = null;
+      this.captureTarget = null;
+    }
+  }
+
+  /** Set tactical formation. Adjusts unit speed; attack/defense bonuses applied in CombatSystem. */
+  setFormation(name: string | null) {
+    this.formation = (name && FORMATIONS[name]) ? name : null;
+    const f = this.formation ? FORMATIONS[this.formation] : null;
+    this._formationSpeedMul = f ? Math.max(0.2, 1 + f.bonusSpeed) : 1.0;
+    this.speed = Math.max(0.5, this._defSpeed * this._formationSpeedMul);
+  }
+
+  /**
+   * Hero war cry: boosts morale and attack of all friendly units within 8 tiles.
+   * Returns number of units affected, or 0 if on cooldown / not a hero.
+   */
+  triggerWarCry(alliedUnits: Unit[]): number {
+    if (!this.isHero || this.warCryCooldown > 0) return 0;
+    this.warCryCooldown = 45;
+    let count = 0;
+    for (const u of alliedUnits) {
+      if (!u.isAlive()) continue;
+      const d = Math.sqrt((u.col - this.col) ** 2 + (u.row - this.row) ** 2);
+      if (d <= 8) {
+        u.morale = Math.min(100, u.morale + 30);
+        u.buffAttackTimer = 12;
+        if (u.panicked) { u.panicked = false; }
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /** Award XP and level up if threshold reached. */
+  gainXP(amount: number) {
+    if (this.level >= 3) return;
+    this.xp += amount;
+    const needed = this.level === 1 ? 50 : 150;
+    if (this.xp >= needed) this.levelUp();
+  }
+
+  private levelUp() {
+    this.level++;
+    this.attack  = Math.round(this.attack  * 1.15);
+    this.defense = Math.round(this.defense * 1.15);
+    this.maxHp   = Math.round(this.maxHp   * 1.10);
+    this.hp      = this.maxHp;
+    this.refreshLevelRing();
+  }
+
+  private refreshLevelRing() {
+    if (this._levelRing) { this.mesh.remove(this._levelRing); this._levelRing = null; }
+    if (this.level < 2) return;
+    const color = this.level >= 3 ? 0xff7700 : 0xffdd00;
+    const mat   = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.75, depthTest: false });
+    this._levelRing = new THREE.Mesh(new THREE.RingGeometry(0.68, 0.84, 32), mat);
+    this._levelRing.rotation.x = -Math.PI / 2;
+    this._levelRing.position.y = 0.04;
+    this._levelRing.renderOrder = 9;
+    this.mesh.add(this._levelRing);
+  }
+
+  markAsHero(name: string) {
+    this.isHero   = true;
+    this.heroName = name;
+    // Boost stats
+    this.maxHp    = Math.round(this.maxHp    * 1.5);
+    this.hp       = this.maxHp;
+    this.attack   = Math.round(this.attack   * 1.35);
+    this.defense  = Math.round(this.defense  * 1.5);
+    this.speed   += 0.2;
+    this._defSpeed = this.speed; // sync canonical speed with hero boost
+    // Distinctive double gold ring
+    const matOuter = new THREE.MeshBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0.90, depthTest: false });
+    const matInner = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.50, depthTest: false });
+    const outer = new THREE.Mesh(new THREE.RingGeometry(0.90, 1.10, 32), matOuter);
+    const inner = new THREE.Mesh(new THREE.RingGeometry(0.72, 0.88, 32), matInner);
+    outer.rotation.x = inner.rotation.x = -Math.PI / 2;
+    outer.position.y = 0.02;
+    inner.position.y = 0.03;
+    outer.renderOrder = inner.renderOrder = 8;
+    this.mesh.add(outer, inner);
   }
 }

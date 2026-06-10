@@ -135,6 +135,12 @@
 
         <div class="civ-select-footer">
           <button id="civ-back-btn" class="auth-btn secondary sm">← Volver</button>
+          <div class="diff-row">
+            <span class="diff-label">Dificultad IA:</span>
+            <button class="diff-btn" data-diff="easy">🌿 Fácil</button>
+            <button class="diff-btn diff-selected" data-diff="normal">⚔️ Normal</button>
+            <button class="diff-btn" data-diff="hard">🔥 Difícil</button>
+          </div>
           <button id="start-game-btn" class="auth-btn primary lg">🌎 ¡Iniciar Conquista!</button>
         </div>
       </div>
@@ -208,15 +214,24 @@
       <div id="hud-top">
         <div id="civ-badge"></div>
         <div id="resources">
-          <span class="res"><span class="res-icon">🌽</span><span id="res-food">200</span></span>
-          <span class="res"><span class="res-icon">⚜️</span><span id="res-gold">100</span></span>
-          <span class="res"><span class="res-icon">🪨</span><span id="res-stone">150</span></span>
+          <span class="res"><span class="res-icon">🌽</span><span id="res-food">200</span><span id="res-food-rate" class="res-rate"></span></span>
+          <span class="res"><span class="res-icon">⚜️</span><span id="res-gold">100</span><span id="res-gold-rate" class="res-rate"></span><span id="treasury-wrap" class="hidden" title="Progreso victoria económica (800 ⚜️)"><div id="treasury-bar-fill"></div></span></span>
+          <span class="res"><span class="res-icon">🪨</span><span id="res-stone">150</span><span id="res-stone-rate" class="res-rate"></span></span>
         </div>
         <div id="hud-extras">
-          <span id="hud-pop" title="Unidades vivas">👥 <span id="pop-count">0</span></span>
+          <span id="hud-pop" title="Población actual / Límite (Almacenes +5 cada uno)">👥 <span id="pop-count">0/25</span><div id="pop-bar-wrap"><div id="pop-bar-fill"></div></div></span>
           <span id="hud-timer">⏱ <span id="game-timer">0:00</span></span>
+          <span id="day-night-indicator" title="Ciclo día/noche">☀️</span>
+          <span id="weather-badge" title="Clima actual" style="cursor:default">☀️ Despejado</span>
+          <span id="speed-indicator" class="hidden" title="Velocidad del juego">⚡ ×1.0</span>
+          <span id="fps-counter" class="hidden">0 FPS</span>
         </div>
         <div id="hud-actions">
+          <button id="power-btn" class="power-btn" title="Poder especial (E)">
+            <span id="power-emoji">⚡</span>
+            <span id="power-label">Listo</span>
+            <div id="power-cooldown-fill"></div>
+          </button>
           <button id="settings-btn" class="hud-icon-btn" title="Configuración">⚙️</button>
         </div>
         <div id="game-status"></div>
@@ -240,11 +255,17 @@
             <span id="hp-text"></span>
           </div>
           <div id="unit-stats"></div>
+          <div id="unit-xp-row" class="hidden"></div>
         </div>
       </div>
 
-      <!-- Selection count -->
+      <!-- Selection count + group actions -->
       <div id="selection-count" class="hidden"></div>
+      <div id="group-action-bar" class="hidden">
+        <button class="grp-btn" id="grp-stop"    title="Detener todas (Espacio)">⏹ Detener</button>
+        <button class="grp-btn" id="grp-hold"    title="Posición de defensa (H)">🛡️ Posición</button>
+        <button class="grp-btn" id="grp-retreat" title="Retirada al asentamiento (R)">🏃 Retirada</button>
+      </div>
 
       <!-- Mobile action bar -->
       <div id="mobile-actions" class="hidden">
@@ -253,16 +274,65 @@
         <button class="mob-btn" id="mob-desel"  title="Deseleccionar">✕</button>
       </div>
 
+      <!-- Player scoreboard -->
+      <div id="scoreboard"></div>
+
+      <!-- Wonder countdown panel -->
+      <div id="wonder-panel" class="hidden">
+        <div id="wonder-name"></div>
+        <div class="wonder-bar-wrap"><div id="wonder-bar-fill"></div></div>
+        <div id="wonder-time"></div>
+      </div>
+
+      <!-- Hero status panel -->
+      <div id="hero-panel" class="hidden">
+        <div id="hero-panel-portrait"></div>
+        <div id="hero-panel-info">
+          <div id="hero-panel-name"></div>
+          <div id="hero-panel-status"></div>
+        </div>
+      </div>
+
+      <!-- Objectives panel -->
+      <div id="objectives-panel">
+        <div class="obj-title">🎯 Objetivos</div>
+        <div id="obj-list"></div>
+      </div>
+
+      <!-- Production queue HUD — compact row showing active training queues -->
+      <div id="prod-queue-hud" class="hidden"></div>
+
+      <!-- Building HP bar overlays -->
+      <div id="bldg-hpbar-container"></div>
+
+      <!-- Unit/building hover tooltip -->
+      <div id="hover-tooltip" class="hidden"></div>
+
+      <!-- Auto-save indicator -->
+      <div id="autosave-indicator" class="hidden">💾 Partida guardada</div>
+
+      <!-- Toast notification container -->
+      <div id="toast-container"></div>
+
       <!-- Controls hint -->
       <div id="controls-hint">
-        📱 <b>Móvil:</b> Toca para seleccionar · Doble toque/mantén para mover/atacar · Pellizca zoom &nbsp;|&nbsp;
-        🖥️ <b>PC:</b> Clic izq. seleccionar · Arrastra selección múltiple · Clic der. mover/atacar · Arrastrar der. cámara · WASD/flechas cámara · Rueda zoom · <b>Esc</b> deseleccionar · <b>Espacio</b> parar · <b>F</b> centrar · <b>Ctrl+A</b> todo · Clic edificio = producción
+        📱 <b>Móvil:</b> Toca · Doble toque para mover/atacar · Pellizca zoom &nbsp;|&nbsp;
+        🖥️ <b>PC:</b> Clic izq. seleccionar · Doble-clic = mismo tipo · Arrastra selección · Clic der. mover/atacar · WASD cámara · <b>Q</b> trabajadores · <b>R</b> retirada · <b>E</b> poder civ · <b>H</b> posición defensa · <b>I</b> unidad inactiva · <b>Tab</b> héroe · <b>G</b> fuego concentrado · <b>U</b> desalojar guarnición · <b>Ctrl+clic der.</b> capturar edificio · <b>+/-</b> velocidad · <b>P</b> pausar · <b>F</b> centrar · <b>Ctrl+A</b> todo · <b>A</b> attack-move · <b>B</b> construir · <b>?</b> ayuda
       </div>
 
       <!-- Selection box overlay -->
       <div id="selection-box"></div>
 
-      <!-- Production panel -->
+      <!-- Pause overlay -->
+      <div id="pause-overlay" class="hidden">
+        <div class="pause-card">
+          <div class="pause-icon">⏸</div>
+          <div class="pause-title">PAUSA</div>
+          <div class="pause-hint">Pulsa <kbd>P</kbd> para continuar</div>
+        </div>
+      </div>
+
+      <!-- Production panel (centered, above bottom bar) -->
       <div id="production-panel" class="hidden">
         <div class="prod-header">
           <span id="prod-building-name">Asentamiento</span>
@@ -271,6 +341,7 @@
         <div class="prod-tabs">
           <button id="prod-tab-train" class="prod-tab active">⚔️ Entrenar</button>
           <button id="prod-tab-build" class="prod-tab">🏗️ Construir</button>
+          <button id="prod-tab-upgrade" class="prod-tab">🔬 Mejoras</button>
         </div>
         <div id="prod-train-section">
           <div class="prod-section-label">Selecciona unidad</div>
@@ -284,7 +355,82 @@
         <div id="prod-build-section" class="hidden">
           <div class="prod-section-label">Selecciona edificio</div>
           <div id="prod-build-list" class="prod-unit-list"></div>
-          <div class="prod-section-label" style="font-size:10px;color:#a09070">Clic en el mapa para colocar</div>
+          <div class="prod-section-label prod-hint-label">Clic en el mapa para colocar</div>
+        </div>
+        <div id="prod-upgrade-section" class="hidden">
+          <div class="prod-section-label">Investigaciones permanentes</div>
+          <div id="prod-upgrade-list" class="prod-unit-list"></div>
+        </div>
+      </div>
+
+      <!-- Controls overlay (? key) -->
+      <div id="controls-overlay" class="hidden">
+        <div class="controls-card">
+          <div class="controls-title">⌨️ Controles</div>
+          <button id="controls-close" class="controls-close">✕</button>
+          <div class="controls-grid">
+            <div class="controls-section">
+              <div class="controls-heading">Cámara</div>
+              <div class="controls-row"><kbd>W A S D</kbd><span>Mover cámara</span></div>
+              <div class="controls-row"><kbd>Scroll</kbd><span>Zoom</span></div>
+              <div class="controls-row"><kbd>Clic derecho</kbd><span>Mover cámara (arrastrar)</span></div>
+              <div class="controls-row"><kbd>F</kbd><span>Centrar en selección</span></div>
+            </div>
+            <div class="controls-section">
+              <div class="controls-heading">Unidades</div>
+              <div class="controls-row"><kbd>Clic izq.</kbd><span>Seleccionar unidad</span></div>
+              <div class="controls-row"><kbd>Arrastrar</kbd><span>Selección por caja</span></div>
+              <div class="controls-row"><kbd>Clic der.</kbd><span>Mover / Atacar</span></div>
+              <div class="controls-row"><kbd>Shift+clic der.</kbd><span>Patrullar entre dos puntos</span></div>
+              <div class="controls-row"><kbd>A</kbd><span>Attack-move</span></div>
+              <div class="controls-row"><kbd>Space</kbd><span>Detener unidades</span></div>
+              <div class="controls-row"><kbd>Ctrl+A</kbd><span>Seleccionar todo</span></div>
+            </div>
+            <div class="controls-section">
+              <div class="controls-heading">Edificios</div>
+              <div class="controls-row"><kbd>Clic izq.</kbd><span>Abrir producción</span></div>
+              <div class="controls-row"><kbd>B</kbd><span>Panel de construcción</span></div>
+              <div class="controls-row"><kbd>Clic der.</kbd><span>Rally point (sin selección)</span></div>
+            </div>
+            <div class="controls-section">
+              <div class="controls-heading">Guerra avanzada</div>
+              <div class="controls-row"><kbd>Clic der. edificio propio</kbd><span>Guarnecer tropas (disparan desde dentro)</span></div>
+              <div class="controls-row"><kbd>U</kbd><span>Desalojar guarnición</span></div>
+              <div class="controls-row"><kbd>Ctrl+clic der.</kbd><span>Capturar edificio enemigo (cuerpo a cuerpo)</span></div>
+              <div class="controls-row"><kbd>V</kbd><span>Descarga sincronizada — unidades a distancia disparan ×2.5</span></div>
+              <div class="controls-row"><kbd>🏹</kbd><span>Munición limitada — reabastecer en asentamiento propio</span></div>
+              <div class="controls-row"><kbd>F1</kbd><span>💨 Formación suelta (+veloc., -def.)</span></div>
+              <div class="controls-row"><kbd>F2</kbd><span>🛡️ Falange (-veloc., +def.)</span></div>
+              <div class="controls-row"><kbd>F3</kbd><span>⚔️ Cuña (+atk.)</span></div>
+              <div class="controls-row"><kbd>F4</kbd><span>Formación libre</span></div>
+              <div class="controls-row"><kbd>🏡</kbd><span>Aldeas neutrales — Ctrl+clic der. para capturar (+10🌽 +6⚜️/30s)</span></div>
+              <div class="controls-row"><kbd>😱</kbd><span>Moral baja = pánico; el héroe estabiliza la línea</span></div>
+              <div class="controls-row"><kbd>🌙</kbd><span>Noche — visión -40%, daño +15% ambos bandos</span></div>
+              <div class="controls-row"><kbd>⛰️</kbd><span>Tierras altas/montaña: +ataque. Desierto: -ataque</span></div>
+              <div class="controls-row"><kbd>🐎</kbd><span>Caballería destruye edificio → saquea ⚜️ oro</span></div>
+              <div class="controls-row"><kbd>⚔️FILA</kbd><span>3+ aliados cerca = +2 def y moral rápida</span></div>
+              <div class="controls-row"><kbd>H</kbd><span>Posición de defensa (+2 def)</span></div>
+              <div class="controls-row"><kbd>X</kbd><span>🏕️ Atrincherarse (+7 def total; cancela al mover)</span></div>
+              <div class="controls-row"><kbd>R</kbd><span>Retirada al asentamiento</span></div>
+              <div class="controls-row"><kbd>G</kbd><span>Fuego concentrado</span></div>
+              <div class="controls-row"><kbd>Y</kbd><span>📯 Grito de guerra del héroe (+30 moral, +25% atk 12s)</span></div>
+              <div class="controls-row"><kbd>Tab</kbd><span>Localizar héroe</span></div>
+            </div>
+            <div class="controls-section">
+              <div class="controls-heading">Grupos y Otros</div>
+              <div class="controls-row"><kbd>Ctrl+1-5</kbd><span>Guardar grupo</span></div>
+              <div class="controls-row"><kbd>1-5</kbd><span>Recuperar grupo</span></div>
+              <div class="controls-row"><kbd>I</kbd><span>Buscar unidad inactiva</span></div>
+              <div class="controls-row"><kbd>W</kbd><span>🔨 Reparar edificio dañado (envía hasta 2 trabajadores; 5× más rápido que auto-reparación)</span></div>
+              <div class="controls-row"><kbd>T</kbd><span>🛶 Ruta comercial — convierte excedentes (100🌽→60⚜️ ó 60⚜️→100🌽; recarga 30 s)</span></div>
+              <div class="controls-row"><kbd>Q</kbd><span>Asignar trabajadores</span></div>
+              <div class="controls-row"><kbd>E</kbd><span>Poder de civilización</span></div>
+              <div class="controls-row"><kbd>+</kbd><span>Velocidad ×0.5 a ×3</span></div>
+              <div class="controls-row"><kbd>-</kbd><span>Reducir velocidad</span></div>
+              <div class="controls-row"><kbd>P</kbd><span>Pausar / Reanudar</span></div>
+              <div class="controls-row"><kbd>Escape</kbd><span>Cancelar / Deseleccionar</span></div>
+            </div>
+          </div>
         </div>
       </div>
 

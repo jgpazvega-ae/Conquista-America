@@ -40,10 +40,12 @@ export enum UnitType {
 }
 
 export enum UnitState {
-  IDLE = 'IDLE',
-  MOVING = 'MOVING',
-  ATTACKING = 'ATTACKING',
-  DEAD = 'DEAD',
+  IDLE         = 'IDLE',
+  MOVING       = 'MOVING',
+  ATTACKING    = 'ATTACKING',
+  ATTACK_MOVE  = 'ATTACK_MOVE',
+  HOLD         = 'HOLD',
+  DEAD         = 'DEAD',
 }
 
 export interface UnitStats {

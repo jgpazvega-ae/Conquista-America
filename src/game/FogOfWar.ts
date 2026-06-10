@@ -1,7 +1,10 @@
 import { MAP_COLS, MAP_ROWS } from './constants';
+import { TerrainType } from './types';
+import { BuildingType } from './buildings';
 import type { Unit } from './Unit';
 import type { Building } from './Building';
 import type { Game } from './Game';
+import type { GameMap } from './Map';
 
 export enum TileVisibility {
   UNEXPLORED = 0,
@@ -24,7 +27,7 @@ export class FogOfWar {
     }
   }
 
-  update(game: Game, playerId: number) {
+  update(game: Game, playerId: number, sightMultiplier = 1.0) {
     // Reset visibility each frame
     for (let r = 0; r < MAP_ROWS; r++) {
       for (let c = 0; c < MAP_COLS; c++) {
@@ -34,17 +37,19 @@ export class FogOfWar {
       }
     }
 
-    // Units reveal terrain
+    // Units reveal terrain (jungle tiles need extra sight to reveal — stealth mechanic)
     const myUnits = game.allUnits.filter(u => u.playerId === playerId && u.isAlive());
     for (const unit of myUnits) {
-      this.revealAroundPoint(Math.round(unit.col), Math.round(unit.row), Math.ceil(unit.sight));
+      this.revealAroundPoint(Math.round(unit.col), Math.round(unit.row), Math.ceil(unit.sight * sightMultiplier), game.map);
     }
 
-    // Buildings reveal terrain
+    // Buildings reveal terrain (watchtowers get boosted sight to match their attack range)
     const myBuildings = game.allBuildings.filter(b => b.playerId === playerId && b.isAlive());
     for (const building of myBuildings) {
-      const sightRange = building.isComplete() ? 4 : 2;
-      this.revealAroundPoint(building.col, building.row, sightRange);
+      const sightRange = building.type === BuildingType.WATCHTOWER && building.isComplete()
+        ? 7
+        : building.isComplete() ? 4 : 2;
+      this.revealAroundPoint(building.col, building.row, sightRange, game.map);
     }
 
     // Store memory of visible tiles
@@ -60,12 +65,15 @@ export class FogOfWar {
     }
   }
 
-  private revealAroundPoint(col: number, row: number, sight: number) {
+  private revealAroundPoint(col: number, row: number, sight: number, map?: GameMap) {
     for (let r = Math.max(0, row - sight); r <= Math.min(MAP_ROWS - 1, row + sight); r++) {
       for (let c = Math.max(0, col - sight); c <= Math.min(MAP_COLS - 1, col + sight); c++) {
         const dx = c - col;
         const dy = r - row;
-        if (dx * dx + dy * dy <= sight * sight) {
+        // Jungle tiles require the viewer to be within 65% of sight to reveal them (stealth)
+        const tile = map?.getTile(c, r);
+        const effectiveSight = tile?.terrain === TerrainType.JUNGLE ? sight * 0.65 : sight;
+        if (dx * dx + dy * dy <= effectiveSight * effectiveSight) {
           this.playerVisibility[r][c] = TileVisibility.VISIBLE;
         }
       }
@@ -105,9 +113,9 @@ export class FogOfWarManager {
     }
   }
 
-  update(game: Game) {
+  update(game: Game, sightMultiplier = 1.0) {
     for (const [playerId, fog] of this.fogMaps) {
-      fog.update(game, playerId);
+      fog.update(game, playerId, sightMultiplier);
     }
   }
 

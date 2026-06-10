@@ -22,12 +22,27 @@ export class InputHandler {
   private drag: DragState = { active: false, startX: 0, startY: 0, currentX: 0, currentY: 0 };
   private mouseDownPos: { x: number; y: number } | null = null;
 
-  onSelectionChange: (() => void) | null = null;
-  onMoveOrder:       (() => void) | null = null;
-  onBuildingClick:   ((buildingId: number) => void) | null = null;
-  onTerrainClick:    ((col: number, row: number) => void) | null = null;
+  onSelectionChange:  (() => void) | null = null;
+  onMoveOrder:        (() => void) | null = null;
+  onBuildingClick:    ((buildingId: number) => void) | null = null;
+  onTerrainClick:     ((col: number, row: number) => void) | null = null;
+  onTerrainHover:     ((col: number, row: number) => void) | null = null;
+  onAttackMove:       ((units: import('../game/Unit').Unit[], col: number, row: number) => void) | null = null;
+  onRallySet:         ((col: number, row: number) => void) | null = null;
+  onPatrolSet:        (() => void) | null = null;
+  onGarrisonOrder:    ((count: number, buildingId: number) => void) | null = null;
+  onCaptureOrder:     ((count: number, buildingId: number) => void) | null = null;
+  onHover:            ((unitId: number | null, buildingId: number | null, screenX: number, screenY: number, tileCol?: number, tileRow?: number) => void) | null = null;
 
-  private _placingMode = false;
+  private _placingMode     = false;
+  private _attackMoveMode  = false;
+  private _lastClickTime   = 0;
+  private _lastClickUnitId: number | null = null;
+
+  setAttackMoveMode(on: boolean) {
+    this._attackMoveMode = on;
+    this.renderer.renderer.domElement.style.cursor = on ? 'crosshair' : '';
+  }
 
   constructor(renderer: Renderer, game: Game, camera: RTSCamera) {
     this.renderer     = renderer;
@@ -54,6 +69,26 @@ export class InputHandler {
   }
 
   private onMouseMove(e: MouseEvent) {
+    // Ghost preview hover
+    if (this._placingMode && this.onTerrainHover) {
+      const hit = this.renderer.pickFromScreen(e.clientX, e.clientY);
+      if (hit?.type === 'tile') this.onTerrainHover(hit.col, hit.row);
+    }
+
+    // Unit/building hover tooltip (only when not dragging)
+    if (this.onHover && !this.drag.active && e.buttons === 0) {
+      const hit = this._placingMode ? null : this.renderer.pickFromScreen(e.clientX, e.clientY);
+      if (hit?.type === 'unit') {
+        this.onHover(hit.unitId, null, e.clientX, e.clientY);
+      } else if (hit?.type === 'building') {
+        this.onHover(null, hit.buildingId, e.clientX, e.clientY);
+      } else if (hit?.type === 'tile') {
+        this.onHover(null, null, e.clientX, e.clientY, hit.col, hit.row);
+      } else {
+        this.onHover(null, null, e.clientX, e.clientY);
+      }
+    }
+
     if (!this.mouseDownPos || e.buttons !== 1) return;
     const dx = e.clientX - this.drag.startX;
     const dy = e.clientY - this.drag.startY;
@@ -92,10 +127,26 @@ export class InputHandler {
     if (this.camera.rightClickWasDrag()) return;
 
     const selected = this.getSelectedUnits();
-    if (selected.length === 0) return;
+    if (selected.length === 0) {
+      // No units selected: right-click on terrain → set rally point
+      const hit = this.renderer.pickFromScreen(e.clientX, e.clientY);
+      if (hit?.type === 'tile') this.onRallySet?.(hit.col, hit.row);
+      return;
+    }
 
     const myUnits = selected.filter(u => u.playerId === this.game.humanPlayerId);
     if (myUnits.length === 0) return;
+
+    // Shift+right-click = set patrol route (current pos → clicked tile)
+    if (e.shiftKey) {
+      const hit = this.renderer.pickFromScreen(e.clientX, e.clientY);
+      if (hit?.type === 'tile') {
+        for (const u of myUnits) u.setPatrol(u.gridPos(), { col: hit.col, row: hit.row });
+        this.onMoveOrder?.();
+        this.onPatrolSet?.();
+      }
+      return;
+    }
 
     const hit = this.renderer.pickFromScreen(e.clientX, e.clientY);
     if (!hit) return;
@@ -109,14 +160,71 @@ export class InputHandler {
       return;
     }
 
+    if (hit.type === 'building') {
+      const bldg = this.game.getBuildingById(hit.buildingId);
+      if (!bldg || !bldg.isAlive()) return;
+      if (bldg.playerId !== this.game.humanPlayerId) {
+        if (e.ctrlKey && bldg.isComplete() && bldg.garrison.length === 0) {
+          // Ctrl+right-click → capture: melee units seize the building intact
+          let ordered = 0;
+          for (const u of myUnits) {
+            if (u.attackRange > 1.5 || u.panicked || u.garrisonedIn !== null) continue;
+            u.captureTarget = bldg;
+            u.attackTarget = null;
+            u.attackBuildingTarget = null;
+            u.garrisonTarget = null;
+            const near = this.game.map.findWalkableNear(bldg.col, bldg.row, 3);
+            if (near) {
+              const path = findPath(this.game.map, u.gridPos(), { col: near[0], row: near[1] }, 300);
+              if (path.length > 0) { u.path = path; u.pathIndex = 0; u.state = UnitState.MOVING; }
+            }
+            ordered++;
+          }
+          if (ordered > 0) {
+            this.onCaptureOrder?.(ordered, bldg.id);
+            this.onMoveOrder?.();
+          }
+          return;
+        }
+        for (const u of myUnits) u.attackBuilding(bldg);
+        this.onMoveOrder?.();
+      } else if (bldg.isComplete() && bldg.garrisonCapacity > 0) {
+        // Right-click own building → garrison selected units inside
+        const free = bldg.garrisonCapacity - bldg.garrison.length;
+        let ordered = 0;
+        for (const u of myUnits) {
+          if (ordered >= free || u.panicked || u.garrisonedIn !== null) continue;
+          u.garrisonTarget = bldg;
+          const near = this.game.map.findWalkableNear(bldg.col, bldg.row, 3);
+          if (near) {
+            const path = findPath(this.game.map, u.gridPos(), { col: near[0], row: near[1] }, 300);
+            if (path.length > 0) {
+              u.path = path; u.pathIndex = 0; u.state = UnitState.MOVING;
+            }
+          }
+          ordered++;
+        }
+        if (ordered > 0) {
+          this.onGarrisonOrder?.(ordered, bldg.id);
+          this.onMoveOrder?.();
+        }
+      }
+      return;
+    }
+
     if (hit.type === 'tile') {
       const map = this.game.map;
-      // Compute centroid for move marker
+      // Formation movement: preserve unit offsets from their centroid
+      let cx = 0, cz = 0;
+      for (const u of myUnits) { cx += u.col; cz += u.row; }
+      cx /= myUnits.length; cz /= myUnits.length;
+
       let sumX = 0, sumZ = 0, moved = 0;
-      myUnits.forEach((unit, i) => {
-        const offset = this.spreadOffset(i, myUnits.length);
-        const tc = hit.col + offset[0];
-        const tr = hit.row + offset[1];
+      myUnits.forEach((unit) => {
+        const offsetC = myUnits.length > 1 ? Math.round(unit.col - cx) : 0;
+        const offsetR = myUnits.length > 1 ? Math.round(unit.row - cz) : 0;
+        const tc = hit.col + offsetC;
+        const tr = hit.row + offsetR;
         const near = map.findWalkableNear(tc, tr, 3);
         if (!near) return;
         const path = findPath(map, unit.gridPos(), { col: near[0], row: near[1] }, 400);
@@ -129,6 +237,13 @@ export class InputHandler {
           unit.state = UnitState.IDLE;
         }
       });
+      // Formation march: the whole group keeps pace with its slowest member
+      if (moved > 1) {
+        const minSpeed = Math.min(...myUnits.map(u => u.speed));
+        for (const u of myUnits) {
+          if (u.state === UnitState.MOVING) u.formationSpeedCap = minSpeed;
+        }
+      }
       // Show move marker at centroid of ordered destinations
       if (moved > 0) {
         this.renderer.showMoveMarker(sumX / moved, sumZ / moved);
@@ -156,8 +271,17 @@ export class InputHandler {
 
     // Placement mode intercepts terrain clicks
     if (this._placingMode) {
+      if (hit?.type === 'tile') this.onTerrainClick?.(hit.col, hit.row);
+      return;
+    }
+
+    // Attack-move mode: issue attack-move order to selected units
+    if (this._attackMoveMode) {
+      this._attackMoveMode = false;
+      this.renderer.renderer.domElement.style.cursor = '';
       if (hit?.type === 'tile') {
-        this.onTerrainClick?.(hit.col, hit.row);
+        const myUnits = this.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId);
+        if (myUnits.length > 0) this.onAttackMove?.(myUnits, hit.col, hit.row);
       }
       return;
     }
@@ -168,7 +292,26 @@ export class InputHandler {
       const unit = this.game.getUnitById(hit.unitId);
       if (unit?.isAlive()) {
         const canSee = this.game.fog.canSeeUnit(unit, this.game.humanPlayerId);
-        if (canSee) unit.setSelected(true);
+        if (canSee) {
+          const now = Date.now();
+          const isDouble = now - this._lastClickTime < 300 && this._lastClickUnitId === hit.unitId;
+          if (isDouble && unit.playerId === this.game.humanPlayerId) {
+            // Double-click: select all visible alive same-type units
+            const targetType = unit.def.type;
+            for (const u of this.game.getAllUnits()) {
+              u.setSelected(
+                u.isAlive() &&
+                u.playerId === this.game.humanPlayerId &&
+                u.def.type === targetType &&
+                this.game.fog.canSeeUnit(u, this.game.humanPlayerId),
+              );
+            }
+          } else {
+            unit.setSelected(true);
+          }
+          this._lastClickTime   = now;
+          this._lastClickUnitId = hit.unitId;
+        }
       }
       this.onSelectionChange?.();
       return;
@@ -194,6 +337,7 @@ export class InputHandler {
     for (const unit of this.game.getAllUnits()) {
       if (!unit.isAlive()) continue;
       if (unit.playerId !== this.game.humanPlayerId) continue;
+      if (unit.garrisonedIn !== null) continue;
       const pos = this.renderer.worldToScreen(unit.worldX, 0.5, unit.worldZ);
       if (pos.x >= x1 && pos.x <= x2 && pos.y >= y1 && pos.y <= y2) {
         unit.setSelected(true);

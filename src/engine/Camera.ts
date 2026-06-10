@@ -33,6 +33,10 @@ export class RTSCamera {
   private mouseX = 0;
   private mouseY = 0;
 
+  // Camera shake
+  private _shakeIntensity = 0;
+  private _shakeDuration  = 0;
+
   constructor(camera: THREE.PerspectiveCamera) {
     this.camera   = camera;
     this.targetX  = this.currentX = (MAP_COLS / 2) * TILE_SIZE;
@@ -127,6 +131,9 @@ export class RTSCamera {
     this.currentX += (this.targetX - this.currentX) * lerp;
     this.currentZ += (this.targetZ - this.currentZ) * lerp;
 
+    // Decay shake
+    if (this._shakeDuration > 0) this._shakeDuration -= dt;
+
     this.applyTransform();
   }
 
@@ -136,11 +143,18 @@ export class RTSCamera {
     const offY    = Math.sin(tiltRad) * dist;
     const offZ    = Math.cos(tiltRad) * dist;
 
-    const cx = this.currentX + Math.sin(this.yaw) * offZ;
-    const cz = this.currentZ + Math.cos(this.yaw) * offZ;
+    let sx = 0, sz = 0;
+    if (this._shakeDuration > 0) {
+      const mag = this._shakeIntensity * this._shakeDuration;
+      sx = (Math.random() * 2 - 1) * mag;
+      sz = (Math.random() * 2 - 1) * mag;
+    }
+
+    const cx = this.currentX + Math.sin(this.yaw) * offZ + sx;
+    const cz = this.currentZ + Math.cos(this.yaw) * offZ + sz;
 
     this.camera.position.set(cx, offY, cz);
-    this.camera.lookAt(this.currentX, 0, this.currentZ);
+    this.camera.lookAt(this.currentX + sx * 0.3, 0, this.currentZ + sz * 0.3);
   }
 
   panTo(worldX: number, worldZ: number) {
@@ -155,8 +169,18 @@ export class RTSCamera {
     return this._rightDragDist > 6;
   }
 
+  /** Trigger a camera shake. intensity is world-units peak offset; duration in seconds decays linearly. */
+  shake(intensity: number, duration: number) {
+    if (intensity > this._shakeIntensity || this._shakeDuration <= 0) {
+      this._shakeIntensity = intensity;
+      this._shakeDuration  = duration;
+    }
+  }
+
   getZoom(): number { return this.zoom; }
   setZoom(z: number) { this.zoom = THREE.MathUtils.clamp(z, CAMERA_ZOOM_MIN, CAMERA_ZOOM_MAX); }
+
+  getPosition(): { x: number; z: number } { return { x: this.currentX, z: this.currentZ }; }
 
   /** Translate screen pixel delta → world pan (called from TouchHandler & right-drag) */
   panByPixels(dx: number, dy: number) {

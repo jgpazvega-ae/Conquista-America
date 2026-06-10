@@ -1,5 +1,6 @@
 import type { Player } from './Player';
 import type { Game } from './Game';
+import { BuildingType } from './buildings';
 
 export interface EconomyStats {
   foodProduction: number;
@@ -25,11 +26,12 @@ export class EconomyManager {
       const stats = this.calculateStats(player, game);
       this.stats.set(player.id, stats);
 
-      // Apply passive income to all players each tick
+      // Apply passive income; cap at 2000 to avoid runaway accumulation
       const rate = player.isHuman ? 0.25 : 0.35; // AI slight advantage for difficulty
-      player.resources.food  = Math.max(0, player.resources.food  + stats.netProduction.food  * rate);
-      player.resources.gold  = Math.max(0, player.resources.gold  + stats.netProduction.gold  * rate);
-      player.resources.stone = Math.max(0, player.resources.stone + stats.netProduction.stone * rate);
+      const cap  = 2000;
+      player.resources.food  = Math.min(cap, Math.max(0, player.resources.food  + stats.netProduction.food  * rate));
+      player.resources.gold  = Math.min(cap, Math.max(0, player.resources.gold  + stats.netProduction.gold  * rate));
+      player.resources.stone = Math.min(cap, Math.max(0, player.resources.stone + stats.netProduction.stone * rate));
     }
   }
 
@@ -58,6 +60,17 @@ export class EconomyManager {
         goldProd += 40;
       }
     }
+
+    // Trade routes: pairs of Storehouses within 10 tiles (max 2 active routes)
+    const stores = game.allBuildings.filter(b => b.playerId === player.id && b.isComplete() && b.type === BuildingType.STOREHOUSE);
+    let routes = 0;
+    for (let i = 0; i < stores.length && routes < 2; i++) {
+      for (let j = i + 1; j < stores.length && routes < 2; j++) {
+        const d = Math.sqrt((stores[i].col - stores[j].col) ** 2 + (stores[i].row - stores[j].row) ** 2);
+        if (d <= 10) routes++;
+      }
+    }
+    goldProd += routes * 20; // 20 gold/5s per route (~60 gold/min each)
 
     // Unit consumption
     const unitCount = player.aliveUnits.length;

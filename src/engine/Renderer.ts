@@ -27,6 +27,12 @@ export class Renderer {
   private waterMat?: THREE.ShaderMaterial;
   private sunDir = new THREE.Vector3(0.4, 1.0, 0.3).normalize();
 
+  // Day/night cycle — references kept for runtime updates
+  private _ambientLight: THREE.AmbientLight | null = null;
+  private _sunLight:     THREE.DirectionalLight | null = null;
+  private _hemiLight:    THREE.HemisphereLight | null = null;
+  private _fillLight:    THREE.DirectionalLight | null = null;
+
   // Height field for placing entities on the terrain surface
   private heightField: Float32Array = new Float32Array(0);
   private hfCols = 0; // = map.cols
@@ -47,6 +53,29 @@ export class Renderer {
   // ── Markers ────────────────────────────────────────────────────────────────
   private moveMarkers: { mesh: THREE.Mesh; age: number }[] = [];
   private objMarkers:  { group: THREE.Group; phase: number }[] = [];
+
+  // ── Ghost building preview ─────────────────────────────────────────────────
+  private _ghostMesh: THREE.Group | null = null;
+  private _ghostMat: THREE.MeshStandardMaterial | null = null;
+
+  // ── Unit path visualization ────────────────────────────────────────────────
+  private _pathDots: THREE.Mesh[] = [];
+
+  // ── Rally point marker ─────────────────────────────────────────────────────
+  private _rallyMarker: THREE.Group | null = null;
+  private _rallyPhase  = 0;
+
+  // ── Attack range ring for selected unit ────────────────────────────────────
+  private _rangeRing: THREE.Mesh | null = null;
+
+  // ── Patrol path line ────────────────────────────────────────────────────────
+  private _patrolLine: THREE.Line | null = null;
+
+  // ── Rain effect ────────────────────────────────────────────────────────────
+  private _rainSystem: THREE.Points | null = null;
+  private _rainPositions: Float32Array | null = null;
+  private _rainActive = false;
+  private static readonly RAIN_COUNT = 1200;
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -107,9 +136,11 @@ export class Renderer {
     // ── Lighting rig: warm key sun + cool sky fill + soft ambient ──────────────
     const ambient = new THREE.AmbientLight(0xffffff, 0.35);
     this.scene.add(ambient);
+    this._ambientLight = ambient;
 
     const hemi = new THREE.HemisphereLight(0xbfd8ff, 0x4a4030, 0.65);
     this.scene.add(hemi);
+    this._hemiLight = hemi;
 
     const sun = new THREE.DirectionalLight(0xfff1d4, 2.1);
     sun.position.copy(this.sunDir).multiplyScalar(120);
@@ -125,11 +156,13 @@ export class Renderer {
     sun.shadow.normalBias = 0.5;
     this.scene.add(sun);
     this.scene.add(sun.target);
+    this._sunLight = sun;
 
     // Cool rim/fill from opposite side to sculpt silhouettes
     const fill = new THREE.DirectionalLight(0x9fc0ff, 0.45);
     fill.position.set(-60, 40, -50);
     this.scene.add(fill);
+    this._fillLight = fill;
 
     this.scene.add(this.tileGroup);
     this.scene.add(this.decoGroup);
@@ -659,11 +692,234 @@ export class Renderer {
     this.fogTexture.needsUpdate = true;
   }
 
+  /** Place a pulsing flag at the rally point grid position. Replaces any existing rally marker. */
+  setRallyMarker(col: number, row: number) {
+    this.clearRallyMarker();
+    const wx = col * TILE_SIZE + TILE_SIZE / 2;
+    const wz = row * TILE_SIZE + TILE_SIZE / 2;
+    const y  = this.getHeightAt(wx, wz);
+    const group = new THREE.Group();
+    group.position.set(wx, y, wz);
+    group.userData.baseY = y;
+
+    // Flagpole
+    const poleMat = new THREE.MeshBasicMaterial({ color: 0xddddcc });
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.2, 6), poleMat);
+    pole.position.y = 1.1;
+    group.add(pole);
+
+    // Flag (flat box)
+    const flagMat = new THREE.MeshBasicMaterial({ color: 0x44ccff, transparent: true, opacity: 0.92, side: THREE.DoubleSide });
+    const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.45), flagMat);
+    flag.position.set(0.4, 2.15, 0);
+    flag.rotation.y = Math.PI / 2;
+    group.add(flag);
+
+    // Ground ring
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0x44ccff, transparent: true, opacity: 0.65, side: THREE.DoubleSide, depthWrite: false });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.35, 0.55, 20), ringMat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.06;
+    ring.renderOrder = 4;
+    group.add(ring);
+
+    group.renderOrder = 6;
+    this.scene.add(group);
+    this._rallyMarker = group;
+    this._rallyPhase  = 0;
+  }
+
+  clearRallyMarker() {
+    if (this._rallyMarker) {
+      this.scene.remove(this._rallyMarker);
+      this._rallyMarker = null;
+    }
+  }
+
+  /** Show a dashed range ring around a world position. radius in world units. */
+  showRangeRing(worldX: number, worldZ: number, radius: number, color = 0x88ddff) {
+    this.clearRangeRing();
+    const y = this.getHeightAt(worldX, worldZ) + 0.08;
+    const mat = new THREE.MeshBasicMaterial({
+      color, transparent: true, opacity: 0.40,
+      side: THREE.DoubleSide, depthWrite: false,
+    });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(radius - 0.12, radius + 0.12, 48), mat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(worldX, y, worldZ);
+    ring.renderOrder = 4;
+    this.scene.add(ring);
+    this._rangeRing = ring;
+  }
+
+  clearRangeRing() {
+    if (this._rangeRing) {
+      this.scene.remove(this._rangeRing);
+      (this._rangeRing.material as THREE.Material).dispose();
+      this._rangeRing = null;
+    }
+  }
+
+  showPatrolPath(ax: number, az: number, bx: number, bz: number) {
+    this.clearPatrolPath();
+    const ya = this.getHeightAt(ax, az) + 0.12;
+    const yb = this.getHeightAt(bx, bz) + 0.12;
+    const points = [new THREE.Vector3(ax, ya, az), new THREE.Vector3(bx, yb, bz)];
+    const geo = new THREE.BufferGeometry().setFromPoints(points);
+    const mat = new THREE.LineBasicMaterial({ color: 0x00ddff, transparent: true, opacity: 0.55, depthWrite: false });
+    this._patrolLine = new THREE.Line(geo, mat);
+    this._patrolLine.renderOrder = 5;
+    this.scene.add(this._patrolLine);
+    // Endpoint markers
+    for (const [wx, wz, y] of [[ax, az, ya], [bx, bz, yb]] as [number, number, number][]) {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.18, 0.30, 20),
+        new THREE.MeshBasicMaterial({ color: 0x00ddff, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }),
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(wx, y, wz);
+      ring.renderOrder = 5;
+      this._patrolLine.add(ring);
+    }
+  }
+
+  clearPatrolPath() {
+    if (this._patrolLine) {
+      this.scene.remove(this._patrolLine);
+      this._patrolLine.traverse(c => {
+        if (c instanceof THREE.Mesh || c instanceof THREE.Line) {
+          c.geometry.dispose();
+          (c.material as THREE.Material).dispose();
+        }
+      });
+      this._patrolLine = null;
+    }
+  }
+
   updateEffects(dt: number) {
     this.effects.update(dt);
     if (this.waterMat) this.waterMat.uniforms.time.value += dt;
     this.updateMarkers(dt);
+    this.updateRain(dt);
+    // Animate rally marker: gentle bob + ring pulse
+    if (this._rallyMarker) {
+      this._rallyPhase += dt * 2.2;
+      this._rallyMarker.position.y = this._rallyMarker.userData.baseY + Math.sin(this._rallyPhase) * 0.12;
+      const ring = this._rallyMarker.children[2] as THREE.Mesh;
+      const ps = 1 + Math.sin(this._rallyPhase * 1.5) * 0.15;
+      ring.scale.set(ps, ps, ps);
+      (ring.material as THREE.MeshBasicMaterial).opacity = 0.5 + Math.sin(this._rallyPhase) * 0.2;
+    }
   }
+
+  /**
+   * Update scene lighting for time-of-day.
+   * @param t Normalised time: 0 = midnight, 0.25 = dawn, 0.5 = noon, 0.75 = dusk
+   */
+  setDayNight(t: number) {
+    if (!this._ambientLight || !this._sunLight || !this._hemiLight || !this._fillLight) return;
+
+    // sun elevation: rises at t=0.25, peaks t=0.5, sets t=0.75
+    const sunElevation = Math.sin((t - 0.25) * Math.PI * 2); // -1..1, positive during day
+
+    // Daytime fraction for interpolation
+    const dayFraction = THREE.MathUtils.clamp((sunElevation + 0.1) / 1.1, 0, 1);
+
+    // Ambient: bright white at noon, deep blue at midnight
+    const ambIntensity = 0.12 + dayFraction * 0.38;
+    this._ambientLight.intensity = ambIntensity;
+
+    // Sun: warm at dawn/dusk, white at noon, off at night
+    const sunIntensity = Math.max(0, sunElevation) * 2.4;
+    this._sunLight.intensity = sunIntensity;
+    // Colour: orange at dawn/dusk, white at noon
+    const warmth = 1 - Math.abs(sunElevation - 0.5) * 0.8; // 0 at rise/set, 1 at noon
+    this._sunLight.color.setRGB(1.0, 0.85 + warmth * 0.15, 0.65 + warmth * 0.35);
+
+    // Sun position arc: rises east (−x), peaks above, sets west (+x)
+    const sunAngle = (t - 0.25) * Math.PI * 2;
+    this._sunLight.position.set(
+      Math.sin(sunAngle) * 100,
+      Math.cos(sunAngle) * 80 + 20,
+      40,
+    );
+    this._sunLight.target.position.set(0, 0, 0);
+
+    // Hemisphere: sky blue during day, deep violet at night
+    const skyR = 0.55 + dayFraction * 0.20;
+    const skyG = 0.65 + dayFraction * 0.20;
+    const skyB = 0.80 + dayFraction * 0.20;
+    this._hemiLight.color.setRGB(skyR, skyG, skyB);
+    this._hemiLight.groundColor.setRGB(0.18 + dayFraction * 0.11, 0.15 + dayFraction * 0.10, 0.09 + dayFraction * 0.06);
+    this._hemiLight.intensity = 0.25 + dayFraction * 0.55;
+
+    // Fill: only noticeable at night as cool moonlight
+    this._fillLight.intensity = THREE.MathUtils.clamp(0.35 - dayFraction * 0.28, 0.07, 0.35);
+
+    // Background sky colour
+    const bgR = 0.04 + dayFraction * 0.35;
+    const bgG = 0.05 + dayFraction * 0.45;
+    const bgB = 0.12 + dayFraction * 0.50;
+    this.scene.background = new THREE.Color(bgR, bgG, bgB);
+  }
+
+  /** Start rain particles. Call stopRain() to end. */
+  startRain() {
+    if (this._rainSystem) return;
+    const N = Renderer.RAIN_COUNT;
+    const positions = new Float32Array(N * 3);
+    const SPREAD = 80;
+    for (let i = 0; i < N; i++) {
+      positions[i * 3]     = (Math.random() - 0.5) * SPREAD;
+      positions[i * 3 + 1] = Math.random() * 30 + 5;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * SPREAD;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const mat = new THREE.PointsMaterial({
+      color: 0x99ccff, size: 0.09, transparent: true, opacity: 0.45,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    });
+    this._rainSystem = new THREE.Points(geo, mat);
+    this._rainSystem.renderOrder = 10;
+    this._rainPositions = positions;
+    this.scene.add(this._rainSystem);
+    this._rainActive = true;
+  }
+
+  stopRain() {
+    if (!this._rainSystem) return;
+    this.scene.remove(this._rainSystem);
+    (this._rainSystem.geometry as THREE.BufferGeometry).dispose();
+    (this._rainSystem.material as THREE.Material).dispose();
+    this._rainSystem = null;
+    this._rainPositions = null;
+    this._rainActive = false;
+  }
+
+  private updateRain(dt: number) {
+    if (!this._rainActive || !this._rainSystem || !this._rainPositions) return;
+    const N = Renderer.RAIN_COUNT;
+    const fallSpeed = 18 * dt;
+    const drift = 2 * dt;
+    const SPREAD = 80;
+    // Follow camera roughly
+    const camX = this.camera.position.x;
+    const camZ = this.camera.position.z;
+    for (let i = 0; i < N; i++) {
+      this._rainPositions[i * 3 + 1] -= fallSpeed;
+      this._rainPositions[i * 3]     -= drift;
+      if (this._rainPositions[i * 3 + 1] < 0) {
+        this._rainPositions[i * 3]     = camX + (Math.random() - 0.5) * SPREAD;
+        this._rainPositions[i * 3 + 1] = 28 + Math.random() * 8;
+        this._rainPositions[i * 3 + 2] = camZ + (Math.random() - 0.5) * SPREAD;
+      }
+    }
+    (this._rainSystem.geometry as THREE.BufferGeometry)
+      .attributes.position.needsUpdate = true;
+  }
+
+  get isRaining() { return this._rainActive; }
 
   render() {
     this.renderer.render(this.scene, this.camera);
@@ -717,5 +973,59 @@ export class Renderer {
       x: ((v.x + 1) / 2) * window.innerWidth,
       y: ((-v.y + 1) / 2) * window.innerHeight,
     };
+  }
+
+  showGhost(color: number) {
+    this.hideGhost();
+    const group = new THREE.Group();
+    const geo = new THREE.BoxGeometry(1.8, 2, 1.8);
+    const mat = new THREE.MeshStandardMaterial({
+      color,
+      opacity: 0.35,
+      transparent: true,
+      depthWrite: false,
+    });
+    group.add(new THREE.Mesh(geo, mat));
+    this.scene.add(group);
+    this._ghostMesh = group;
+    this._ghostMat  = mat;
+  }
+
+  updateGhostAt(col: number, row: number, valid = true) {
+    if (!this._ghostMesh) return;
+    this._ghostMesh.position.set(col * TILE_SIZE, 1, row * TILE_SIZE);
+    if (this._ghostMat) {
+      this._ghostMat.color.setHex(valid ? 0x44dd88 : 0xdd3333);
+      this._ghostMat.opacity = valid ? 0.38 : 0.45;
+    }
+  }
+
+  hideGhost() {
+    if (!this._ghostMesh) return;
+    this.scene.remove(this._ghostMesh);
+    this._ghostMesh = null;
+    this._ghostMat  = null;
+  }
+
+  showUnitPath(path: import('../game/types').GridPos[], fromIndex = 0) {
+    this.clearUnitPath();
+    const geo = new THREE.CircleGeometry(0.18, 8);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x44aaff, transparent: true, opacity: 0.65, depthTest: false,
+    });
+    const step = Math.max(1, Math.ceil((path.length - fromIndex) / 24)); // max 24 dots
+    for (let i = fromIndex; i < path.length; i += step) {
+      const dot = new THREE.Mesh(geo, mat);
+      dot.rotation.x = -Math.PI / 2;
+      dot.position.set(path[i].col * TILE_SIZE, 0.06, path[i].row * TILE_SIZE);
+      dot.renderOrder = 5;
+      this.scene.add(dot);
+      this._pathDots.push(dot);
+    }
+  }
+
+  clearUnitPath() {
+    for (const dot of this._pathDots) this.scene.remove(dot);
+    this._pathDots = [];
   }
 }

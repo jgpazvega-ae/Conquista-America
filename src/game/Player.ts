@@ -9,6 +9,13 @@ export interface Resources {
   stone: number;
 }
 
+export interface PlayerUpgrades {
+  metallurgy:    boolean; // +6 attack all units
+  logistics:     boolean; // +0.4 speed all units
+  fortification: boolean; // +50 HP all units
+  civTech:       boolean; // civilization-specific elite upgrade
+}
+
 export class Player {
   readonly id: number;
   readonly civType: CivilizationType;
@@ -17,6 +24,12 @@ export class Player {
 
   resources: Resources;
   units: Unit[] = [];
+  upgrades: PlayerUpgrades = { metallurgy: false, logistics: false, fortification: false, civTech: false };
+
+  // Civilization power state
+  powerCooldown   = 0;      // seconds remaining until next use
+  powerActive     = false;  // is the buff currently active?
+  powerActiveTimer= 0;      // seconds remaining on active buff
 
   // Simple AI state
   aiTimer = 0;

@@ -204,6 +204,12 @@ export class SaveSystem {
     if (stats.gamesPlayed >= 10) add('veteran');
   }
 
+  saveCheckpoint(data: { civ: CivilizationType; gameTime: number; kills: number; food: number; gold: number; stone: number }) {
+    try {
+      localStorage.setItem('conquista_checkpoint', JSON.stringify({ ...data, savedAt: Date.now() }));
+    } catch { /* storage full or unavailable */ }
+  }
+
   updateCivPreference(civ: CivilizationType) {
     const profile = this.getProfile();
     if (!profile) return;

@@ -162,6 +162,76 @@ export class AudioManager {
       }, 12000 + Math.random() * 8000);
     };
     scheduleChatter();
+
+    // Pentatonic flute motif every 18–30 s (A minor pentatonic: A4-C5-D5-E5-G5)
+    const PENTA = [440, 523, 587, 659, 784];
+    const scheduleFlute = () => {
+      setTimeout(() => {
+        if (!this.ctx) return;
+        const len = 3 + Math.floor(Math.random() * 3); // 3–5 notes
+        const root = PENTA[Math.floor(Math.random() * 2)]; // A4 or C5 start
+        let t = 0;
+        for (let i = 0; i < len; i++) {
+          const f = PENTA[Math.floor(Math.random() * PENTA.length)];
+          const dur = 0.30 + Math.random() * 0.25;
+          this.osc(f, 'sine',     dur, 0.020 * this.musicVol, t);
+          this.osc(f, 'triangle', dur * 0.6, 0.008 * this.musicVol, t + 0.01);
+          t += dur * 0.65 + 0.05;
+        }
+        void root; // suppress unused warning
+        scheduleFlute();
+      }, (18 + Math.random() * 12) * 1000);
+    };
+    scheduleFlute();
+  }
+
+  playBuildingDestroyed() {
+    // Deep crumble + rumble
+    this.noise(0.60, 0.40, 350);
+    this.noise(0.35, 0.28, 800, 0.05);
+    this.osc(80,  'sawtooth', 0.50, 0.22, 0,  30);
+    this.osc(50,  'sine',     0.70, 0.18, 0.1, 25);
+    this.osc(160, 'sawtooth', 0.20, 0.10, 0.02, 60);
+  }
+
+  playLevelUp() {
+    // Ascending arpeggio: C4-E4-G4-C5
+    [262, 330, 392, 524].forEach((f, i) => this.osc(f, 'sine',     0.22, 0.22, i * 0.09));
+    [262, 330, 392, 524].forEach((f, i) => this.osc(f, 'triangle', 0.18, 0.10, i * 0.09 + 0.03));
+    this.osc(200, 'sine', 0.15, 0.10, 0, 100);
+  }
+
+  playTrainingComplete() {
+    // Short military horn: two rising notes
+    this.osc(330, 'triangle', 0.12, 0.16);
+    this.osc(440, 'triangle', 0.14, 0.18, 0.11);
+    this.osc(220, 'sine',     0.10, 0.10, 0.02);
+  }
+
+  playResourceDepleted() {
+    // Low warning thud
+    this.osc(140, 'sine',     0.20, 0.14, 0,    60);
+    this.osc(100, 'triangle', 0.18, 0.10, 0.06, 50);
+    this.noise(0.15, 0.08, 250, 0.02);
+  }
+
+  playRetreat() {
+    // Urgent descending horn: high → low two-note fall
+    this.osc(440, 'sawtooth', 0.18, 0.055 * this.effectsVol, 0,    340);
+    this.osc(330, 'sawtooth', 0.22, 0.055 * this.effectsVol, 0.20, 300);
+    this.osc(262, 'sawtooth', 0.20, 0.040 * this.effectsVol, 0.44, 220);
+  }
+
+  playResearchComplete() {
+    // Triumphant ascending arpeggio (C-E-G-C)
+    const notes = [262, 330, 392, 523];
+    notes.forEach((f, i) => {
+      this.osc(f, 'triangle', 0.30, 0.045 * this.musicVol, i * 0.12, f + 30);
+      this.osc(f * 2, 'sine', 0.18, 0.015 * this.musicVol, i * 0.12 + 0.04);
+    });
+    // Final chord sustain
+    this.osc(523, 'sine',     0.55, 0.030 * this.musicVol, 0.50);
+    this.osc(659, 'triangle', 0.55, 0.020 * this.musicVol, 0.50);
   }
 
   // ── Volume control ───────────────────────────────────────────────────────────

@@ -18,6 +18,10 @@ export class ResourceNode {
   amount: number;
   maxAmount: number;
   baseY = 0;
+  private regenTimer = 0;
+  private static readonly REGEN_DELAY = 120; // 2 minutes before partial regen
+  private static readonly REGEN_AMOUNT = 0.55; // restore to 55% of original
+  justRegenerated = false; // set for one frame when regen fires; read by Game.ts
 
   mesh!: THREE.Group;
 
@@ -81,11 +85,23 @@ export class ResourceNode {
   gather(amount: number): number {
     const taken = Math.min(amount, this.amount);
     this.amount = Math.max(0, this.amount - taken);
+    if (this.amount <= 0) this.regenTimer = 0; // start regen countdown
     return taken;
   }
 
   isEmpty(): boolean {
     return this.amount <= 0;
+  }
+
+  updateRegen(dt: number) {
+    this.justRegenerated = false;
+    if (this.amount > 0) return;
+    this.regenTimer += dt;
+    if (this.regenTimer >= ResourceNode.REGEN_DELAY) {
+      this.amount = Math.floor(this.maxAmount * ResourceNode.REGEN_AMOUNT);
+      this.regenTimer = 0;
+      this.justRegenerated = true;
+    }
   }
 
   updateVisibility() {
