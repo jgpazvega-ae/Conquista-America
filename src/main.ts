@@ -123,6 +123,7 @@ class GameInstance {
   private builtCount  = 0;
   private endHandled  = false;
   private unitGroups    = new Map<number, number[]>();
+  private _tradeCooldown = 0; // seconds until next manual trade
   private _placingType: BuildingType | null = null;
   private _panelBuilding: import('./game/Building').Building | null = null;
   private _unitLevels           = new Map<number, number>();
@@ -461,6 +462,7 @@ class GameInstance {
     const dt = rawDt * this._gameSpeed;
 
     this.updateFpsCounter(rawDt);
+    if (this._tradeCooldown > 0) this._tradeCooldown = Math.max(0, this._tradeCooldown - rawDt);
     this.game.update(dt);
 
     // Register any units produced this frame
@@ -1272,6 +1274,31 @@ class GameInstance {
           this.hud.notify(`🔨 ${sent} trabajador${sent > 1 ? 'es' : ''} reparando ${damaged.def.name}`, 'info');
           this.hintOnce('repair', '💡 W: envía trabajadores a reparar el edificio más dañado. Los trabajadores reparan 5× más rápido que la reparación automática.');
         }
+        return;
+      }
+      // T: manual trade — convert excess resources (30 s cooldown)
+      if (e.code === 'KeyT' && !e.ctrlKey && !e.altKey) {
+        if (this._tradeCooldown > 0) {
+          this.hud.notify(`🛶 Próximo comercio en ${Math.ceil(this._tradeCooldown)}s`, 'info');
+          return;
+        }
+        const p = this.game.humanPlayer;
+        const FOOD_TO_GOLD = 100; const GOLD_REWARD = 60;
+        const GOLD_TO_FOOD = 60;  const FOOD_REWARD = 100;
+        if (p.resources.food >= p.resources.gold && p.resources.food >= FOOD_TO_GOLD) {
+          p.resources.food -= FOOD_TO_GOLD;
+          p.resources.gold = Math.min(2000, p.resources.gold + GOLD_REWARD);
+          this.hud.notify(`🛶 Ruta comercial: -${FOOD_TO_GOLD}🌽 → +${GOLD_REWARD}⚜️`, 'info');
+          this._tradeCooldown = 30;
+        } else if (p.resources.gold >= GOLD_TO_FOOD) {
+          p.resources.gold -= GOLD_TO_FOOD;
+          p.resources.food = Math.min(2000, p.resources.food + FOOD_REWARD);
+          this.hud.notify(`🛶 Ruta comercial: -${GOLD_TO_FOOD}⚜️ → +${FOOD_REWARD}🌽`, 'info');
+          this._tradeCooldown = 30;
+        } else {
+          this.hud.notify('🛶 Sin recursos suficientes para comerciar (100🌽 ó 60⚜️)', 'warning');
+        }
+        this.hintOnce('trade', '💡 T: ruta comercial — convierte alimentos excedentes en oro o viceversa (30 s de recarga).');
         return;
       }
       // Q: auto-assign idle workers to nearest resource
