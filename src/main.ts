@@ -136,7 +136,8 @@ class GameInstance {
   private _fpsDisplay = 0;
   private _idleUnitIdx = 0; // cycles through idle units on 'I' press
   private _unitsTrainedCount = 0;
-  private _nextEventTime = 120; // first random event after 2 min
+  private _nextEventTime  = 120; // first random event after 2 min
+  private _autoSaveTimer  = 180; // auto-checkpoint every 3 min of game time
   private _dustTimers = new Map<number, number>(); // unit.id → time since last dust puff
   private _totalResourcesSpent = 0; // food+gold+stone combined
   private _treasuryWarned75 = false; // notified player at 75% of economic victory
@@ -308,8 +309,8 @@ class GameInstance {
       }
     };
 
-    this.input.onHover = (unitId, buildingId, x, y) => {
-      this.hud.showHoverTooltip(unitId, buildingId, x, y);
+    this.input.onHover = (unitId, buildingId, x, y, tileCol, tileRow) => {
+      this.hud.showHoverTooltip(unitId, buildingId, x, y, tileCol, tileRow, this.game.map);
     };
 
     this.input.onTerrainClick = (col, row) => {
@@ -545,6 +546,18 @@ class GameInstance {
     if (this.game.gameTime >= this._nextEventTime) {
       this._nextEventTime = this.game.gameTime + 120 + Math.random() * 120;
       this.triggerRandomEvent();
+    }
+
+    // Auto-checkpoint every 3 minutes: save current stats to profile
+    if (this.game.gameTime >= this._autoSaveTimer) {
+      this._autoSaveTimer += 180;
+      const p = this.game.humanPlayer;
+      this.saveSystem.saveCheckpoint({
+        civ: this.civ, gameTime: Math.floor(this.game.gameTime),
+        kills: this.killCount, food: Math.floor(p.resources.food),
+        gold: Math.floor(p.resources.gold), stone: Math.floor(p.resources.stone),
+      });
+      this.hud.flashAutoSave();
     }
 
     // Persistent smoke/fire for damaged buildings
