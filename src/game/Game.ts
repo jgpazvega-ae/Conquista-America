@@ -616,6 +616,19 @@ export class Game {
   private runAutoAttack() {
     for (const unit of this.allUnits) {
       if (!unit.isAlive()) continue;
+      // HOLD units silently re-acquire nearest in-range enemy after each kill (no movement)
+      const isHold = unit.state === UnitState.HOLD;
+      if (isHold && unit.attackTarget === null && unit.attackBuildingTarget === null) {
+        let best: Unit | null = null;
+        let bestDist = unit.attackRange + 1.5;
+        for (const e of this.allUnits) {
+          if (!e.isAlive() || e.playerId === unit.playerId) continue;
+          const d = unit.distanceTo(e);
+          if (d < bestDist) { bestDist = d; best = e; }
+        }
+        if (best) unit.attackTarget = best;
+        continue;
+      }
       if (unit.state !== UnitState.IDLE) continue;
       if (unit.attackTarget !== null || unit.attackBuildingTarget !== null) continue;
 

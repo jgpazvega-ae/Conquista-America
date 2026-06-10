@@ -1240,6 +1240,40 @@ class GameInstance {
         }
         return;
       }
+      // W: assign idle workers to repair the nearest damaged friendly building
+      if (e.code === 'KeyW' && !e.ctrlKey && !e.altKey) {
+        const myWorkers = this.game.allWorkers.filter(
+          w => w.playerId === this.game.humanPlayerId &&
+               (w.task === WorkerTask.IDLE || w.task === WorkerTask.RETURNING),
+        );
+        const damaged = this.game.allBuildings
+          .filter(b => b.playerId === this.game.humanPlayerId && b.isAlive() && b.hp < b.maxHp * 0.99)
+          .sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp))[0]; // most damaged first
+        if (!damaged || myWorkers.length === 0) {
+          this.hud.notify('🔨 Sin edificios dañados o sin trabajadores disponibles', 'info');
+          return;
+        }
+        let sent = 0;
+        for (const w of myWorkers.slice(0, 2)) {
+          const near = this.game.map.findWalkableNear(damaged.col, damaged.row, 2);
+          if (!near) continue;
+          const path = findPath(this.game.map, { col: w.col, row: w.row }, { col: near[0], row: near[1] }, 200);
+          if (path.length > 0) {
+            w.path = path; w.pathIndex = 0; w.task = WorkerTask.MOVING;
+            // Set repair task once arrived — we chain it via repairTarget
+            w.repairTarget = damaged;
+          } else {
+            w.task = WorkerTask.REPAIRING;
+            w.repairTarget = damaged;
+          }
+          sent++;
+        }
+        if (sent > 0) {
+          this.hud.notify(`🔨 ${sent} trabajador${sent > 1 ? 'es' : ''} reparando ${damaged.def.name}`, 'info');
+          this.hintOnce('repair', '💡 W: envía trabajadores a reparar el edificio más dañado. Los trabajadores reparan 5× más rápido que la reparación automática.');
+        }
+        return;
+      }
       // Q: auto-assign idle workers to nearest resource
       if (e.code === 'KeyQ' && !e.ctrlKey && !e.altKey) {
         this.autoAssignWorkers();
