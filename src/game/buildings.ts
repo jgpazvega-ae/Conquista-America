@@ -6,6 +6,7 @@ export enum BuildingType {
   STOREHOUSE = 'STOREHOUSE',      // Almacén (bonus recursos)
   FORGE = 'FORGE',                // Herrería (mejora armamentos)
   WONDER = 'WONDER',              // Maravilla (victoria por supervivencia)
+  VILLAGE = 'VILLAGE',            // Aldea neutral — capturar para ingresos pasivos
 }
 
 export interface BuildingDef {

@@ -786,13 +786,26 @@ class GameInstance {
     // Building captures
     for (const cap of this.game.newlyCapturedBuildings) {
       const name = BUILDING_DEFS[cap.building.type]?.name ?? 'Edificio';
+      const isVillage = cap.building.type === BuildingType.VILLAGE;
       if (cap.toPlayerId === this.game.humanPlayerId) {
-        this.hud.notify(`🚩 ¡${name} enemigo capturado!`, 'success');
+        if (isVillage) {
+          this.hud.notify(`🏡 ¡Aldea capturada! +10🌽 +6⚜️ cada 30s mientras la controles`, 'success');
+          this.hintOnce('village', '💡 Las aldeas neutrales generan recursos pasivos (+10🌽 +6⚜️/30s). El enemigo puede reconquistarlas — ¡guarnece o defiende las que tengas!');
+        } else {
+          this.hud.notify(`🚩 ¡${name} enemigo capturado!`, 'success');
+        }
         this.audio.playVictory();
         this.renderer.effects.createLevelUpBurst(cap.building.col * TILE_SIZE, 1.5, cap.building.row * TILE_SIZE);
       } else if (cap.fromPlayerId === this.game.humanPlayerId) {
-        this.hud.notify(`⚠️ ¡El enemigo ha capturado tu ${name}!`, 'warning');
+        this.hud.notify(`⚠️ ¡El enemigo ha capturado tu ${isVillage ? 'aldea' : name}!`, 'warning');
         this.camera.shake(0.4, 0.5);
+      }
+    }
+
+    // Village income notifications for the human player
+    for (const inc of this.game.villageIncomeEvents) {
+      if (inc.playerId === this.game.humanPlayerId) {
+        this.hud.notify(`🏡 Ingresos de aldea: +${inc.food}🌽 +${inc.gold}⚜️`, 'success');
       }
     }
 
