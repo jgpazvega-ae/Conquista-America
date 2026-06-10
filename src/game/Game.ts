@@ -67,6 +67,8 @@ export class Game {
   newlyCapturedBuildings: { building: Building; fromPlayerId: number; toPlayerId: number }[] = [];
   newWarDeclarations: { fromPlayerId: number; toPlayerId: number }[] = [];
   newlyLeveledUpUnits: Unit[] = [];
+  newlyEliminatedPlayers: Player[] = [];
+  private _hadSettlement = new Set<number>(); // track which players ever had a settlement
   private _heroRespawnTimers = new Map<number, number>(); // playerId → seconds until respawn
   status: GameStatus = 'PLAYING';
   victoryType: 'MILITARY' | 'ECONOMIC' | 'WONDER' = 'MILITARY';
@@ -347,10 +349,23 @@ export class Game {
     this.newlyPanickedUnits = [];
     this.newlyGarrisonedUnits = [];
     this.newlyLeveledUpUnits = [];
+    this.newlyEliminatedPlayers = [];
 
     // Collect units that leveled up this frame (justLeveledUp reset below)
     for (const u of this.allUnits) {
       if (u.justLeveledUp) { this.newlyLeveledUpUnits.push(u); u.justLeveledUp = false; }
+    }
+
+    // Track civilization eliminations: fire event first time a player loses their last settlement
+    for (const p of this.players) {
+      if (p.id === this.humanPlayerId) continue;
+      const hasSett = this.hasSettlement(p.id);
+      if (hasSett) {
+        this._hadSettlement.add(p.id);
+      } else if (this._hadSettlement.has(p.id) && !this.newlyEliminatedPlayers.some(e => e.id === p.id)) {
+        this._hadSettlement.delete(p.id);
+        this.newlyEliminatedPlayers.push(p);
+      }
     }
 
     // Garrison: units ordered into a building enter when they get close
