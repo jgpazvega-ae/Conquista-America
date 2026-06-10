@@ -323,10 +323,11 @@ export class AISystem {
       }
     }
 
-    // Send 80% of forces; keep 20% near settlement as garrison
-    const available = myUnits.filter(
-      u => (u.state === UnitState.IDLE || u.state === UnitState.MOVING) && u.garrisonedIn === null && !u.outOfAmmo,
-    );
+    // Send 80% of forces; keep 20% near settlement as garrison.
+    // Heroes always lead from the front (sorted first in the dispatch list).
+    const available = myUnits
+      .filter(u => (u.state === UnitState.IDLE || u.state === UnitState.MOVING) && u.garrisonedIn === null && !u.outOfAmmo)
+      .sort((a, b) => (b.isHero ? 1 : 0) - (a.isHero ? 1 : 0));
     const toSend = Math.ceil(available.length * 0.8);
 
     // Human wonder is highest-priority target — destroy before countdown expires

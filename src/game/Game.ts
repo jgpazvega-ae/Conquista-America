@@ -478,6 +478,12 @@ export class Game {
       u.attackTarget = null;
       u.attackBuildingTarget = null;
       this.newlyPanickedUnits.push(u);
+      // Morale contagion: routing spreads fear to nearby allies (American Conquest core mechanic)
+      for (const ally of this.allUnits) {
+        if (!ally.isAlive() || ally.playerId !== u.playerId || ally === u || ally.isHero || ally.panicked) continue;
+        const d = Math.sqrt((ally.col - u.col) ** 2 + (ally.row - u.row) ** 2);
+        if (d <= 5) ally.loseMorale(10); // panic is contagious within 5 tiles
+      }
       // Rout: flee toward the nearest friendly building
       const refuge = this.allBuildings
         .filter(b => b.playerId === u.playerId && b.isAlive())
