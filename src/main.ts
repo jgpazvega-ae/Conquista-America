@@ -1244,6 +1244,24 @@ class GameInstance {
         }
         return;
       }
+      // Y: hero war cry — rally nearby allies (+30 morale, +25% atk buff for 12s)
+      if (e.code === 'KeyY' && !e.ctrlKey && !e.altKey) {
+        const hero = this.input.getSelectedUnits().find(u => u.isHero && u.isAlive());
+        if (hero) {
+          const allies = this.game.humanPlayer.aliveUnits;
+          const count = hero.triggerWarCry(allies);
+          if (count > 0) {
+            this.hud.notify(`📯 ¡GRITO DE GUERRA! ${count} unidad${count > 1 ? 'es' : ''} en llamas — +25% atk 12s`, 'success');
+            this.audio.playLevelUp();
+            this.hintOnce('warCry', '💡 Grito de guerra (Y): el héroe infunde valor a aliados cercanos — +30 moral, +25% atk 12s. Rompe el pánico. Recarga: 45s.');
+          } else if (hero.warCryCooldown > 0) {
+            this.hud.notify(`📯 Recarga: ${Math.ceil(hero.warCryCooldown)}s`, 'info');
+          }
+        } else {
+          this.hud.notify('📯 Selecciona al héroe para usar el grito de guerra (Y)', 'info');
+        }
+        return;
+      }
       // F1-F3: formation orders; F4: clear formation
       if (e.code === 'F1' || e.code === 'F2' || e.code === 'F3' || e.code === 'F4') {
         e.preventDefault();
