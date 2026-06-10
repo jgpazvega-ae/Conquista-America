@@ -127,6 +127,8 @@ export class CombatSystem {
           if (unit.berserkTimer > 0) dmg = Math.round(dmg * 1.25);
           // Leadership aura: +5% damage when player has any level-3 unit alive
           if (playersWithLeader.has(unit.playerId)) dmg = Math.round(dmg * 1.05);
+          // Hero war cry buff: +25% attack for 12s
+          if (unit.buffAttackTimer > 0) dmg = Math.round(dmg * 1.25);
           // Volley: synchronized burst for 2.5× damage, longer reload
           if (isVolley) dmg = Math.round(dmg * 2.5);
           // Weather: rain/storm reduces gunpowder & all-ranged effectiveness
@@ -137,7 +139,7 @@ export class CombatSystem {
           // Ammo consumption (volley costs 2 rounds)
           if (unit.ammo > 0) unit.ammo = Math.max(0, unit.ammo - (isVolley ? 2 : 1));
 
-          let isCrit = multiplier >= 1.5 || isFlanking || isCharge || unit.berserkTimer > 0 || isVolley;
+          let isCrit = multiplier >= 1.5 || isFlanking || isCharge || unit.berserkTimer > 0 || isVolley || unit.buffAttackTimer > 0;
           this.events.push({ attacker: unit, target, damage: actual, worldX: target.worldX, worldZ: target.worldZ, critical: isCrit });
 
           // Kill streak tracking: 3 kills in a row without taking damage → 12s berserk

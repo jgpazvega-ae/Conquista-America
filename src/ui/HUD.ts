@@ -451,6 +451,13 @@ export class HUD {
       : unit.ammo >= 0
       ? `<span title="Munición restante (V = descarga sincronizada ×2.5)" style="color:#aaddff">🏹${unit.ammo}/${unit.maxAmmo}</span>`
       : '';
+    const warCryBadge = unit.isHero
+      ? unit.warCryCooldown > 0
+        ? `<span title="Grito de guerra en recarga (Y)" style="color:#888">📯${Math.ceil(unit.warCryCooldown)}s</span>`
+        : `<span title="Grito de guerra listo — pulsa Y para activar (+30 moral, +25% atk a aliados en 8 casillas)" style="color:#ffd700">📯LISTO</span>`
+      : unit.buffAttackTimer > 0
+        ? `<span title="Buff de grito de guerra: +25% atk" style="color:#ffd700">📯${Math.ceil(unit.buffAttackTimer)}s</span>`
+        : '';
     const FORM_LABELS: Record<string, string> = { LOOSE: '💨SUELTA', PHALANX: '🛡️FALANGE', WEDGE: '⚔️CUÑA' };
     const FORM_TIPS:   Record<string, string> = {
       LOOSE:   'Formación suelta — +20% veloc., -10% atk, -15% def · F4 para cancelar',
@@ -465,7 +472,7 @@ export class HUD {
       `<span>🛡️ ${unit.defense}</span>` +
       `<span>💨 ${unit.speed.toFixed(1)}</span>` +
       `<span>🎯 ${unit.attackRange.toFixed(1)}</span>` +
-      holdBadge + burnBadge + poisonBadge + berserkBadge + chargeBadge + formBadge + moraleBadge + ammoBadge + orderBadge;
+      holdBadge + burnBadge + poisonBadge + berserkBadge + chargeBadge + formBadge + moraleBadge + ammoBadge + orderBadge + warCryBadge;
 
     // XP bar (only if unit can still level up)
     const xpEl = document.getElementById('unit-xp-row');

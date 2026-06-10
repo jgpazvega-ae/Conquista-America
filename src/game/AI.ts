@@ -114,6 +114,12 @@ export class AISystem {
             }
           }
         }
+        // AI hero war cry: use when hero is attacking and cooldown is ready
+        for (const u of player.aliveUnits) {
+          if (u.isHero && u.warCryCooldown === 0 && u.state === UnitState.ATTACKING) {
+            u.triggerWarCry(player.aliveUnits);
+          }
+        }
         const allDead = game.allUnits.filter(u => u.playerId !== player.id && u.isAlive()).length === 0;
         if (state.phaseTimer >= ATTACK_DURATION || allDead) {
           state.phase = 'gathering';
