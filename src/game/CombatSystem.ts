@@ -117,6 +117,13 @@ export class CombatSystem {
           if (target.state === UnitState.HOLD) dmg = Math.max(1, dmg - 2);
           // Entrenched: dug into cover (+5 defense on top of HOLD bonus)
           if (target.entrenched) dmg = Math.max(1, dmg - 5);
+          // Jungle ambush: melee units fighting from dense cover gain +20% attack.
+          // Cavalry and Cannon lose this advantage — they can't maneuver in thick forest.
+          if (unit.attackRange <= 1.5 &&
+              unit.type !== UnitType.CAVALRY && unit.type !== UnitType.CANNON) {
+            const attackerTile = map?.getTile(Math.round(unit.col), Math.round(unit.row));
+            if (attackerTile?.terrain === TerrainType.JUNGLE) dmg = Math.round(dmg * 1.20);
+          }
           // Close ranks: formation fighters shield each other
           if (target.inFormation) dmg = Math.max(1, dmg - 2);
           // Routed targets are cut down more easily
