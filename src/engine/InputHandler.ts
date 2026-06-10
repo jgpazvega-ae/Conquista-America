@@ -31,6 +31,7 @@ export class InputHandler {
   onRallySet:         ((col: number, row: number) => void) | null = null;
   onPatrolSet:        (() => void) | null = null;
   onGarrisonOrder:    ((count: number, buildingId: number) => void) | null = null;
+  onCaptureOrder:     ((count: number, buildingId: number) => void) | null = null;
   onHover:            ((unitId: number | null, buildingId: number | null, screenX: number, screenY: number, tileCol?: number, tileRow?: number) => void) | null = null;
 
   private _placingMode     = false;
@@ -163,6 +164,28 @@ export class InputHandler {
       const bldg = this.game.getBuildingById(hit.buildingId);
       if (!bldg || !bldg.isAlive()) return;
       if (bldg.playerId !== this.game.humanPlayerId) {
+        if (e.ctrlKey && bldg.isComplete() && bldg.garrison.length === 0) {
+          // Ctrl+right-click → capture: melee units seize the building intact
+          let ordered = 0;
+          for (const u of myUnits) {
+            if (u.attackRange > 1.5 || u.panicked || u.garrisonedIn !== null) continue;
+            u.captureTarget = bldg;
+            u.attackTarget = null;
+            u.attackBuildingTarget = null;
+            u.garrisonTarget = null;
+            const near = this.game.map.findWalkableNear(bldg.col, bldg.row, 3);
+            if (near) {
+              const path = findPath(this.game.map, u.gridPos(), { col: near[0], row: near[1] }, 300);
+              if (path.length > 0) { u.path = path; u.pathIndex = 0; u.state = UnitState.MOVING; }
+            }
+            ordered++;
+          }
+          if (ordered > 0) {
+            this.onCaptureOrder?.(ordered, bldg.id);
+            this.onMoveOrder?.();
+          }
+          return;
+        }
         for (const u of myUnits) u.attackBuilding(bldg);
         this.onMoveOrder?.();
       } else if (bldg.isComplete() && bldg.garrisonCapacity > 0) {

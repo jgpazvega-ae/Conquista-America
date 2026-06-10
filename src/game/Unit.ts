@@ -102,6 +102,9 @@ export class Unit {
   garrisonedIn: number | null = null;
   garrisonTarget: import('./Building').Building | null = null;
 
+  // Capture: enemy building this melee unit is seizing
+  captureTarget: import('./Building').Building | null = null;
+
   // Hero unit
   isHero   = false;
   heroName = '';
@@ -671,6 +674,7 @@ export class Unit {
     this.attackTarget         = null;
     this.attackBuildingTarget = null;
     this.garrisonTarget       = null;
+    this.captureTarget        = null;
     this.patrolA = null; this.patrolB = null;
   }
 
@@ -687,6 +691,7 @@ export class Unit {
     this.attackTarget         = target;
     this.attackBuildingTarget = null;
     this.garrisonTarget       = null;
+    this.captureTarget        = null;
     this.state                = UnitState.ATTACKING;
     this.attackAnim           = 1;
   }
@@ -897,6 +902,7 @@ export class Unit {
     this.pathIndex   = 0;
     this.attackTarget = null;
     this.garrisonTarget = null;
+    this.captureTarget  = null;
     this.state       = UnitState.ATTACK_MOVE;
   }
 

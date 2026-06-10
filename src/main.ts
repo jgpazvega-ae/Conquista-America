@@ -229,6 +229,11 @@ class GameInstance {
       this.audio.playMove();
     };
 
+    this.input.onCaptureOrder = (count) => {
+      this.hud.notify(`🚩 ${count} unidad${count > 1 ? 'es' : ''} a la captura — mantenlas junto al edificio`, 'info');
+      this.audio.playMove();
+    };
+
     this.hud.onPowerActivate = () => this.triggerCivPower();
 
     this.hud.onGroupStop = () => {
@@ -758,6 +763,19 @@ class GameInstance {
         this.hud.notify(`⚔️ ${hero.heroName} ha regresado a la batalla`, 'success');
         this.audio.playLevelUp();
         this.renderer.effects.createLevelUpBurst(hero.worldX, 1.0, hero.worldZ);
+      }
+    }
+
+    // Building captures
+    for (const cap of this.game.newlyCapturedBuildings) {
+      const name = BUILDING_DEFS[cap.building.type]?.name ?? 'Edificio';
+      if (cap.toPlayerId === this.game.humanPlayerId) {
+        this.hud.notify(`🚩 ¡${name} enemigo capturado!`, 'success');
+        this.audio.playVictory();
+        this.renderer.effects.createLevelUpBurst(cap.building.col * TILE_SIZE, 1.5, cap.building.row * TILE_SIZE);
+      } else if (cap.fromPlayerId === this.game.humanPlayerId) {
+        this.hud.notify(`⚠️ ¡El enemigo ha capturado tu ${name}!`, 'warning');
+        this.camera.shake(0.4, 0.5);
       }
     }
 
