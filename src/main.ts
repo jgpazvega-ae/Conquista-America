@@ -224,6 +224,11 @@ class GameInstance {
       this.hud.notify('🔄 Patrulla establecida — Shift+clic der.', 'info');
     };
 
+    this.input.onGarrisonOrder = (count) => {
+      this.hud.notify(`🏰 ${count} unidad${count > 1 ? 'es' : ''} hacia la guarnición — pulsa U para desalojar`, 'info');
+      this.audio.playMove();
+    };
+
     this.hud.onPowerActivate = () => this.triggerCivPower();
 
     this.hud.onGroupStop = () => {
@@ -756,6 +761,13 @@ class GameInstance {
       }
     }
 
+    // Garrison entries
+    const humanGarrisons = this.game.newlyGarrisonedUnits.filter(u => u.playerId === this.game.humanPlayerId);
+    if (humanGarrisons.length > 0) {
+      this.hud.notify(`🏰 ${humanGarrisons.length} unidad${humanGarrisons.length > 1 ? 'es' : ''} en guarnición`, 'success');
+      this.audio.playBuild();
+    }
+
     // Morale breaks: warn when own troops rout; celebrate when the enemy flees
     const humanPanics = this.game.newlyPanickedUnits.filter(u => u.playerId === this.game.humanPlayerId);
     if (humanPanics.length > 0) {
@@ -1052,7 +1064,7 @@ class GameInstance {
       if (e.code === 'KeyG' && !e.ctrlKey && !e.altKey) {
         const sel = this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId && u.isAlive());
         if (sel.length === 0) return;
-        const enemies = this.game.getAllUnits().filter(u => u.playerId !== this.game.humanPlayerId && u.isAlive());
+        const enemies = this.game.getAllUnits().filter(u => u.playerId !== this.game.humanPlayerId && u.isAlive() && u.garrisonedIn === null);
         if (enemies.length === 0) { this.hud.notify('Sin enemigos en rango', 'info'); return; }
         const maxSight = Math.max(...sel.map(u => u.sight));
         const cx = sel.reduce((s, u) => s + u.col, 0) / sel.length;
@@ -1079,7 +1091,7 @@ class GameInstance {
       if (e.code === 'KeyA' && e.ctrlKey) {
         e.preventDefault();
         for (const u of this.game.getAllUnits()) {
-          u.setSelected(u.isAlive() && u.playerId === this.game.humanPlayerId);
+          u.setSelected(u.isAlive() && u.playerId === this.game.humanPlayerId && u.garrisonedIn === null);
         }
         this.hud.update(this.input.getSelectedUnits());
         return;
@@ -1101,7 +1113,7 @@ class GameInstance {
       }
       // I: cycle through idle military units (find next, select & center)
       if (e.code === 'KeyI' && !e.ctrlKey && !e.altKey) {
-        const idle = this.game.humanPlayer.aliveUnits.filter(u => u.state === UnitState.IDLE);
+        const idle = this.game.humanPlayer.aliveUnits.filter(u => u.state === UnitState.IDLE && u.garrisonedIn === null);
         if (idle.length === 0) { this.hud.notify('Sin unidades inactivas', 'info'); return; }
         this._idleUnitIdx = this._idleUnitIdx % idle.length;
         const u = idle[this._idleUnitIdx];
@@ -1152,6 +1164,22 @@ class GameInstance {
       // Q: auto-assign idle workers to nearest resource
       if (e.code === 'KeyQ' && !e.ctrlKey && !e.altKey) {
         this.autoAssignWorkers();
+        return;
+      }
+      // U: eject garrison (selected building first, else any own garrisoned building)
+      if (e.code === 'KeyU' && !e.ctrlKey && !e.altKey) {
+        const b = this._panelBuilding && this._panelBuilding.garrison.length > 0
+          ? this._panelBuilding
+          : this.game.allBuildings.find(x => x.playerId === this.game.humanPlayerId && x.garrison.length > 0);
+        if (b) {
+          const out = this.game.ejectGarrison(b);
+          if (out.length > 0) {
+            this.hud.notify(`🏰 ${out.length} unidad${out.length > 1 ? 'es' : ''} desalojada${out.length > 1 ? 's' : ''}`, 'info');
+            this.audio.playMove();
+          }
+        } else {
+          this.hud.notify('Sin guarniciones que desalojar', 'info');
+        }
         return;
       }
       // E: activate civilization power

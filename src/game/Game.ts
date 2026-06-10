@@ -59,6 +59,7 @@ export class Game {
   newlyRegeneratedNodes: import('./ResourceNode').ResourceNode[] = [];
   newlyRespawnedHeroes: Unit[] = [];
   newlyPanickedUnits: Unit[] = [];
+  newlyGarrisonedUnits: Unit[] = [];
   private _heroRespawnTimers = new Map<number, number>(); // playerId → seconds until respawn
   status: GameStatus = 'PLAYING';
   victoryType: 'MILITARY' | 'ECONOMIC' | 'WONDER' = 'MILITARY';
@@ -299,6 +300,33 @@ export class Game {
     this.newlyRegeneratedNodes = [];
     this.newlyRespawnedHeroes = [];
     this.newlyPanickedUnits = [];
+    this.newlyGarrisonedUnits = [];
+
+    // Garrison: units ordered into a building enter when they get close
+    for (const u of this.allUnits) {
+      if (!u.isAlive() || !u.garrisonTarget || u.garrisonedIn !== null) continue;
+      const b = u.garrisonTarget;
+      if (!b.isAlive() || !b.isComplete() || b.garrison.length >= b.garrisonCapacity) {
+        u.garrisonTarget = null;
+        continue;
+      }
+      const d = Math.sqrt((u.col - b.col) ** 2 + (u.row - b.row) ** 2);
+      if (d <= 2.2) {
+        u.garrisonTarget = null;
+        this.garrisonUnit(u, b);
+      }
+    }
+
+    // Garrison upkeep: drop the dead; collapsed buildings spill survivors into the rubble
+    for (const b of this.allBuildings) {
+      if (b.garrison.length === 0) continue;
+      if (b.isAlive()) {
+        b.garrison = b.garrison.filter(u => u.isAlive());
+      } else {
+        const survivors = this.ejectGarrison(b);
+        for (const u of survivors) u.takeDamage(25);
+      }
+    }
 
     // Hero respawn timers
     for (const [playerId, timer] of this._heroRespawnTimers) {
@@ -379,7 +407,7 @@ export class Game {
       if (u.isHero && u.isAlive()) heroesByPlayer.set(u.playerId, u);
     }
     for (const u of this.allUnits) {
-      if (!u.isAlive() || u.isHero || u.panicked || u.morale > 25) continue;
+      if (!u.isAlive() || u.isHero || u.panicked || u.morale > 25 || u.garrisonedIn !== null) continue;
       const hero = heroesByPlayer.get(u.playerId);
       if (hero && u.distanceTo(hero) <= 8) {
         u.morale = 35; // the hero steadies the line
@@ -410,6 +438,7 @@ export class Game {
     }
 
     this.updateTowerAttacks(dt);
+    this.updateGarrisonFire(dt);
     this.updateUnitBuildingAttacks(dt);
 
     this.resourceSys.update(this);
@@ -523,6 +552,77 @@ export class Game {
     }
   }
 
+  garrisonUnit(u: Unit, b: Building) {
+    b.garrison.push(u);
+    u.garrisonedIn = b.id;
+    u.path = []; u.pathIndex = 0;
+    u.attackTarget = null;
+    u.attackBuildingTarget = null;
+    u.state = UnitState.IDLE;
+    u.setSelected(false);
+    u.col = b.col; u.row = b.row;
+    u.worldX = b.col * TILE_SIZE;
+    u.worldZ = b.row * TILE_SIZE;
+    u.mesh.visible = false;
+    this.newlyGarrisonedUnits.push(u);
+  }
+
+  /** Empty a building's garrison onto walkable tiles around it. Returns the units placed. */
+  ejectGarrison(b: Building): Unit[] {
+    const out: Unit[] = [];
+    for (const u of b.garrison) {
+      if (!u.isAlive()) continue;
+      const near = this.map.findWalkableNear(
+        b.col + Math.floor(Math.random() * 3) - 1,
+        b.row + Math.floor(Math.random() * 3) - 1,
+        4,
+      );
+      if (near) {
+        u.col = near[0]; u.row = near[1];
+        u.worldX = near[0] * TILE_SIZE;
+        u.worldZ = near[1] * TILE_SIZE;
+      }
+      u.garrisonedIn = null;
+      u.mesh.visible = true;
+      out.push(u);
+    }
+    b.garrison = [];
+    return out;
+  }
+
+  /** Ranged units inside a garrison shoot at nearby enemies with extended reach. */
+  private updateGarrisonFire(dt: number) {
+    for (const b of this.allBuildings) {
+      if (!b.isAlive() || b.garrison.length === 0) continue;
+      for (const u of b.garrison) {
+        if (!u.isAlive()) continue;
+        u.attackTimer = Math.max(0, u.attackTimer - dt);
+        if (!u.def.isRanged || u.attackTimer > 0) continue;
+        const range = u.attackRange + 2; // height advantage
+        let nearest: Unit | null = null;
+        let nearestDist = range;
+        for (const e of this.allUnits) {
+          if (!e.isAlive() || e.playerId === b.playerId || e.garrisonedIn !== null) continue;
+          const d = Math.sqrt((e.col - b.col) ** 2 + (e.row - b.row) ** 2);
+          if (d < nearestDist) { nearestDist = d; nearest = e; }
+        }
+        if (nearest) {
+          const actual = nearest.takeDamage(Math.round(u.attack * 0.85));
+          u.attackTimer = u.attackCooldown * 1.2;
+          this.damageEvents.push({
+            attacker: null,
+            target: nearest,
+            damage: actual,
+            worldX: nearest.worldX,
+            worldZ: nearest.worldZ,
+            sourceWorldX: b.col * TILE_SIZE + TILE_SIZE / 2,
+            sourceWorldZ: b.row * TILE_SIZE + TILE_SIZE / 2,
+          });
+        }
+      }
+    }
+  }
+
   private updateTowerAttacks(dt: number) {
     const TOWER_RANGE    = 5.5;
     const TOWER_DAMAGE   = 12;
@@ -538,7 +638,7 @@ export class Game {
       let nearest: Unit | null = null;
       let nearestDist = TOWER_RANGE;
       for (const u of this.allUnits) {
-        if (!u.isAlive() || u.playerId === b.playerId) continue;
+        if (!u.isAlive() || u.playerId === b.playerId || u.garrisonedIn !== null) continue;
         const d = Math.sqrt((u.col - b.col) ** 2 + (u.row - b.row) ** 2);
         if (d < nearestDist) { nearestDist = d; nearest = u; }
       }

@@ -30,6 +30,7 @@ export class InputHandler {
   onAttackMove:       ((units: import('../game/Unit').Unit[], col: number, row: number) => void) | null = null;
   onRallySet:         ((col: number, row: number) => void) | null = null;
   onPatrolSet:        (() => void) | null = null;
+  onGarrisonOrder:    ((count: number, buildingId: number) => void) | null = null;
   onHover:            ((unitId: number | null, buildingId: number | null, screenX: number, screenY: number, tileCol?: number, tileRow?: number) => void) | null = null;
 
   private _placingMode     = false;
@@ -164,6 +165,26 @@ export class InputHandler {
       if (bldg.playerId !== this.game.humanPlayerId) {
         for (const u of myUnits) u.attackBuilding(bldg);
         this.onMoveOrder?.();
+      } else if (bldg.isComplete() && bldg.garrisonCapacity > 0) {
+        // Right-click own building → garrison selected units inside
+        const free = bldg.garrisonCapacity - bldg.garrison.length;
+        let ordered = 0;
+        for (const u of myUnits) {
+          if (ordered >= free || u.panicked || u.garrisonedIn !== null) continue;
+          u.garrisonTarget = bldg;
+          const near = this.game.map.findWalkableNear(bldg.col, bldg.row, 3);
+          if (near) {
+            const path = findPath(this.game.map, u.gridPos(), { col: near[0], row: near[1] }, 300);
+            if (path.length > 0) {
+              u.path = path; u.pathIndex = 0; u.state = UnitState.MOVING;
+            }
+          }
+          ordered++;
+        }
+        if (ordered > 0) {
+          this.onGarrisonOrder?.(ordered, bldg.id);
+          this.onMoveOrder?.();
+        }
       }
       return;
     }
@@ -286,6 +307,7 @@ export class InputHandler {
     for (const unit of this.game.getAllUnits()) {
       if (!unit.isAlive()) continue;
       if (unit.playerId !== this.game.humanPlayerId) continue;
+      if (unit.garrisonedIn !== null) continue;
       const pos = this.renderer.worldToScreen(unit.worldX, 0.5, unit.worldZ);
       if (pos.x >= x1 && pos.x <= x2 && pos.y >= y1 && pos.y <= y2) {
         unit.setSelected(true);
