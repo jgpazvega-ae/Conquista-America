@@ -284,6 +284,13 @@ class GameInstance {
         const path = findPath(map, unit.gridPos(), { col: near[0], row: near[1] }, 400);
         if (path.length > 0) unit.attackMove(path);
       }
+      // Formation march: advance at the pace of the slowest member
+      if (units.length > 1) {
+        const minSpeed = Math.min(...units.map(u => u.speed));
+        for (const u of units) {
+          if (u.state === UnitState.ATTACK_MOVE) u.formationSpeedCap = minSpeed;
+        }
+      }
       this.audio.playMove();
     };
 

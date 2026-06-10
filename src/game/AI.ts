@@ -84,6 +84,10 @@ export class AISystem {
           state.phase = 'gathering';
           state.phaseTimer = 0;
           state.defendTimer = 0;
+          // Siege is over: pull the garrison back out to rejoin the army
+          for (const b of game.allBuildings) {
+            if (b.playerId === player.id && b.garrison.length > 0) game.ejectGarrison(b);
+          }
         }
       } else if (baseUnderAttack) {
         // Switch to defending immediately when base takes significant damage
@@ -136,7 +140,7 @@ export class AISystem {
     const cx = settlement.col, cz = settlement.row;
 
     for (const unit of player.aliveUnits) {
-      if (unit.state !== UnitState.IDLE) continue;
+      if (unit.state !== UnitState.IDLE || unit.garrisonedIn !== null) continue;
       const d = Math.sqrt((unit.col - cx) ** 2 + (unit.row - cz) ** 2);
       if (d > 6) {
         const tc = cx + Math.floor(Math.random() * 5) - 2;
@@ -152,6 +156,28 @@ export class AISystem {
 
   /** Defend-phase: rush all units to protect damaged buildings and engage nearby threats. */
   private defendBase(player: Player, game: Game) {
+    // Tuck ranged units into garrisons while under siege (American Conquest style)
+    const garrisonable = game.allBuildings.filter(
+      b => b.playerId === player.id && b.isAlive() && b.isComplete() &&
+           b.garrison.length < b.garrisonCapacity,
+    );
+    for (const b of garrisonable) {
+      let free = b.garrisonCapacity - b.garrison.length;
+      for (const u of player.aliveUnits) {
+        if (free <= 0) break;
+        if (!u.def.isRanged || u.garrisonedIn !== null || u.garrisonTarget || u.panicked) continue;
+        const d = Math.sqrt((u.col - b.col) ** 2 + (u.row - b.row) ** 2);
+        if (d > 12) continue;
+        u.garrisonTarget = b;
+        const near = game.map.findWalkableNear(b.col, b.row, 3);
+        if (near) {
+          const path = findPath(game.map, u.gridPos(), { col: near[0], row: near[1] }, 300);
+          if (path.length > 0) { u.path = path; u.pathIndex = 0; u.state = UnitState.MOVING; }
+        }
+        free--;
+      }
+    }
+
     const damagedBuilding = game.allBuildings
       .filter(b => b.playerId === player.id && b.isAlive() && b.hp < b.maxHp * 0.85)
       .sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0]; // most-damaged first
@@ -168,6 +194,7 @@ export class AISystem {
     });
 
     for (const unit of player.aliveUnits) {
+      if (unit.garrisonedIn !== null || unit.garrisonTarget) continue; // already posted inside
       if (nearbyEnemies.length > 0) {
         // Engage nearest threat to the damaged building
         let best = nearbyEnemies[0];
@@ -203,7 +230,9 @@ export class AISystem {
     if (myUnits.length === 0 || enemies.length === 0) return;
 
     // Send 80% of forces; keep 20% near settlement as garrison
-    const available = myUnits.filter(u => u.state === UnitState.IDLE || u.state === UnitState.MOVING);
+    const available = myUnits.filter(
+      u => (u.state === UnitState.IDLE || u.state === UnitState.MOVING) && u.garrisonedIn === null,
+    );
     const toSend = Math.ceil(available.length * 0.8);
 
     // Human wonder is highest-priority target — destroy before countdown expires
