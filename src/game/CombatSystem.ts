@@ -115,6 +115,8 @@ export class CombatSystem {
           }
           // Hold position: +2 defense bonus for targets holding their ground
           if (target.state === UnitState.HOLD) dmg = Math.max(1, dmg - 2);
+          // Stationary defense: unit holding ground ≥5s gains battle readiness (+1 def)
+          if (target.stationaryTimer >= 5) dmg = Math.max(1, dmg - 1);
           // Entrenched: dug into cover (+5 defense on top of HOLD bonus)
           if (target.entrenched) dmg = Math.max(1, dmg - 5);
           // Jungle ambush: melee units fighting from dense cover gain +20% attack.

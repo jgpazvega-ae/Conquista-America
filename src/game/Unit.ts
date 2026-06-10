@@ -104,6 +104,9 @@ export class Unit {
   // Entrench (X key): dig in for +5 defense; cleared on any movement order
   entrenched = false;
 
+  // Stationary defense: seconds spent holding position (IDLE/HOLD) without moving
+  stationaryTimer = 0;
+
   // Garrison: inside building id, or moving toward one to enter
   garrisonedIn: number | null = null;
   garrisonTarget: import('./Building').Building | null = null;
@@ -810,6 +813,13 @@ export class Unit {
     this.attackTimer  = Math.max(0, this.attackTimer - dt);
     if (this.berserkTimer > 0) this.berserkTimer = Math.max(0, this.berserkTimer - dt);
     this.animT += dt;
+
+    // Stationary defense: track time spent holding ground without moving
+    if (this.state === UnitState.IDLE || this.state === UnitState.HOLD) {
+      this.stationaryTimer = Math.min(10, this.stationaryTimer + dt);
+    } else {
+      this.stationaryTimer = 0;
+    }
 
     // Morale regeneration: faster near own settlement; rally at 50 ends panic
     if (this._moraleCooldown > 0) {
