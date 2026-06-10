@@ -28,9 +28,13 @@ const ROOF_TILE   = 0xa3402a;
 export class Building {
   readonly id: number;
   readonly type: BuildingType;
-  readonly playerId: number;
+  playerId: number; // mutable: buildings can be captured (American Conquest style)
   readonly def: BuildingDef;
   readonly civType: CivilizationType;
+
+  // Capture: melee units adjacent to an ungarrisoned enemy building raise this to 100
+  captureProgress = 0;
+  private _bannerMats: THREE.MeshStandardMaterial[] = [];
 
   col: number;
   row: number;
@@ -123,8 +127,9 @@ export class Building {
     // Ownership banner (high & colorful, readable from above)
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.0, 6), this.mat(0x5a4a32, 0.9));
     pole.position.set(0.7, 1.5, 0.7); this.structure.add(pole);
-    const banner = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.32),
-      new THREE.MeshStandardMaterial({ color: civColor, side: THREE.DoubleSide, emissive: civColor, emissiveIntensity: 0.18, roughness: 0.6 }));
+    const bannerMat = new THREE.MeshStandardMaterial({ color: civColor, side: THREE.DoubleSide, emissive: civColor, emissiveIntensity: 0.18, roughness: 0.6 });
+    this._bannerMats.push(bannerMat);
+    const banner = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.32), bannerMat);
     banner.position.set(0.5, 1.82, 0.7); this.structure.add(banner);
 
     // Progress bar
@@ -320,6 +325,20 @@ export class Building {
 
   isComplete(): boolean { return this.state === BuildingState.COMPLETE; }
   isAlive(): boolean { return this.state !== BuildingState.DESTROYED; }
+
+  /** Transfer ownership after a successful capture: new banner color, fresh state. */
+  transferTo(newPlayerId: number, newCivColor: number) {
+    this.playerId = newPlayerId;
+    this.captureProgress = 0;
+    this._prodQueue = [];
+    this.finishedUnit = null;
+    this.rallyCol = null;
+    this.rallyRow = null;
+    for (const m of this._bannerMats) {
+      m.color.setHex(newCivColor);
+      m.emissive.setHex(newCivColor);
+    }
+  }
 
   trainUnit(unitType: UnitType): boolean {
     if (!this.isComplete()) return false;

@@ -60,6 +60,7 @@ export class Game {
   newlyRespawnedHeroes: Unit[] = [];
   newlyPanickedUnits: Unit[] = [];
   newlyGarrisonedUnits: Unit[] = [];
+  newlyCapturedBuildings: { building: Building; fromPlayerId: number; toPlayerId: number }[] = [];
   private _heroRespawnTimers = new Map<number, number>(); // playerId → seconds until respawn
   status: GameStatus = 'PLAYING';
   victoryType: 'MILITARY' | 'ECONOMIC' | 'WONDER' = 'MILITARY';
@@ -327,6 +328,8 @@ export class Game {
         for (const u of survivors) u.takeDamage(25);
       }
     }
+    this.newlyCapturedBuildings = [];
+    this.updateCaptures(dt);
 
     // Hero respawn timers
     for (const [playerId, timer] of this._heroRespawnTimers) {
@@ -549,6 +552,42 @@ export class Game {
         if (d < bestBldgDist) { bestBldgDist = d; bestBldg = b; }
       }
       if (bestBldg) unit.attackBuilding(bestBldg);
+    }
+  }
+
+  /** Melee units adjacent to an ungarrisoned enemy building raise its capture meter. */
+  private updateCaptures(dt: number) {
+    const capturers = new Map<Building, Unit[]>();
+    for (const u of this.allUnits) {
+      if (!u.isAlive() || !u.captureTarget || u.garrisonedIn !== null) continue;
+      const b = u.captureTarget;
+      if (!b.isAlive() || !b.isComplete() || b.playerId === u.playerId || b.garrison.length > 0) {
+        u.captureTarget = null;
+        continue;
+      }
+      const d = Math.sqrt((u.col - b.col) ** 2 + (u.row - b.row) ** 2);
+      if (d > 2.2) continue; // still approaching
+      if (!capturers.has(b)) capturers.set(b, []);
+      capturers.get(b)!.push(u);
+    }
+
+    for (const [b, units] of capturers) {
+      b.captureProgress = Math.min(100, b.captureProgress + units.length * 8 * dt);
+      if (b.captureProgress >= 100) {
+        const newOwner = units[0].playerId;
+        const oldOwner = b.playerId;
+        const civ = this.players[newOwner]?.civType ?? CivilizationType.AZTEC;
+        b.transferTo(newOwner, CIV_COLORS[civ]);
+        for (const u of units) u.captureTarget = null;
+        this.newlyCapturedBuildings.push({ building: b, fromPlayerId: oldOwner, toPlayerId: newOwner });
+      }
+    }
+
+    // Contested meters drain when no one is actively capturing
+    for (const b of this.allBuildings) {
+      if (b.captureProgress > 0 && !capturers.has(b)) {
+        b.captureProgress = Math.max(0, b.captureProgress - 6 * dt);
+      }
     }
   }
 
