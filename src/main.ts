@@ -776,6 +776,15 @@ class GameInstance {
       }
     }
 
+    // Veteran level-up notifications for human units
+    for (const u of this.game.newlyLeveledUpUnits) {
+      if (u.playerId !== this.game.humanPlayerId) continue;
+      const star = u.level >= 3 ? '🟠' : '⭐';
+      this.hud.notify(`${star} ¡${u.def.name} ha ascendido a veterano rango ${u.level}!`, 'success');
+      this.audio.playLevelUp();
+      this.renderer.effects.createLevelUpBurst(u.worldX, 1.0, u.worldZ);
+    }
+
     // Hero respawn notifications
     for (const hero of this.game.newlyRespawnedHeroes) {
       if (hero.playerId === this.game.humanPlayerId) {

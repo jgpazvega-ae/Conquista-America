@@ -51,8 +51,9 @@ export class Unit {
   patrolFlip = false;
 
   // XP / leveling
-  xp:    number = 0;
-  level: number = 1;
+  xp:           number  = 0;
+  level:        number  = 1;
+  justLeveledUp = false; // cleared by Game.ts each frame; true on the frame levelUp fires
 
   // Civilization power buffs
   incaBuff  = false;
@@ -816,6 +817,17 @@ export class Unit {
     } else if (this.morale < 100) {
       let regen = this._nearSettlement ? 9 : 4;
       if (this.inFormation) regen *= 1.5; // close ranks steady the nerves
+      // Home terrain bonus: natives recover morale faster on their ancestral lands
+      const tile = map.getTile(this.col, this.row);
+      if (tile) {
+        const t = tile.terrain;
+        const onHome =
+          ((this.civType === CivilizationType.AZTEC || this.civType === CivilizationType.MAYA) &&
+           t === TerrainType.JUNGLE) ||
+          (this.civType === CivilizationType.INCA &&
+           (t === TerrainType.HIGHLAND || t === TerrainType.MOUNTAIN));
+        if (onHome) regen *= 1.6;
+      }
       this.morale = Math.min(100, this.morale + regen * dt);
     }
     if (this.panicked && this.morale >= 50) this.panicked = false;
@@ -1047,6 +1059,7 @@ export class Unit {
     this.defense = Math.round(this.defense * 1.15);
     this.maxHp   = Math.round(this.maxHp   * 1.10);
     this.hp      = this.maxHp;
+    this.justLeveledUp = true;
     this.refreshLevelRing();
   }
 
