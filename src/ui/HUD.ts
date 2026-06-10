@@ -439,10 +439,11 @@ export class HUD {
     const berserkBadge = unit.berserkTimer > 0 ? `<span title="¡Frenesí! +25% daño" style="color:#ff6600">🔥FRENESÍ ${Math.ceil(unit.berserkTimer)}s</span>` : '';
     const chargeBadge  = unit.chargeReady  ? `<span title="Carga de caballería lista — +60% daño en primer golpe" style="color:#ffe066">⚡CARGA</span>` : '';
     const formBadge    = unit.inFormation ? `<span title="Filas cerradas — +2 defensa · la moral se recupera un 50% más rápido" style="color:#88ddaa">⚔️FILA</span>` : '';
-    const moraleBadge  = unit.panicked
-      ? `<span title="¡Moral rota! La unidad huye y no acepta órdenes hasta recuperarse" style="color:#ff5544">😱PÁNICO</span>`
-      : unit.morale < 50
-      ? `<span title="Moral baja — cerca del pánico. Se recupera lejos del combate o junto al héroe" style="color:#ffaa44">😰${Math.round(unit.morale)}</span>`
+    const moraleColor = unit.panicked || unit.morale < 25 ? '#dd2222' : unit.morale < 50 ? '#ddaa00' : '#22dd44';
+    const moraleIcon  = unit.panicked ? '😱' : unit.morale < 50 ? '😰' : '❤';
+    const moraleBadge = `<span title="${unit.panicked ? '¡Moral rota! Huye hasta recuperarse' : `Moral: ${Math.round(unit.morale)}/100 — cae con bajas cercanas y flanqueos`}" style="display:inline-flex;align-items:center;gap:2px;margin-left:1px"><span style="font-size:9px;color:${moraleColor}">${moraleIcon}</span><div style="width:36px;height:4px;background:rgba(255,255,255,0.10);border-radius:2px;display:inline-block;vertical-align:middle"><div style="width:${Math.round(unit.morale)}%;height:100%;background:${moraleColor};border-radius:2px"></div></div></span>`;
+    const entrenchedBadge = unit.entrenched
+      ? `<span title="Atrincherado — +7 def total (HOLD +2, fortín +5). Pulsa X o mueve para cancelar" style="color:#aaddff">🏕️FORTÍN</span>`
       : '';
     const ammoBadge = unit.outOfAmmo
       ? `<span title="Sin munición — combate cuerpo a cuerpo. Retira a un asentamiento propio para reabastecer" style="color:#ff4444">🏹SIN AMMO</span>`
@@ -472,7 +473,7 @@ export class HUD {
       `<span>🛡️ ${unit.defense}</span>` +
       `<span>💨 ${unit.speed.toFixed(1)}</span>` +
       `<span>🎯 ${unit.attackRange.toFixed(1)}</span>` +
-      holdBadge + burnBadge + poisonBadge + berserkBadge + chargeBadge + formBadge + moraleBadge + ammoBadge + orderBadge + warCryBadge;
+      holdBadge + entrenchedBadge + burnBadge + poisonBadge + berserkBadge + chargeBadge + formBadge + moraleBadge + ammoBadge + orderBadge + warCryBadge;
 
     // XP bar (only if unit can still level up)
     const xpEl = document.getElementById('unit-xp-row');
