@@ -130,6 +130,10 @@ export class Unit {
   isHero   = false;
   heroName = '';
 
+  // Hero war cry: Y-key buff that boosts nearby allies
+  warCryCooldown = 0;  // seconds remaining before war cry can be used again
+  buffAttackTimer = 0; // seconds of +25% attack buff remaining (from allied hero war cry)
+
   constructor(
     type: UnitType, civ: CivilizationType, playerId: number,
     col: number, row: number, civColor: number,
@@ -845,6 +849,10 @@ export class Unit {
       }
     }
 
+    // Hero war cry cooldown and attack buff
+    if (this.warCryCooldown > 0) this.warCryCooldown = Math.max(0, this.warCryCooldown - dt);
+    if (this.buffAttackTimer > 0) this.buffAttackTimer = Math.max(0, this.buffAttackTimer - dt);
+
     // Cavalry charge tracking
     if (this.type === UnitType.CAVALRY) {
       if (this.state === UnitState.IDLE || this.state === UnitState.HOLD) {
@@ -969,6 +977,27 @@ export class Unit {
     const f = this.formation ? FORMATIONS[this.formation] : null;
     this._formationSpeedMul = f ? Math.max(0.2, 1 + f.bonusSpeed) : 1.0;
     this.speed = Math.max(0.5, this._defSpeed * this._formationSpeedMul);
+  }
+
+  /**
+   * Hero war cry: boosts morale and attack of all friendly units within 8 tiles.
+   * Returns number of units affected, or 0 if on cooldown / not a hero.
+   */
+  triggerWarCry(alliedUnits: Unit[]): number {
+    if (!this.isHero || this.warCryCooldown > 0) return 0;
+    this.warCryCooldown = 45;
+    let count = 0;
+    for (const u of alliedUnits) {
+      if (!u.isAlive()) continue;
+      const d = Math.sqrt((u.col - this.col) ** 2 + (u.row - this.row) ** 2);
+      if (d <= 8) {
+        u.morale = Math.min(100, u.morale + 30);
+        u.buffAttackTimer = 12;
+        if (u.panicked) { u.panicked = false; }
+        count++;
+      }
+    }
+    return count;
   }
 
   /** Award XP and level up if threshold reached. */
