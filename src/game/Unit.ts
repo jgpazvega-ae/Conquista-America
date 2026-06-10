@@ -112,6 +112,14 @@ export class Unit {
   // Recomputed periodically by Game.updateFormations.
   inFormation = false;
 
+  // Ammo (ranged units only; -1 = melee, never depletes)
+  ammo    = -1;
+  maxAmmo = 0;
+  private _ammoRechargeTimer = 0;
+
+  // Volley fire: V-key sets this to bypass attackTimer once for a burst shot
+  volleyReady = false;
+
   // Hero unit
   isHero   = false;
   heroName = '';
@@ -141,7 +149,22 @@ export class Unit {
     this.worldZ = row * TILE_SIZE;
 
     this.buildMesh(civColor);
+
+    if (this.def.isRanged) {
+      const AMMO: Partial<Record<UnitType, number>> = {
+        [UnitType.ARCHER]:      28,
+        [UnitType.ATLATL]:      25,
+        [UnitType.SLINGER]:     30,
+        [UnitType.ARQUEBUSIER]: 15,
+        [UnitType.CANNON]:      10,
+      };
+      this.maxAmmo = AMMO[this.type] ?? 20;
+      this.ammo    = this.maxAmmo;
+    }
   }
+
+  get outOfAmmo(): boolean { return this.ammo === 0; }
+  get lowAmmo():   boolean { return this.ammo > 0 && this.ammo <= Math.ceil(this.maxAmmo * 0.25); }
 
   // ── Mesh construction ────────────────────────────────────────────────────────
   private buildMesh(civColor: number) {
@@ -825,6 +848,17 @@ export class Unit {
         this.chargeReady = false;
       }
       // While ATTACKING: chargeReady persists until consumed in CombatSystem
+    }
+
+    // Ammo resupply: 1 round per 1.5 s when standing near own settlement
+    if (this.ammo >= 0 && this.ammo < this.maxAmmo && this._nearSettlement) {
+      this._ammoRechargeTimer += dt;
+      if (this._ammoRechargeTimer >= 1.5) {
+        this._ammoRechargeTimer -= 1.5;
+        this.ammo++;
+      }
+    } else {
+      this._ammoRechargeTimer = 0;
     }
 
     if (this.state === UnitState.MOVING || this.state === UnitState.ATTACK_MOVE) {

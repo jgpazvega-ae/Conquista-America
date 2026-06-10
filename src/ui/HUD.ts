@@ -435,12 +435,19 @@ export class HUD {
       : unit.morale < 50
       ? `<span title="Moral baja — cerca del pánico. Se recupera lejos del combate o junto al héroe" style="color:#ffaa44">😰${Math.round(unit.morale)}</span>`
       : '';
+    const ammoBadge = unit.outOfAmmo
+      ? `<span title="Sin munición — combate cuerpo a cuerpo. Retira a un asentamiento propio para reabastecer" style="color:#ff4444">🏹SIN AMMO</span>`
+      : unit.lowAmmo
+      ? `<span title="Munición baja — retira a un asentamiento propio para reabastecer" style="color:#ffaa44">🏹${unit.ammo}</span>`
+      : unit.ammo >= 0
+      ? `<span title="Munición restante (V = descarga sincronizada ×2.5)" style="color:#aaddff">🏹${unit.ammo}/${unit.maxAmmo}</span>`
+      : '';
     this.elUnitStats.innerHTML =
       `<span>⚔️ ${unit.attack}</span>` +
       `<span>🛡️ ${unit.defense}</span>` +
       `<span>💨 ${unit.speed.toFixed(1)}</span>` +
       `<span>🎯 ${unit.attackRange.toFixed(1)}</span>` +
-      holdBadge + burnBadge + poisonBadge + berserkBadge + chargeBadge + formBadge + moraleBadge;
+      holdBadge + burnBadge + poisonBadge + berserkBadge + chargeBadge + formBadge + moraleBadge + ammoBadge;
 
     // XP bar (only if unit can still level up)
     const xpEl = document.getElementById('unit-xp-row');
