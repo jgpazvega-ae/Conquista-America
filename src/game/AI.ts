@@ -35,6 +35,7 @@ interface AIState {
 
 export class AISystem {
   private aiStates = new Map<number, AIState>();
+  private _warDeclared = new Set<string>(); // "fromId→toId" pairs already declared
 
   update(dt: number, game: Game) {
     for (const player of game.players) {
@@ -102,6 +103,12 @@ export class AISystem {
         if (state.phaseTimer >= GATHER_DURATION * scale || player.aliveUnits.length >= rallyCap) {
           state.phase = 'attacking';
           state.phaseTimer = 0;
+          // First time each AI declares war on the human player
+          const key = `${player.id}→${game.humanPlayerId}`;
+          if (!this._warDeclared.has(key)) {
+            this._warDeclared.add(key);
+            game.newWarDeclarations.push({ fromPlayerId: player.id, toPlayerId: game.humanPlayerId });
+          }
         }
       } else {
         this.waveAttack(player, game);
