@@ -93,6 +93,9 @@ export class AISystem {
             if (b.playerId === player.id && b.garrison.length > 0) game.ejectGarrison(b);
           }
         }
+      } else if (player.aliveUnits.length <= 3 && player.aliveUnits.length > 0) {
+        // Desperate last stand: few survivors ignore gathering and charge
+        this.waveAttack(player, game);
       } else if (baseUnderAttack) {
         // Switch to defending immediately when base takes significant damage
         state.phase = 'defending';
