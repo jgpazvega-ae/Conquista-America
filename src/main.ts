@@ -380,6 +380,21 @@ class GameInstance {
         this.hud.notify(`🔥 Edificio demolido — recuperados ${refFood}🌽 ${refGold}⚜️`, 'warning');
         this.audio.playBuild();
       };
+      this.prodPanel.onHireMercenary = () => {
+        const b = this._panelBuilding;
+        if (!b) return;
+        if (this.game.humanPlayer.resources.gold < 80) {
+          this.hud.notify('⚜️ Necesitas 80 de oro para contratar un mercenario', 'warning');
+          return;
+        }
+        const ok = this.game.hireMercenary(b, this.game.humanPlayerId);
+        if (ok) {
+          this.prodPanel.refresh();
+          this.audio.playBuild();
+        } else {
+          this.hud.notify('👥 Límite de población alcanzado o sin recursos', 'warning');
+        }
+      };
     };
 
     this.input.onTerrainHover = (col, row) => {

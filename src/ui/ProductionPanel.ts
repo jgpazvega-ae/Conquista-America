@@ -40,6 +40,7 @@ export class ProductionPanel {
   onUpgrade: ((key: keyof PlayerUpgrades) => void)             | null = null;
   onCancel:  (() => void)                                      | null = null;
   onDemolish: (() => void)                                     | null = null;
+  onHireMercenary: (() => void)                                | null = null;
 
   constructor() {
     this.el = document.getElementById('production-panel')!;
@@ -127,7 +128,10 @@ export class ProductionPanel {
       demolishEl.style.cssText = 'padding:6px 8px 2px;border-top:1px solid rgba(255,255,255,0.08);';
       this.el.appendChild(demolishEl);
     }
-    if (b.type !== BuildingType.SETTLEMENT && b.type !== BuildingType.VILLAGE) {
+    if (b.type === BuildingType.VILLAGE) {
+      demolishEl.innerHTML = `<button id="prod-demolish-btn" style="width:100%;padding:5px 8px;background:rgba(30,100,180,0.35);border:1px solid rgba(60,140,220,0.5);border-radius:5px;color:#aaddff;cursor:pointer;font-size:11px;" title="Contrata un mercenario de la aldea — 80⚜️. Tipo aleatorio (lancero, arquero, etc.)">⚔️ Contratar Mercenario (80⚜️)</button>`;
+      document.getElementById('prod-demolish-btn')?.addEventListener('click', () => this.onHireMercenary?.());
+    } else if (b.type !== BuildingType.SETTLEMENT) {
       const def = BUILDING_DEFS[b.type];
       const refoodPct = Math.floor(def.cost.food * 0.25);
       const refgoldPct = Math.floor(def.cost.gold * 0.25);

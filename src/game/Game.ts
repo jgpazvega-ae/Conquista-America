@@ -1065,6 +1065,23 @@ export class Game {
     return true;
   }
 
+  /** Hire a mercenary unit from a captured village (costs 80 gold). */
+  hireMercenary(village: import('./Building').Building, playerId: number): boolean {
+    const player = this.players[playerId];
+    if (!player || player.resources.gold < 80) return false;
+    if (player.aliveUnits.length >= this.getPopCap(playerId)) return false;
+    const mercTypes = [UnitType.SPEARMAN, UnitType.ARCHER, UnitType.SLINGER, UnitType.QUECHUA];
+    const unitType = mercTypes[Math.floor(Math.random() * mercTypes.length)];
+    const pos = this.map.findWalkableNear(village.col, village.row + 2, 5);
+    if (!pos) return false;
+    player.resources.gold -= 80;
+    const unit = new Unit(unitType, player.civType, playerId, pos[0], pos[1], CIV_COLORS[player.civType]);
+    player.addUnit(unit);
+    this.newlySpawnedUnits.push(unit);
+    this.pendingEventMessages.push(`⚔️ Mercenario contratado — ${unit.def.name} a tus órdenes`);
+    return true;
+  }
+
   placeBuilding(type: BuildingType, col: number, row: number, playerId: number): boolean {
     const def    = BUILDING_DEFS[type];
     const player = this.players[playerId];

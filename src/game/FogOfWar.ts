@@ -40,7 +40,9 @@ export class FogOfWar {
     // Units reveal terrain (jungle tiles need extra sight to reveal — stealth mechanic)
     const myUnits = game.allUnits.filter(u => u.playerId === playerId && u.isAlive());
     for (const unit of myUnits) {
-      this.revealAroundPoint(Math.round(unit.col), Math.round(unit.row), Math.ceil(unit.sight * sightMultiplier), game.map);
+      // Eagle Warriors are night hunters — they don't suffer the night sight penalty
+      const unitMult = (sightMultiplier < 1.0 && unit.type === 'EAGLE_WARRIOR') ? 1.0 : sightMultiplier;
+      this.revealAroundPoint(Math.round(unit.col), Math.round(unit.row), Math.ceil(unit.sight * unitMult), game.map);
     }
 
     // Buildings reveal terrain (watchtowers get boosted sight to match their attack range)
