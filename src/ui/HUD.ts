@@ -444,6 +444,9 @@ export class HUD {
     const poisonBadge  = unit.poisoned    > 0 ? `<span title="Envenenado" style="color:#44dd44">☠️${Math.ceil(unit.poisoned)}s</span>`       : '';
     const berserkBadge = unit.berserkTimer > 0 ? `<span title="¡Frenesí! +25% daño" style="color:#ff6600">🔥FRENESÍ ${Math.ceil(unit.berserkTimer)}s</span>` : '';
     const chargeBadge  = unit.chargeReady  ? `<span title="Carga de caballería lista — +60% daño en primer golpe" style="color:#ffe066">⚡CARGA</span>` : '';
+    const deployBadge  = unit.type === 'CANNON' && unit.stationaryTimer < 4
+      ? `<span title="Desplegando cañón — espera ${(4 - unit.stationaryTimer).toFixed(1)}s antes de disparar" style="color:#ffcc44">⚙️DESPLEGANDO</span>`
+      : '';
     const nightBadge   = this.game.isNight ? `<span title="Noche: +15% daño de combate para ambos bandos" style="color:#88aaff">🌙+15%</span>` : '';
     const reloadPct    = unit.attackTimer > 0 && unit.attackCooldown > 0 ? Math.round((unit.attackTimer / unit.attackCooldown) * 100) : 0;
     const reloadBadge  = reloadPct > 0 ? `<span title="Recargando ${unit.attackTimer.toFixed(1)}s" style="color:#ccaa44">🔄${reloadPct}%</span>` : '';
@@ -482,7 +485,7 @@ export class HUD {
       `<span>🛡️ ${unit.defense}</span>` +
       `<span>💨 ${unit.speed.toFixed(1)}</span>` +
       `<span>🎯 ${unit.attackRange.toFixed(1)}</span>` +
-      woundBadge + holdBadge + entrenchedBadge + burnBadge + poisonBadge + berserkBadge + chargeBadge + formBadge + moraleBadge + ammoBadge + orderBadge + warCryBadge + nightBadge + reloadBadge;
+      woundBadge + holdBadge + entrenchedBadge + burnBadge + poisonBadge + berserkBadge + chargeBadge + deployBadge + formBadge + moraleBadge + ammoBadge + orderBadge + warCryBadge + nightBadge + reloadBadge;
 
     // XP bar (only if unit can still level up)
     const xpEl = document.getElementById('unit-xp-row');
