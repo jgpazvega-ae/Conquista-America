@@ -252,6 +252,7 @@ export class HUD {
     // Minimap units
     this.updateMinimap();
     this.updateScoreboard();
+    this.updateMomentum();
     this.updateObjectives();
     this.updatePowerButton();
     this.updateBuildingHpBars();
@@ -391,6 +392,49 @@ export class HUD {
       </div>`;
     }).join('');
     this.elScoreboard.innerHTML = html;
+  }
+
+  /** Estimate a player's military strength: sum of (attack + defense + hp/10) over alive units. */
+  private militaryStrength(playerId: number): number {
+    let total = 0;
+    for (const u of this.game.players[playerId]?.aliveUnits ?? []) {
+      total += u.attack + u.defense + u.hp / 10 + (u.isHero ? 40 : 0) + u.level * 5;
+    }
+    return total;
+  }
+
+  private updateMomentum() {
+    const bar = document.getElementById('momentum-bar');
+    const fill = document.getElementById('momentum-fill');
+    const marker = document.getElementById('momentum-marker');
+    const label = document.getElementById('momentum-label');
+    if (!bar || !fill || !marker || !label) return;
+    if (this.game.status !== 'PLAYING') { bar.classList.add('hidden'); return; }
+
+    const mine = this.militaryStrength(this.game.humanPlayerId);
+    // Strongest living enemy
+    let enemyMax = 0;
+    for (const p of this.game.players) {
+      if (p.id === this.game.humanPlayerId || p.isDefeated()) continue;
+      enemyMax = Math.max(enemyMax, this.militaryStrength(p.id));
+    }
+    if (mine === 0 && enemyMax === 0) { bar.classList.add('hidden'); return; }
+    bar.classList.remove('hidden');
+
+    // Ratio 0..1 where 0.5 = parity; clamp display
+    const ratio = mine / (mine + enemyMax || 1);
+    const pct = Math.round(ratio * 100);
+    fill.style.width = `${pct}%`;
+    // Color: green when ahead, amber near parity, red when behind
+    const color = ratio > 0.62 ? '#33cc55' : ratio > 0.42 ? '#ddaa22' : '#dd3333';
+    fill.style.background = color;
+    marker.style.left = '50%'; // parity reference line
+
+    const advantage = Math.round((ratio - 0.5) * 200); // -100..+100
+    if (advantage > 12)      label.textContent = `⚔️ Ventaja +${advantage}%`;
+    else if (advantage < -12) label.textContent = `🛡️ Desventaja ${advantage}%`;
+    else                      label.textContent = '⚖️ Equilibrio militar';
+    label.style.color = color;
   }
 
   private updateHeroPanel() {
