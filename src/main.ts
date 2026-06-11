@@ -366,6 +366,20 @@ class GameInstance {
         this.renderer.showGhost(CIV_COLORS[civColor]);
         this.hud.notify(`🏗️ Coloca el ${def.name} — clic derecho para cancelar`, 'info');
       };
+      this.prodPanel.onDemolish = () => {
+        const b = this._panelBuilding;
+        if (!b || !b.isAlive()) return;
+        const def = BUILDING_DEFS[b.type as BuildingType];
+        const refFood = Math.floor((def?.cost.food ?? 0) * 0.25);
+        const refGold = Math.floor((def?.cost.gold ?? 0) * 0.25);
+        b.takeDamage(b.maxHp * 2); // guaranteed kill
+        this.game.humanPlayer.resources.food = Math.min(2000, this.game.humanPlayer.resources.food + refFood);
+        this.game.humanPlayer.resources.gold = Math.min(2000, this.game.humanPlayer.resources.gold + refGold);
+        this.prodPanel.hide();
+        this._panelBuilding = null;
+        this.hud.notify(`🔥 Edificio demolido — recuperados ${refFood}🌽 ${refGold}⚜️`, 'warning');
+        this.audio.playBuild();
+      };
     };
 
     this.input.onTerrainHover = (col, row) => {

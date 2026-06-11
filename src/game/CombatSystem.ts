@@ -97,6 +97,12 @@ export class CombatSystem {
         const isVolley = unit.volleyReady && unit.ammo > 0;
         if (isVolley) unit.volleyReady = false;
 
+        // Cannon deployment: must be stationary ≥ 4s before firing (AC: unlimbering time)
+        if (unit.type === UnitType.CANNON && unit.stationaryTimer < 4) {
+          unit.attackTimer = Math.max(unit.attackTimer, 1.0); // retry in ≤1s
+          continue;
+        }
+
         if (isVolley || unit.attackTimer <= 0) {
           const attackerTile = map.getTile(unit.col, unit.row);
           const baseAtk = unit.outOfAmmo ? Math.max(4, Math.round(unit.def.stats.attack * 0.4)) : unit.attack;

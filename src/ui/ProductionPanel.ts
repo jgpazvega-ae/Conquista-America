@@ -39,6 +39,7 @@ export class ProductionPanel {
   onBuild:   ((type: BuildingType) => void)                    | null = null;
   onUpgrade: ((key: keyof PlayerUpgrades) => void)             | null = null;
   onCancel:  (() => void)                                      | null = null;
+  onDemolish: (() => void)                                     | null = null;
 
   constructor() {
     this.el = document.getElementById('production-panel')!;
@@ -116,6 +117,24 @@ export class ProductionPanel {
       this.renderBuildList(p);
     } else {
       this.renderUpgradeList(p);
+    }
+
+    // Demolish footer — always visible for non-settlement buildings
+    let demolishEl = document.getElementById('prod-demolish-footer');
+    if (!demolishEl) {
+      demolishEl = document.createElement('div');
+      demolishEl.id = 'prod-demolish-footer';
+      demolishEl.style.cssText = 'padding:6px 8px 2px;border-top:1px solid rgba(255,255,255,0.08);';
+      this.el.appendChild(demolishEl);
+    }
+    if (b.type !== BuildingType.SETTLEMENT && b.type !== BuildingType.VILLAGE) {
+      const def = BUILDING_DEFS[b.type];
+      const refoodPct = Math.floor(def.cost.food * 0.25);
+      const refgoldPct = Math.floor(def.cost.gold * 0.25);
+      demolishEl.innerHTML = `<button id="prod-demolish-btn" style="width:100%;padding:5px 8px;background:rgba(180,30,30,0.35);border:1px solid rgba(200,60,60,0.5);border-radius:5px;color:#ffaaaa;cursor:pointer;font-size:11px;" title="Destruye el edificio al instante — recupera el 25% de los materiales (${refoodPct}🌽 ${refgoldPct}⚜️). Útil para tierra quemada.">🔥 Demolir (+${refoodPct}🌽 +${refgoldPct}⚜️)</button>`;
+      document.getElementById('prod-demolish-btn')?.addEventListener('click', () => this.onDemolish?.());
+    } else {
+      demolishEl.innerHTML = '';
     }
   }
 
