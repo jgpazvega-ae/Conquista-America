@@ -58,6 +58,8 @@ export class Unit {
   // Civilization power buffs
   incaBuff  = false;
   conquBuff = false;
+  _preBuffAttack = 0; // attack value before civ power buff (0 = not buffed)
+  _preBuffSpeed  = 0;
 
   moveX: number = 0;
   moveZ: number = 0;
