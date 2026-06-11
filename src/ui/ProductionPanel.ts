@@ -39,6 +39,7 @@ export class ProductionPanel {
   onBuild:   ((type: BuildingType) => void)                    | null = null;
   onUpgrade: ((key: keyof PlayerUpgrades) => void)             | null = null;
   onCancel:  (() => void)                                      | null = null;
+  onCancelProduction: (() => void)                             | null = null;
   onDemolish: (() => void)                                     | null = null;
   onHireMercenary: (() => void)                                | null = null;
 
@@ -255,5 +256,21 @@ export class ProductionPanel {
     } else {
       progWrap.classList.add('hidden');
     }
+
+    // Cancel current production button
+    let cancelBtn = document.getElementById('prod-cancel-prod-btn') as HTMLButtonElement | null;
+    if (!cancelBtn) {
+      cancelBtn = document.createElement('button');
+      cancelBtn.id = 'prod-cancel-prod-btn';
+      cancelBtn.style.cssText =
+        'margin-top:4px;width:100%;padding:4px 8px;background:rgba(140,30,30,0.4);' +
+        'border:1px solid rgba(200,80,80,0.5);border-radius:5px;color:#ffbbbb;' +
+        'cursor:pointer;font-size:11px;';
+      cancelBtn.title = 'Cancela la unidad en producción y recupera el 75% del coste';
+      cancelBtn.textContent = '✕ Cancelar producción (75% reembolso)';
+      cancelBtn.addEventListener('click', () => this.onCancelProduction?.());
+      progWrap.parentElement?.insertBefore(cancelBtn, progWrap.nextSibling);
+    }
+    cancelBtn.classList.toggle('hidden', b.productionQueue.length === 0);
   }
 }

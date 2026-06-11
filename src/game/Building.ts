@@ -426,6 +426,13 @@ export class Building {
   }
 
   get productionQueue(): readonly ProdQueueItem[] { return this._prodQueue; }
+
+  /** Remove the first item from the queue and return it (for refund calculation). Returns null if empty. */
+  cancelCurrentProduction(): ProdQueueItem | null {
+    if (this._prodQueue.length === 0) return null;
+    return this._prodQueue.shift()!;
+  }
+
   get productionProgress(): number {
     if (this._prodQueue.length === 0) return 0;
     return this._prodQueue[0].elapsed / this._prodQueue[0].totalTime;
