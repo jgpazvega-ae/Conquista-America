@@ -69,6 +69,7 @@ export class Game {
   newlyLeveledUpUnits: Unit[] = [];
   newlyEliminatedPlayers: Player[] = [];
   newlyVisibleEnemyHeroes: Unit[] = [];
+  newlyResearchedUpgrades: { playerId: number; upgrade: string }[] = [];
   private _hadSettlement = new Set<number>(); // track which players ever had a settlement
   private _visibleEnemyHeroIds = new Set<number>(); // enemy hero ids currently visible to human
   private _heroRespawnTimers = new Map<number, number>(); // playerId → seconds until respawn
@@ -380,6 +381,7 @@ export class Game {
     this.newlyLeveledUpUnits = [];
     this.newlyEliminatedPlayers = [];
     this.newlyVisibleEnemyHeroes = [];
+    this.newlyResearchedUpgrades = [];
 
     // Collect units that leveled up this frame (justLeveledUp reset below)
     for (const u of this.allUnits) {
@@ -1185,6 +1187,7 @@ export class Game {
     player.resources.gold  -= cost.gold;
     player.resources.stone -= cost.stone;
     player.upgrades[upgrade] = true;
+    this.newlyResearchedUpgrades.push({ playerId, upgrade: upgrade as string });
 
     // Apply to all existing units immediately
     for (const unit of this.allUnits) {

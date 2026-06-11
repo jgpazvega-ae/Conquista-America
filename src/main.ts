@@ -371,6 +371,25 @@ class GameInstance {
         this.renderer.showGhost(CIV_COLORS[civColor]);
         this.hud.notify(`🏗️ Coloca el ${def.name} — clic derecho para cancelar`, 'info');
       };
+      this.prodPanel.onCancelProduction = () => {
+        const b = this._panelBuilding;
+        if (!b) return;
+        const item = b.cancelCurrentProduction();
+        if (!item) return;
+        const cost = TRAIN_COSTS[item.unitType];
+        if (cost) {
+          const refFood  = Math.floor(cost.food  * 0.75);
+          const refGold  = Math.floor(cost.gold  * 0.75);
+          const refStone = Math.floor((cost.stone ?? 0) * 0.75);
+          const p = this.game.humanPlayer;
+          p.resources.food  = Math.min(2000, p.resources.food  + refFood);
+          p.resources.gold  = Math.min(2000, p.resources.gold  + refGold);
+          p.resources.stone = Math.min(2000, p.resources.stone + refStone);
+          const parts = [refFood ? `+${refFood}🌽` : '', refGold ? `+${refGold}⚜️` : '', refStone ? `+${refStone}🪨` : ''].filter(Boolean).join(' ');
+          this.hud.notify(`✕ Producción cancelada — reembolso: ${parts}`, 'info');
+        }
+        this.prodPanel.refresh();
+      };
       this.prodPanel.onDemolish = () => {
         const b = this._panelBuilding;
         if (!b || !b.isAlive()) return;
@@ -926,6 +945,19 @@ class GameInstance {
       this.hud.notify(`⚰️ ¡${name} han sido eliminados de la batalla!`, 'success');
       this.camera.shake(0.6, 1.0);
       this.audio.playVictory();
+    }
+
+    // Enemy tech research notifications
+    const upgradeNames: Record<string, string> = {
+      metallurgy:    '⚔️ Metalurgia (+6 atk a todas sus unidades)',
+      logistics:     '👟 Logística (+0.4 veloc. a todas sus unidades)',
+      fortification: '🛡️ Fortificación (+50 HP máx. a todas sus unidades)',
+      civTech:       '⭐ Tecnología élite (mejora especial de su civilización)',
+    };
+    for (const r of this.game.newlyResearchedUpgrades) {
+      if (r.playerId === this.game.humanPlayerId) continue;
+      const label = upgradeNames[r.upgrade] ?? r.upgrade;
+      this.hud.notify(`🔬 ¡El enemigo investigó ${label}! Acelera tu propia investigación en la Fragua.`, 'warning');
     }
 
     // Enemy hero spotted: high-priority alert
