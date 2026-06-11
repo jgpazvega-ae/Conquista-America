@@ -1192,6 +1192,22 @@ input.toggle { width: 22px; height: 22px; accent-color: #d4880a; }
 .hud-toast-warning { border: 1px solid rgba(255,180,50,0.4);  color: #f0c060; }
 .hud-toast-success { border: 1px solid rgba(60,220,100,0.4);  color: #44ee88; }
 
+/* ═══════════════════════════════════════ KILL FEED ══════ */
+#kill-feed {
+  position: fixed; right: 12px; bottom: 44px; z-index: 400;
+  display: flex; flex-direction: column-reverse; gap: 3px;
+  pointer-events: none; width: 240px;
+}
+.kf-entry {
+  background: rgba(8,6,2,0.80);
+  border-left: 2px solid rgba(255,180,50,0.45);
+  border-radius: 0 5px 5px 0;
+  padding: 3px 8px; font-size: 11px; color: #ccc;
+  opacity: 1; transition: opacity 1.5s ease;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.kf-entry.fade { opacity: 0; }
+
 /* ═══════════════════════════════════════ PAUSE OVERLAY ══ */
 #pause-overlay {
   position: fixed; inset: 0; z-index: 1050;

@@ -683,11 +683,21 @@ export class Game {
       }
     }
 
-    // Panic check: morale ≤ 25 breaks the unit unless its hero stands nearby
+    // Hero passive morale aura: hero nearby slowly boosts allied morale (+1/s within 6 tiles)
     const heroesByPlayer = new Map<number, Unit>();
     for (const u of this.allUnits) {
       if (u.isHero && u.isAlive()) heroesByPlayer.set(u.playerId, u);
     }
+    for (const [, hero] of heroesByPlayer) {
+      for (const ally of this.allUnits) {
+        if (!ally.isAlive() || ally.isHero || ally.playerId !== hero.playerId || ally.panicked) continue;
+        if (ally.distanceTo(hero) <= 6 && ally.morale < 80) {
+          ally.morale = Math.min(80, ally.morale + dt * 1.0);
+        }
+      }
+    }
+
+    // Panic check: morale ≤ 25 breaks the unit unless its hero stands nearby
     for (const u of this.allUnits) {
       if (!u.isAlive() || u.isHero || u.panicked || u.morale > 25 || u.garrisonedIn !== null) continue;
       const hero = heroesByPlayer.get(u.playerId);

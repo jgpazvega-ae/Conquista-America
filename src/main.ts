@@ -817,10 +817,22 @@ class GameInstance {
               this.hud.notify(`⚔️ ¡Héroe enemigo abatido! +${kg}⚜️`, 'success');
             }
           }
-          // Hero death notification
+          // Kill feed entry for significant kills
+          if (evt.target.isHero) {
+            const side = evt.target.playerId === this.game.humanPlayerId ? '☠️' : '⚔️';
+            this.hud.addKillFeedEntry(`${side} ${evt.target.heroName ?? evt.target.def.name} ha caído`);
+          } else if (evt.target.level >= 2) {
+            const stars = evt.target.level >= 3 ? '★★' : '★';
+            this.hud.addKillFeedEntry(`⚔️ ${evt.target.def.name} ${stars} eliminado`);
+          }
+          // Hero death notification + dramatic slow-motion
           if (evt.target.isHero && evt.target.playerId === this.game.humanPlayerId) {
             this.hud.notify(`☠️ ${evt.target.heroName} ha caído — regresará en 60s`, 'warning');
             this.camera.shake(0.4, 0.6);
+            // Brief slow-motion: 0.25× for 0.6s, then restore
+            const prevSpeed = this._gameSpeed;
+            this._gameSpeed = 0.25;
+            setTimeout(() => { this._gameSpeed = prevSpeed; }, 600);
           }
         } else {
           this.audio.playHit(evt.damage / 30);
@@ -910,6 +922,7 @@ class GameInstance {
     for (const cap of this.game.newlyCapturedBuildings) {
       const name = BUILDING_DEFS[cap.building.type]?.name ?? 'Edificio';
       const isVillage = cap.building.type === BuildingType.VILLAGE;
+      this.hud.addKillFeedEntry(`🚩 ${name} capturado`);
       if (cap.toPlayerId === this.game.humanPlayerId) {
         if (isVillage) {
           this.hud.notify(`🏡 ¡Aldea capturada! +10🌽 +6⚜️ cada 30s mientras la controles`, 'success');
