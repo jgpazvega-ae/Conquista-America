@@ -94,6 +94,8 @@ export class Game {
   private _villageIncomeTimer = 30; // seconds between village income ticks
   private _autobraceTimer = 0;
   private _autobraceNotified = false;
+  private _kiteTimer = 0;
+  private _supplyLineTimer = 0;
   private _towerAlertTimer = 0; // global cooldown between watchtower alarm notifications
   private _recentHumanDeaths = 0;
   private _deathWindowTimer  = 30;
@@ -647,6 +649,29 @@ export class Game {
       }
     }
 
+    // Supply line morale: units > 15 tiles from any friendly building slowly lose cohesion
+    // (AC mechanic: stretched supply lines demoralise isolated troops in enemy territory)
+    this._supplyLineTimer += dt;
+    if (this._supplyLineTimer >= 5) {
+      this._supplyLineTimer = 0;
+      const bldgsByPlayer = new Map<number, { col: number; row: number }[]>();
+      for (const b of this.allBuildings) {
+        if (!b.isAlive()) continue;
+        if (!bldgsByPlayer.has(b.playerId)) bldgsByPlayer.set(b.playerId, []);
+        bldgsByPlayer.get(b.playerId)!.push({ col: b.col, row: b.row });
+      }
+      for (const unit of this.allUnits) {
+        if (!unit.isAlive() || unit.isHero || unit.garrisonedIn !== null) continue;
+        const bldgs = bldgsByPlayer.get(unit.playerId) ?? [];
+        let minDist = Infinity;
+        for (const b of bldgs) {
+          const d = Math.sqrt((unit.col - b.col) ** 2 + (unit.row - b.row) ** 2);
+          if (d < minDist) minDist = d;
+        }
+        if (minDist > 15) unit.loseMorale(2); // ~0.4 morale/s when isolated far from base
+      }
+    }
+
     // Population pressure: at ≥90% pop cap troops are overcrowded and morale suffers
     {
       const cap   = this.getPopCap(this.humanPlayerId);
@@ -762,6 +787,38 @@ export class Game {
       this._autoAttackTimer = 0;
       this.runAutoAttack();
       this.updatePatrol();
+    }
+
+    // Ranged kiting: every 0.4s, ranged non-cannon units in IDLE state back away from
+    // adjacent enemy melee units (AC fire-and-fall-back behaviour)
+    this._kiteTimer += dt;
+    if (this._kiteTimer >= 0.4) {
+      this._kiteTimer = 0;
+      for (const unit of this.allUnits) {
+        if (!unit.isAlive() || unit.garrisonedIn !== null || unit.panicked) continue;
+        if (unit.attackRange <= 1.5 || unit.type === UnitType.CANNON) continue;
+        if (unit.state !== UnitState.IDLE) continue;
+        if (unit.outOfAmmo) continue;
+        let nearestDist = Infinity;
+        let nearestMelee: Unit | null = null;
+        for (const other of this.allUnits) {
+          if (!other.isAlive() || other.playerId === unit.playerId || other.garrisonedIn !== null) continue;
+          if (other.attackRange > 1.5) continue;
+          const d = unit.distanceTo(other);
+          if (d < nearestDist) { nearestDist = d; nearestMelee = other; }
+        }
+        if (!nearestMelee || nearestDist > 2.5) continue;
+        const dc = unit.col - nearestMelee.col;
+        const dr = unit.row - nearestMelee.row;
+        const len = Math.sqrt(dc * dc + dr * dr) || 1;
+        const tCol = Math.round(unit.col + (dc / len) * 3);
+        const tRow = Math.round(unit.row + (dr / len) * 3);
+        const near = this.map.findWalkableNear(tCol, tRow, 2);
+        if (near) {
+          const path = findPath(this.map, unit.gridPos(), { col: near[0], row: near[1] }, 80);
+          if (path.length > 0) unit.moveTo(path);
+        }
+      }
     }
 
     // Random events

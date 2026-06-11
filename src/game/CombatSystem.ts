@@ -37,6 +37,7 @@ export interface DamageEvent {
   worldZ:        number;
   critical?:     boolean;
   isCharge?:     boolean;
+  chargeBlocked?: boolean; // cavalry charge was absorbed by spear phalanx
   sourceWorldX?: number; // set for building-sourced attacks (watchtower)
   sourceWorldZ?: number;
 }
@@ -172,11 +173,20 @@ export class CombatSystem {
           if (unit.type === UnitType.CANNON && unit.entrenched) dmg = Math.round(dmg * 1.5);
           // Cavalry charge: +60% on first strike after 3s idle + morale shock on target
           let isCharge = false;
+          let chargeBlocked = false;
           if (unit.type === UnitType.CAVALRY && unit.chargeReady) {
-            dmg = Math.round(dmg * 1.6);
             unit.chargeReady = false;
-            isCharge = true;
-            if (!target.isHero) target.loseMorale(15); // charge breaks enemy morale
+            const spearTypes = new Set([UnitType.SPEARMAN, UnitType.QUECHUA, UnitType.ANTIS_WARRIOR, UnitType.CHAKANA_GUARD]);
+            if (target.formation === 'PHALANX' && spearTypes.has(target.type)) {
+              // Phalanx brace: spear units set against charging cavalry absorb the blow.
+              // No charge bonus, no morale shock; defenders gain confidence (+10 morale).
+              chargeBlocked = true;
+              if (!target.isHero) target.morale = Math.min(100, target.morale + 10);
+            } else {
+              dmg = Math.round(dmg * 1.6);
+              isCharge = true;
+              if (!target.isHero) target.loseMorale(15); // charge breaks enemy morale
+            }
           }
           // Heavy wounds (< 25% HP): attacker fights at reduced effectiveness
           if (unit.hp < unit.maxHp * 0.25) dmg = Math.round(dmg * 0.8);
@@ -205,7 +215,7 @@ export class CombatSystem {
           if (unit.ammo > 0) unit.ammo = Math.max(0, unit.ammo - (isVolley ? 2 : 1));
 
           let isCrit = multiplier >= 1.5 || isFlanking || isCharge || unit.berserkTimer > 0 || isVolley || unit.buffAttackTimer > 0;
-          this.events.push({ attacker: unit, target, damage: actual, worldX: target.worldX, worldZ: target.worldZ, critical: isCrit, isCharge });
+          this.events.push({ attacker: unit, target, damage: actual, worldX: target.worldX, worldZ: target.worldZ, critical: isCrit, isCharge, chargeBlocked });
 
           // Kill streak tracking: 3 kills in a row without taking damage → 12s berserk
           if (!target.isAlive()) {

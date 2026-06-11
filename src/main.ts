@@ -159,6 +159,7 @@ class GameInstance {
   private _hintsShown = new Set<string>(); // one-time contextual tutorial hints
   private _advantageTimer   = 0;  // seconds player has held >65% military advantage
   private _advantageCooldown = 0; // prevents repeated "press the attack" alerts (90s)
+  private _enemyDisarrayCooldown = 0; // prevents repeated enemy-disarray alerts (60s)
 
   /** Show a tutorial hint at most once per match. */
   private hintOnce(key: string, msg: string) {
@@ -530,7 +531,8 @@ class GameInstance {
     if (this._chargeResistTimer   > 0) this._chargeResistTimer   = Math.max(0, this._chargeResistTimer   - rawDt);
     if (this._idleArmyCooldown    > 0) this._idleArmyCooldown    = Math.max(0, this._idleArmyCooldown    - rawDt);
     if (this._lowMoraleCooldown   > 0) this._lowMoraleCooldown   = Math.max(0, this._lowMoraleCooldown   - rawDt);
-    if (this._advantageCooldown   > 0) this._advantageCooldown   = Math.max(0, this._advantageCooldown   - rawDt);
+    if (this._advantageCooldown    > 0) this._advantageCooldown    = Math.max(0, this._advantageCooldown    - rawDt);
+    if (this._enemyDisarrayCooldown > 0) this._enemyDisarrayCooldown = Math.max(0, this._enemyDisarrayCooldown - rawDt);
     this.game.update(dt);
 
     // Register any units produced this frame
@@ -855,13 +857,13 @@ class GameInstance {
         this.hud.notify('⚔️ ¡Tus tropas están bajo ataque!', 'warning');
       }
 
-      // Phalanx charge-resist: human phalanx absorbs a cavalry charge
+      // Phalanx charge-resist: human spear phalanx absorbed a cavalry charge
       if (this._chargeResistTimer <= 0) {
         for (const evt of this.game.damageEvents) {
-          if (!evt.isCharge || !evt.attacker) continue;
-          if (evt.target.playerId === this.game.humanPlayerId && evt.target.formation === 'PHALANX') {
+          if (!evt.chargeBlocked || !evt.attacker) continue;
+          if (evt.target.playerId === this.game.humanPlayerId) {
             this._chargeResistTimer = 20;
-            this.hud.notify('🛡️ ¡La falange resistió la carga de caballería!', 'success');
+            this.hud.notify('🛡️ ¡La falange resistió la carga de caballería! +10 moral', 'success');
             break;
           }
         }
@@ -1131,6 +1133,22 @@ class GameInstance {
         }
       } else {
         this._advantageTimer = 0;
+      }
+    }
+
+    // Enemy army in disarray: alert when a major enemy faction's morale collapses (<35% avg)
+    // so the player knows to seize the window before they regroup
+    if (this.game.status === 'PLAYING' && this._enemyDisarrayCooldown <= 0) {
+      for (const p of this.game.players) {
+        if (p.id === this.game.humanPlayerId || p.isDefeated()) continue;
+        const fighters = p.aliveUnits.filter(u => !u.isHero);
+        if (fighters.length < 3) continue;
+        const avgMorale = fighters.reduce((s, u) => s + u.morale, 0) / fighters.length;
+        if (avgMorale < 35) {
+          this._enemyDisarrayCooldown = 60;
+          this.hud.notify('🏳️ ¡El ejército enemigo está en desorden! Presiona el ataque', 'success');
+          break;
+        }
       }
     }
 
