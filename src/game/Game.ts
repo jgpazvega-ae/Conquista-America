@@ -1327,6 +1327,34 @@ export class Game {
         human.resources.stone = Math.min(cap, human.resources.stone + 50);
         return '🌽 ¡Festival de la cosecha! +150 🌽 alimentos, +50 🪨 piedra';
       },
+      // Earthquake: damages all enemy buildings
+      () => {
+        if (enemyBuildings.length === 0) return null;
+        let hit = 0;
+        for (const b of enemyBuildings) {
+          b.takeDamage(15);
+          if (!b.isAlive()) this.newlyDestroyedBuildings.push(b);
+          hit++;
+        }
+        return `🌋 ¡Terremoto! ${hit} edificio${hit > 1 ? 's' : ''} enemigo${hit > 1 ? 's' : ''} dañado${hit > 1 ? 's' : ''}`;
+      },
+      // Holy festival: human non-hero units gain +20 morale
+      () => {
+        const boosted = human.aliveUnits.filter(u => !u.isHero && u.morale < 80);
+        if (boosted.length === 0) return null;
+        for (const u of boosted) u.morale = Math.min(80, u.morale + 20);
+        return `🙏 ¡Festival sagrado! ${boosted.length} unidad${boosted.length > 1 ? 'es' : ''} recuper${boosted.length > 1 ? 'an' : 'a'} moral (+20)`;
+      },
+      // Gold tribute from a captured village
+      () => {
+        const village = this.allBuildings.find(
+          b => b.type === BuildingType.VILLAGE && b.playerId === this.humanPlayerId && b.isAlive(),
+        );
+        if (!village) return null;
+        const tribute = 40 + Math.floor(Math.random() * 30);
+        human.resources.gold = Math.min(cap, human.resources.gold + tribute);
+        return `🏡 ¡Tributo de aldea! +${tribute} ⚜️ oro`;
+      },
     ];
 
     // Shuffle and try events until one succeeds
