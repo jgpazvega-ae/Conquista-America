@@ -44,6 +44,19 @@ export class ResourceSystem {
         continue;
       }
 
+      // ── Storehouse proximity bonus: +20% gather speed within 5 tiles ─────────
+      const isGathering = worker.task === WorkerTask.GATHERING_FOOD ||
+                          worker.task === WorkerTask.GATHERING_GOLD ||
+                          worker.task === WorkerTask.GATHERING_STONE;
+      if (isGathering) {
+        const nearStorehouse = game.allBuildings.some(
+          b => b.playerId === worker.playerId &&
+               (b.type as string) === 'STOREHOUSE' && b.isComplete() &&
+               Math.sqrt((worker.col - b.col) ** 2 + (worker.row - b.row) ** 2) <= 5,
+        );
+        if (nearStorehouse) worker.taskProgress += game.lastDt * 0.2;
+      }
+
       // ── Find resource to gather (auto-assign idle workers) ──────────────────
       if (worker.task !== WorkerTask.IDLE) continue;
 

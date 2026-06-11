@@ -131,6 +131,15 @@ export class Game {
         case CivilizationType.INCA:          player.resources.stone += 100; break; // Andean quarrying
         case CivilizationType.CONQUISTADOR:  player.resources.gold  += 150; break; // gold seekers
       }
+      // Difficulty scaling: human player only (Easy bonus, Hard penalty)
+      if (isHuman) {
+        const mult = this.difficulty === 'easy' ? 1.5 : this.difficulty === 'hard' ? 0.75 : 1.0;
+        if (mult !== 1.0) {
+          player.resources.food  = Math.round(player.resources.food  * mult);
+          player.resources.gold  = Math.round(player.resources.gold  * mult);
+          player.resources.stone = Math.round(player.resources.stone * mult);
+        }
+      }
       this.players.push(player);
       this.spawnUnitsFor(player);
     });
@@ -306,9 +315,13 @@ export class Game {
     return this.allBuildings.find(b => b.id === id);
   }
 
+  /** Delta time of the last update call — available to subsystems like ResourceSystem. */
+  lastDt = 0;
+
   update(dt: number) {
     if (this.status !== 'PLAYING' || this.paused) return;
 
+    this.lastDt = dt;
     this.gameTime += dt;
 
     // Precompute settlement and storehouse positions per player for proximity effects
