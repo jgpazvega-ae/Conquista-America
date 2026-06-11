@@ -862,7 +862,8 @@ export class Game {
         if (best) unit.attackTarget = best;
         continue;
       }
-      if (unit.state !== UnitState.IDLE) continue;
+      // Patrolling units also auto-attack enemies within sight
+      if (unit.state !== UnitState.IDLE && unit.patrolA === null) continue;
       if (unit.attackTarget !== null || unit.attackBuildingTarget !== null) continue;
 
       let best: Unit | null = null;

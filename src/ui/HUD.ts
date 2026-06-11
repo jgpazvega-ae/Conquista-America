@@ -53,6 +53,8 @@ export class HUD {
   private minimapBuilt = false;
   private minimapBase: ImageData | null = null;
   private elTimer      = document.getElementById('game-timer');
+  private elHeroRespawnChip = document.getElementById('hero-respawn-chip');
+  private elHeroRespawnSecs = document.getElementById('hero-respawn-secs');
   private elPop             = document.getElementById('pop-count');
   private elPopBarFill      = document.getElementById('pop-bar-fill') as HTMLDivElement | null;
   private elTreasuryWrap    = document.getElementById('treasury-wrap') as HTMLElement | null;
@@ -176,6 +178,18 @@ export class HUD {
     const m = Math.floor(secs / 60);
     const s = secs % 60;
     if (this.elTimer) this.elTimer.textContent = `${m}:${String(s).padStart(2, '0')}`;
+
+    // Hero respawn countdown chip (always visible while hero is respawning)
+    if (this.elHeroRespawnChip) {
+      const heroTimer = this.game.getHeroRespawnTimer(this.game.humanPlayerId);
+      const heroAlive = this.game.humanPlayer.aliveUnits.some(u => u.isHero);
+      if (!heroAlive && heroTimer !== undefined && heroTimer > 0) {
+        this.elHeroRespawnChip.classList.remove('hidden');
+        if (this.elHeroRespawnSecs) this.elHeroRespawnSecs.textContent = String(Math.ceil(heroTimer));
+      } else {
+        this.elHeroRespawnChip.classList.add('hidden');
+      }
+    }
 
     // Population (human alive units)
     if (this.elPop) {

@@ -540,6 +540,11 @@ class GameInstance {
     // Register AI-placed buildings with renderer
     for (const b of this.game.newlyPlacedBuildings) {
       this.renderer.addBuilding(b);
+      // Warn player when an AI starts building a wonder
+      if (b.playerId !== this.game.humanPlayerId && b.type === BuildingType.WONDER) {
+        this.hud.notify('⚠️ ¡El enemigo empieza a construir una Gran Maravilla! ¡Destrúyela antes de que termine!', 'warning');
+        this.camera.shake(0.3, 0.5);
+      }
     }
 
     // Notify when human buildings finish construction
