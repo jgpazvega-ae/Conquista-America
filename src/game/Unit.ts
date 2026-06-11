@@ -885,6 +885,12 @@ export class Unit {
     if (this.buffAttackTimer  > 0) this.buffAttackTimer  = Math.max(0, this.buffAttackTimer  - dt);
     if (this.rallyCooldown    > 0) this.rallyCooldown    = Math.max(0, this.rallyCooldown    - dt);
 
+    // Auto-entrench: units holding position for ≥8s dig in automatically
+    if (this.state === UnitState.HOLD && !this.entrenched && !this.isHero &&
+        this.type !== UnitType.CAVALRY && this.stationaryTimer >= 8) {
+      this.entrenched = true;
+    }
+
     // Cavalry charge tracking
     if (this.type === UnitType.CAVALRY) {
       if (this.state === UnitState.IDLE || this.state === UnitState.HOLD) {
