@@ -69,6 +69,8 @@ export class HUD {
   onGroupRetreat: (() => void) | null = null;
   private _combatPings:    { col: number; row: number; ts: number }[] = [];
   private _lastSeenUnits:  Map<number, { col: number; row: number }> = new Map();
+  private _killFeedEl      = document.getElementById('kill-feed');
+  private _killFeedEntries: { el: HTMLElement; ts: number }[] = [];
 
   private camera: import('../engine/Camera').RTSCamera | null = null;
   setCamera(cam: import('../engine/Camera').RTSCamera) { this.camera = cam; }
@@ -244,6 +246,9 @@ export class HUD {
       this.elSelCount.classList.add('hidden');
     }
 
+    // Kill feed: remove entries older than 8s
+    this.pruneKillFeed();
+
     // Minimap units
     this.updateMinimap();
     this.updateScoreboard();
@@ -329,6 +334,32 @@ export class HUD {
         </div>
       </div>`;
     }).join('');
+  }
+
+  /** Add a line to the kill feed (max 5 visible entries). */
+  addKillFeedEntry(text: string) {
+    if (!this._killFeedEl) return;
+    const el = document.createElement('div');
+    el.className = 'kf-entry';
+    el.textContent = text;
+    this._killFeedEl.prepend(el);
+    const entry = { el, ts: Date.now() };
+    this._killFeedEntries.unshift(entry);
+    // Trim to 5
+    while (this._killFeedEntries.length > 5) {
+      const old = this._killFeedEntries.pop()!;
+      old.el.remove();
+    }
+    // Start fade after 6s
+    setTimeout(() => el.classList.add('fade'), 6000);
+  }
+
+  private pruneKillFeed() {
+    const now = Date.now();
+    this._killFeedEntries = this._killFeedEntries.filter(e => {
+      if (now - e.ts > 8000) { e.el.remove(); return false; }
+      return true;
+    });
   }
 
   private updateScoreboard() {
