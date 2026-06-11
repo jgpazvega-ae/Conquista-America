@@ -55,6 +55,9 @@ export class HUD {
   private elTimer      = document.getElementById('game-timer');
   private elHeroRespawnChip = document.getElementById('hero-respawn-chip');
   private elHeroRespawnSecs = document.getElementById('hero-respawn-secs');
+  private elIdleWorkerChip  = document.getElementById('idle-worker-chip');
+  private elIdleWorkerCount = document.getElementById('idle-worker-count');
+  private elIdleWorkerPlural = document.getElementById('idle-worker-plural');
   private elPop             = document.getElementById('pop-count');
   private elPopBarFill      = document.getElementById('pop-bar-fill') as HTMLDivElement | null;
   private elTreasuryWrap    = document.getElementById('treasury-wrap') as HTMLElement | null;
@@ -190,6 +193,21 @@ export class HUD {
         if (this.elHeroRespawnSecs) this.elHeroRespawnSecs.textContent = String(Math.ceil(heroTimer));
       } else {
         this.elHeroRespawnChip.classList.add('hidden');
+      }
+    }
+
+    // Idle worker chip — nudges the player to put idle villagers to work (Q)
+    if (this.elIdleWorkerChip) {
+      let idle = 0;
+      for (const w of this.game.allWorkers) {
+        if (w.playerId === this.game.humanPlayerId && w.task === 'IDLE' && !w.carrying) idle++;
+      }
+      if (idle > 0) {
+        this.elIdleWorkerChip.classList.remove('hidden');
+        if (this.elIdleWorkerCount)  this.elIdleWorkerCount.textContent = String(idle);
+        if (this.elIdleWorkerPlural) this.elIdleWorkerPlural.textContent = idle > 1 ? 's' : '';
+      } else {
+        this.elIdleWorkerChip.classList.add('hidden');
       }
     }
 
