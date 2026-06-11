@@ -141,6 +141,8 @@ export class Unit {
   // Hero war cry: Y-key buff that boosts nearby allies
   warCryCooldown = 0;  // seconds remaining before war cry can be used again
   buffAttackTimer = 0; // seconds of +25% attack buff remaining (from allied hero war cry)
+  // Hero auto-rally: triggers when hero morale drops below 40
+  rallyCooldown = 0;
 
   constructor(
     type: UnitType, civ: CivilizationType, playerId: number,
@@ -878,9 +880,10 @@ export class Unit {
       }
     }
 
-    // Hero war cry cooldown and attack buff
+    // Hero war cry cooldown, attack buff, and rally cooldown
     if (this.warCryCooldown > 0) this.warCryCooldown = Math.max(0, this.warCryCooldown - dt);
-    if (this.buffAttackTimer > 0) this.buffAttackTimer = Math.max(0, this.buffAttackTimer - dt);
+    if (this.buffAttackTimer  > 0) this.buffAttackTimer  = Math.max(0, this.buffAttackTimer  - dt);
+    if (this.rallyCooldown    > 0) this.rallyCooldown    = Math.max(0, this.rallyCooldown    - dt);
 
     // Cavalry charge tracking
     if (this.type === UnitType.CAVALRY) {
