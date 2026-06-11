@@ -38,6 +38,15 @@ interface AIState {
 export class AISystem {
   private aiStates = new Map<number, AIState>();
   private _warDeclared = new Set<string>(); // "fromId→toId" pairs already declared
+  private _armyFormation = new Map<number, string | null>(); // playerId → current army formation
+
+  /** Apply a formation to all non-hero combat units; only touches units whose formation differs. */
+  private applyFormation(player: Player, name: string | null) {
+    this._armyFormation.set(player.id, name);
+    for (const u of player.aliveUnits) {
+      if (!u.isHero && u.formation !== name) u.setFormation(name);
+    }
+  }
 
   update(dt: number, game: Game) {
     for (const player of game.players) {
@@ -110,12 +119,18 @@ export class AISystem {
         // Switch to defending immediately when base takes significant damage
         state.phase = 'defending';
         state.defendTimer = 0;
+        // Defensive stance: hold the line in phalanx (+30% def)
+        this.applyFormation(player, 'PHALANX');
         this.defendBase(player, game);
       } else if (state.phase === 'gathering') {
+        // Regrouping: loose formation for faster repositioning
+        this.applyFormation(player, null);
         this.rallyTroops(player, game);
         if (state.phaseTimer >= GATHER_DURATION * scale || player.aliveUnits.length >= rallyCap) {
           state.phase = 'attacking';
           state.phaseTimer = 0;
+          // Offensive stance: charge in wedge (+25% atk)
+          this.applyFormation(player, 'WEDGE');
           // First time each AI declares war on the human player
           const key = `${player.id}→${game.humanPlayerId}`;
           if (!this._warDeclared.has(key)) {
@@ -134,6 +149,8 @@ export class AISystem {
           }
         }
         if (state.phase === 'attacking') {
+          // Keep the offensive wedge applied (catches newly trained units)
+          this.applyFormation(player, 'WEDGE');
           this.waveAttack(player, game);
           // AI volley fire: every 12-20s during attack, trigger synchronized burst
           state.volleyTimer -= dt;
