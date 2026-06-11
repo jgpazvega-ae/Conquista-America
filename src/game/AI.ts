@@ -12,6 +12,7 @@ import { ResourceType } from './ResourceNode';
 import { CIV_COLORS } from './constants';
 import { TRAIN_COSTS } from './unitProduction';
 import { STRATEGY_BY_CIV } from './AIStrategy';
+import { getDamageMultiplier } from './UnitBalancing';
 
 const AI_BUILD_INTERVAL    = 14.0;
 const AI_WORKER_INTERVAL   = 5.0;
@@ -593,8 +594,34 @@ export class AISystem {
     });
     if (affordable.length === 0) return;
 
-    // Weighted selection: preferred units appear 3× more often in the pool
-    const pool = affordable.flatMap(u => preferredTypes.has(u.type) ? [u, u, u] : [u]);
+    // Counter-composition: identify the human's most common unit type so the AI
+    // can favor units that hard-counter it (e.g. spearmen vs a cavalry-heavy army)
+    let threatType: UnitType | null = null;
+    {
+      const counts = new Map<UnitType, number>();
+      for (const u of game.humanPlayer.aliveUnits) {
+        if (u.isHero) continue;
+        counts.set(u.type, (counts.get(u.type) ?? 0) + 1);
+      }
+      let best = 0;
+      for (const [t, c] of counts) {
+        if (c > best) { best = c; threatType = t; }
+      }
+      // Only react if that type is a meaningful share of their army
+      if (best < Math.max(3, game.humanPlayer.aliveUnits.length * 0.3)) threatType = null;
+    }
+
+    // Weighted selection: preferred units appear 3× more often; counter units get
+    // extra weight proportional to how hard they beat the human's dominant unit type
+    const pool = affordable.flatMap(u => {
+      let weight = preferredTypes.has(u.type) ? 3 : 1;
+      if (threatType) {
+        const mult = getDamageMultiplier(u.type, threatType);
+        if (mult >= 1.4) weight += 3;       // hard counter
+        else if (mult >= 1.15) weight += 1; // soft advantage
+      }
+      return Array<typeof u>(weight).fill(u);
+    });
     const pick = pool[Math.floor(Math.random() * pool.length)];
     const cost = TRAIN_COSTS[pick.type]!;
     if (settlement.trainUnit(pick.type)) {
