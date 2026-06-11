@@ -91,6 +91,7 @@ export class Game {
   private _villageIncomeTimer = 30; // seconds between village income ticks
   private _autobraceTimer = 0;
   private _autobraceNotified = false;
+  private _towerAlertTimer = 0; // global cooldown between watchtower alarm notifications
   villageIncomeEvents: { playerId: number; food: number; gold: number }[] = [];
 
   constructor(humanCiv: CivilizationType = CivilizationType.AZTEC) {
@@ -611,6 +612,7 @@ export class Game {
     }
 
     // Enemy approach alerts — check every 15s
+    this._towerAlertTimer = Math.max(0, this._towerAlertTimer - dt);
     this._approachTimer -= dt;
     if (this._approachTimer <= 0) {
       this._approachTimer = 15;
@@ -914,6 +916,12 @@ export class Game {
           sourceWorldZ: b.row * TILE_SIZE + TILE_SIZE / 2,
         });
         b.attackTimer = TOWER_COOLDOWN;
+        // Watchtower first-alert: notify the human player (global 20s cooldown to avoid spam)
+        if (b.playerId === this.humanPlayerId && this._towerAlertTimer <= 0) {
+          this._towerAlertTimer = 20;
+          const label = nearest.isHero ? '¡HÉROE enemigo' : 'Enemigo';
+          this.pendingEventMessages.push(`🗼 ¡Atalaya en alerta! — ${label} detectado en posición`);
+        }
       }
     }
   }
