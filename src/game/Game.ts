@@ -949,7 +949,12 @@ export class Game {
       if (unit.attackTimer > 0) continue;
       unit.attackTimer = unit.attackCooldown;
 
-      const rawDmg = Math.max(1, unit.attack - 5); // buildings have some armor
+      // Coordinated assault: 3+ allies battering the same building → +50% damage
+      const assaulters = this.allUnits.filter(
+        u => u.isAlive() && u.playerId === unit.playerId && u.attackBuildingTarget === bldg,
+      ).length;
+      const assaultMult = assaulters >= 3 ? 1.5 : 1.0;
+      const rawDmg = Math.max(1, Math.round((unit.attack - 5) * assaultMult)); // buildings have some armor
       bldg.takeDamage(rawDmg);
       if (!bldg.isAlive()) {
         this.newlyDestroyedBuildings.push(bldg);
