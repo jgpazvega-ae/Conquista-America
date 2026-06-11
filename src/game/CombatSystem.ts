@@ -146,6 +146,8 @@ export class CombatSystem {
             isCharge = true;
             if (!target.isHero) target.loseMorale(15); // charge breaks enemy morale
           }
+          // Heavy wounds (< 25% HP): attacker fights at reduced effectiveness
+          if (unit.hp < unit.maxHp * 0.25) dmg = Math.round(dmg * 0.8);
           // Berserk: +25% damage during 12-second kill-streak buff
           if (unit.berserkTimer > 0) dmg = Math.round(dmg * 1.25);
           // Leadership aura: +5% damage when player has any level-3 unit alive
