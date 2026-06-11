@@ -64,6 +64,18 @@ export class CombatSystem {
       if (!unit.isAlive()) continue;
       if (unit.garrisonedIn !== null) continue; // garrisoned troops fight via Game.updateGarrisonFire
 
+      // Melee-pin detection: ranged units fighting while an adjacent enemy melee unit is present
+      // suffer -40% damage (they can't aim/reload properly while being rushed).
+      if (!unit.outOfAmmo && unit.attackRange > 1.5 && unit.type !== UnitType.CANNON) {
+        const meleeThreat = allUnits.some(e =>
+          e.isAlive() && e.playerId !== unit.playerId && e.attackRange <= 1.5 &&
+          e.garrisonedIn === null && unit.distanceTo(e) <= 1.6,
+        );
+        unit.meleePinned = meleeThreat;
+      } else {
+        unit.meleePinned = false;
+      }
+
       // Process active combat (ATTACKING or HOLD with a target)
       const isHold = unit.state === UnitState.HOLD;
       if ((unit.state === UnitState.ATTACKING || isHold) && unit.attackTarget) {
@@ -182,6 +194,10 @@ export class CombatSystem {
           if (isNight) dmg = Math.round(dmg * 1.15);
           // Veteran toughness: level-3 Champions absorb 15% of incoming damage
           if (target.level >= 3) dmg = Math.max(1, Math.round(dmg * 0.85));
+          // Melee pin: ranged unit threatened by adjacent enemy melee fires at -40%
+          if (unit.meleePinned) dmg = Math.max(1, Math.round(dmg * 0.6));
+          // Officer aura: units near a hero or veteran champion take -2 damage
+          if (target.nearOfficer) dmg = Math.max(1, dmg - 2);
 
           const actual = target.takeDamage(dmg);
           unit.attackTimer = unit.attackCooldown * (isVolley ? 1.5 : 1.0);

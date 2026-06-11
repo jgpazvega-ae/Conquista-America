@@ -611,13 +611,15 @@ input.toggle { width: 22px; height: 22px; accent-color: #d4880a; }
   border-radius: 6px; padding: 4px 8px; font-size: 11px;
   backdrop-filter: blur(4px);
 }
-.sb-emoji  { font-size: 13px; }
-.sb-name   { color: #c8a060; min-width: 48px; }
-.sb-pop    { color: #a0c0e0; min-width: 30px; font-size: 10px; }
-.sb-kills  { color: #ff9966; min-width: 28px; font-size: 10px; }
-.sb-hp-wrap { width: 44px; height: 5px; background: rgba(255,255,255,0.12); border-radius: 3px; overflow: hidden; }
-.sb-hp-fill { height: 100%; border-radius: 3px; transition: width 0.4s; }
-.sb-defeated { opacity: 0.6; }
+.sb-emoji    { font-size: 13px; }
+.sb-name     { color: #c8a060; min-width: 48px; }
+.sb-pop      { color: #a0c0e0; min-width: 30px; font-size: 10px; }
+.sb-kills    { color: #ff9966; min-width: 28px; font-size: 10px; }
+.sb-bldgs    { color: #c8a060; min-width: 26px; font-size: 10px; opacity: 0.75; }
+.sb-elim     { color: #666; font-size: 10px; font-style: italic; }
+.sb-hp-wrap  { width: 44px; height: 5px; background: rgba(255,255,255,0.12); border-radius: 3px; overflow: hidden; }
+.sb-hp-fill  { height: 100%; border-radius: 3px; transition: width 0.4s; }
+.sb-defeated { opacity: 0.6; filter: grayscale(60%); }
 
 /* Military momentum indicator */
 #momentum-bar {
