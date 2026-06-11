@@ -36,6 +36,7 @@ export interface DamageEvent {
   worldX:        number;
   worldZ:        number;
   critical?:     boolean;
+  isCharge?:     boolean;
   sourceWorldX?: number; // set for building-sourced attacks (watchtower)
   sourceWorldZ?: number;
 }
@@ -175,7 +176,7 @@ export class CombatSystem {
           if (unit.ammo > 0) unit.ammo = Math.max(0, unit.ammo - (isVolley ? 2 : 1));
 
           let isCrit = multiplier >= 1.5 || isFlanking || isCharge || unit.berserkTimer > 0 || isVolley || unit.buffAttackTimer > 0;
-          this.events.push({ attacker: unit, target, damage: actual, worldX: target.worldX, worldZ: target.worldZ, critical: isCrit });
+          this.events.push({ attacker: unit, target, damage: actual, worldX: target.worldX, worldZ: target.worldZ, critical: isCrit, isCharge });
 
           // Kill streak tracking: 3 kills in a row without taking damage → 12s berserk
           if (!target.isAlive()) {

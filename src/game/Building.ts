@@ -64,6 +64,7 @@ export class Building {
       case BuildingType.WATCHTOWER: return 4;
       case BuildingType.TEMPLE:     return 3;
       case BuildingType.VILLAGE:    return 2;
+      case BuildingType.BARRACKS:   return 3; // troops can shelter inside their barracks
       default:                      return 0;
     }
   }

@@ -146,8 +146,9 @@ class GameInstance {
   private _starvWarnTimer     = 0; // throttle starvation notifications (30s cooldown)
   private _ambushWarnTimer    = 0; // throttle jungle ambush notifications (30s cooldown)
   private _nightAttackTimer   = 0; // throttle night-attack notifications (60s cooldown)
-  private _stoneCritWarnTimer = 0; // throttle low-stone warnings (60s cooldown)
-  private _goldCritWarnTimer  = 0; // throttle low-gold warnings (60s cooldown)
+  private _stoneCritWarnTimer  = 0; // throttle low-stone warnings (60s cooldown)
+  private _goldCritWarnTimer   = 0; // throttle low-gold warnings (60s cooldown)
+  private _chargeResistTimer   = 0; // throttle phalanx charge-resist notification (20s cooldown)
   private _statusParticleTimers = new Map<number, number>(); // unit.id → time since last status particle
   private _wasNight = false;
   private _wasStorm = false;
@@ -500,8 +501,9 @@ class GameInstance {
     if (this._starvWarnTimer    > 0) this._starvWarnTimer    = Math.max(0, this._starvWarnTimer    - rawDt);
     if (this._ambushWarnTimer   > 0) this._ambushWarnTimer   = Math.max(0, this._ambushWarnTimer   - rawDt);
     if (this._nightAttackTimer  > 0) this._nightAttackTimer  = Math.max(0, this._nightAttackTimer  - rawDt);
-    if (this._stoneCritWarnTimer > 0) this._stoneCritWarnTimer = Math.max(0, this._stoneCritWarnTimer - rawDt);
-    if (this._goldCritWarnTimer  > 0) this._goldCritWarnTimer  = Math.max(0, this._goldCritWarnTimer  - rawDt);
+    if (this._stoneCritWarnTimer  > 0) this._stoneCritWarnTimer  = Math.max(0, this._stoneCritWarnTimer  - rawDt);
+    if (this._goldCritWarnTimer   > 0) this._goldCritWarnTimer   = Math.max(0, this._goldCritWarnTimer   - rawDt);
+    if (this._chargeResistTimer   > 0) this._chargeResistTimer   = Math.max(0, this._chargeResistTimer   - rawDt);
     this.game.update(dt);
 
     // Register any units produced this frame
@@ -800,6 +802,18 @@ class GameInstance {
       }
       if (humanUnderAttack && Math.random() < 0.05) {
         this.hud.notify('⚔️ ¡Tus tropas están bajo ataque!', 'warning');
+      }
+
+      // Phalanx charge-resist: human phalanx absorbs a cavalry charge
+      if (this._chargeResistTimer <= 0) {
+        for (const evt of this.game.damageEvents) {
+          if (!evt.isCharge || !evt.attacker) continue;
+          if (evt.target.playerId === this.game.humanPlayerId && evt.target.formation === 'PHALANX') {
+            this._chargeResistTimer = 20;
+            this.hud.notify('🛡️ ¡La falange resistió la carga de caballería!', 'success');
+            break;
+          }
+        }
       }
 
       // Jungle ambush notification: enemy attacks a human unit from jungle cover
