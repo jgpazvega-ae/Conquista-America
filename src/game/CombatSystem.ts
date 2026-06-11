@@ -114,6 +114,17 @@ export class CombatSystem {
           }
           const multiplier = getDamageMultiplier(unit.type, target.type);
           dmg = Math.round(dmg * multiplier);
+          // Ranged units can't aim properly with a melee enemy in their face (−40% damage)
+          if (!unit.outOfAmmo && unit.attackRange > 1.5 && unit.type !== UnitType.CANNON) {
+            const meleeThreat = allUnits.some(e =>
+              e.isAlive() && e.playerId !== unit.playerId && e.attackRange <= 1.5 &&
+              e.garrisonedIn === null && unit.distanceTo(e) <= 1.6,
+            );
+            unit.meleePinned = meleeThreat;
+            if (meleeThreat) dmg = Math.max(1, Math.round(dmg * 0.6));
+          } else {
+            unit.meleePinned = false;
+          }
           const tile = map.getTile(target.col, target.row);
           dmg = Math.max(1, dmg - terrainDefenseBonus(tile?.terrain));
           // Formation defense (LOOSE: -15% def, PHALANX: +30% def, WEDGE: +10% def)
