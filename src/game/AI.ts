@@ -409,15 +409,19 @@ export class AISystem {
         continue;
       }
 
-      // Pick nearest enemy unit (flank group targets from a side angle)
+      // Pick best target: closest enemy, with priority bonuses for heroes/cannon/wounded
       const isFlankGroup = i >= flankSplit && (flankDC !== 0 || flankDR !== 0);
       let best = enemies[0];
-      let bestD = unit.distanceTo(best);
+      let bestScore = Infinity;
       for (const e of enemies) {
         const d = unit.distanceTo(e);
-        // Flank group slightly prefers enemies on the offset side
         const flankBonus = isFlankGroup ? (e.col * flankDC + e.row * flankDR) * 0.01 : 0;
-        if (d - flankBonus < bestD) { bestD = d; best = e; }
+        let priority = 0;
+        if (e.isHero)                      priority -= 8; // eliminate the hero
+        if (e.type === UnitType.CANNON)    priority -= 5; // silence artillery
+        if (e.hp < e.maxHp * 0.5)         priority -= 3; // finish off wounded
+        const score = d - flankBonus + priority;
+        if (score < bestScore) { bestScore = score; best = e; }
       }
 
       if (unit.distanceTo(best) <= unit.attackRange + 1.0) {
