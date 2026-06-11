@@ -908,6 +908,12 @@ export class Unit {
       this._ammoRechargeTimer = 0;
     }
 
+    // Supply regen: Storehouse proximity slowly heals wounded troops (up to 50% max HP)
+    if (this._nearSupplyDepot && this.hp < this.maxHp * 0.5 && this.hp > 0) {
+      this.hp = Math.min(Math.round(this.maxHp * 0.5), this.hp + dt);
+      this.updateHealthBar();
+    }
+
     if (this.state === UnitState.MOVING || this.state === UnitState.ATTACK_MOVE) {
       this.updateMovement(dt, map);
     }
