@@ -1475,6 +1475,32 @@ class GameInstance {
         }
         return;
       }
+      // C: regroup the army on the hero (consolidate under the officer/morale aura)
+      if (e.code === 'KeyC' && !e.ctrlKey && !e.altKey) {
+        const hero = this.game.humanPlayer.aliveUnits.find(u => u.isHero);
+        if (!hero) {
+          const t = this.game.getHeroRespawnTimer(this.game.humanPlayerId);
+          this.hud.notify(t !== undefined ? `⏳ Héroe reaparecerá en ${Math.ceil(t)}s` : 'Sin héroe activo para reagrupar', 'info');
+          return;
+        }
+        const sel = this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId && u.isAlive() && !u.isHero);
+        const army = sel.length > 0 ? sel : this.game.humanPlayer.aliveUnits.filter(u => !u.isHero && u.garrisonedIn === null);
+        let n = 0;
+        army.forEach((u, i) => {
+          const off = this.input.spreadOffset(i, army.length);
+          const near = this.game.map.findWalkableNear(hero.col + off[0], hero.row + off[1], 3);
+          if (!near) return;
+          const path = findPath(this.game.map, u.gridPos(), { col: near[0], row: near[1] }, 300);
+          if (path.length > 0) { u.attackTarget = null; u.moveTo(path); n++; }
+        });
+        if (n > 0) {
+          this.camera.panTo(hero.worldX, hero.worldZ);
+          this.hud.notify(`🎖️ ${n} unidad${n > 1 ? 'es' : ''} reagrupándose con ${hero.heroName}`, 'info');
+          this.audio.playMove();
+          this.hintOnce('regroup', '💡 C: reagrupa tu ejército junto al héroe. Las unidades cercanas a un héroe o campeón Nv.3 ganan +2 defensa y recuperan moral más rápido.');
+        }
+        return;
+      }
       // W: assign idle workers to repair the nearest damaged friendly building
       if (e.code === 'KeyW' && !e.ctrlKey && !e.altKey) {
         const myWorkers = this.game.allWorkers.filter(
