@@ -55,6 +55,10 @@ export class ResourceSystem {
                Math.sqrt((worker.col - b.col) ** 2 + (worker.row - b.row) ** 2) <= 5,
         );
         if (nearStorehouse) worker.taskProgress += game.lastDt * 0.2;
+        // Drought withers crops: food gathering is 30% slower during a drought
+        if (game.weather.state === 'DROUGHT' && worker.task === WorkerTask.GATHERING_FOOD) {
+          worker.taskProgress -= game.lastDt * 0.3;
+        }
       }
 
       // ── Find resource to gather (auto-assign idle workers) ──────────────────

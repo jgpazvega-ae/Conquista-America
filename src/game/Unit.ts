@@ -17,6 +17,9 @@ const SKIN_TONES: Record<CivilizationType, number> = {
 };
 
 export class Unit {
+  /** Global weather movement multiplier, set once per frame by Game (1.0 = clear, <1 = rain/storm mud). */
+  static weatherSpeedMult = 1.0;
+
   readonly id: number;
   readonly type: UnitType;
   readonly civType: CivilizationType;
@@ -1018,6 +1021,8 @@ export class Unit {
     }
     // Heavy wounds (< 25% HP) impair movement — bleeding soldiers can't keep pace
     if (this.hp < this.maxHp * 0.25) terrainMult *= 0.7;
+    // Wet weather turns ground to mud — all units move slower in rain/storm
+    terrainMult *= Unit.weatherSpeedMult;
     const effSpeed = this.formationSpeedCap !== null ? Math.min(this.speed, this.formationSpeedCap) : this.speed;
     const step = effSpeed * TILE_SIZE * dt * terrainMult;
 

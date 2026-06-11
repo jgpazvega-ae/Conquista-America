@@ -32,9 +32,9 @@ export const WEATHER_NAMES: Record<WeatherState, string> = {
 
 export const WEATHER_TIPS: Record<WeatherState, string> = {
   CLEAR:   '',
-  RAIN:    'Lluvia — pólvora mojada: arcabuceros y cañones ×0.5 daño',
-  STORM:   'Tormenta — todas las unidades a distancia ×0.6 daño',
-  DROUGHT: 'Sequía — riesgo de incendio ×2. Cañones más letales',
+  RAIN:    'Lluvia — pólvora mojada: arcabuceros y cañones ×0.5 daño · barro: movimiento ×0.9',
+  STORM:   'Tormenta — unidades a distancia ×0.6 daño · barro: movimiento ×0.8',
+  DROUGHT: 'Sequía — riesgo de incendio ×2 · cosechas marchitas: recolección de comida ×0.7',
 };
 
 export class WeatherSystem {
