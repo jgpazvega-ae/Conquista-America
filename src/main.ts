@@ -947,6 +947,11 @@ class GameInstance {
         this.audio.playHit(0.9);
       }
       this._lastSettlementHp = humanSettlement.hp;
+      // Red danger vignette when settlement is critically damaged
+      const vigEl = document.getElementById('settle-danger-vignette');
+      if (vigEl) vigEl.classList.toggle('hidden', humanSettlement.hp >= humanSettlement.maxHp * 0.25);
+    } else {
+      document.getElementById('settle-danger-vignette')?.classList.add('hidden');
     }
 
     // Weather change notification
