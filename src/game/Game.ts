@@ -72,6 +72,7 @@ export class Game {
   newlyVisibleEnemyHeroes: Unit[] = [];
   newlyResearchedUpgrades: { playerId: number; upgrade: string }[] = [];
   private _hadSettlement = new Set<number>(); // track which players ever had a settlement
+  private _capitalShockDone = new Set<number>(); // building ids that already triggered capital-loss morale shock
   private _visibleEnemyHeroIds = new Set<number>(); // enemy hero ids currently visible to human
   private _heroRespawnTimers = new Map<number, number>(); // playerId → seconds until respawn
   status: GameStatus = 'PLAYING';
@@ -769,6 +770,25 @@ export class Game {
     if (this._eventTimer <= 0) {
       this._eventTimer = 60 + Math.random() * 60;
       this.fireRandomEvent();
+    }
+
+    // Capital-loss morale shock: when a settlement falls, its owner's surviving
+    // troops are demoralized by the loss of their capital (American Conquest mechanic)
+    for (const b of this.newlyDestroyedBuildings) {
+      if (b.type !== BuildingType.SETTLEMENT || this._capitalShockDone.has(b.id)) continue;
+      this._capitalShockDone.add(b.id);
+      // Only shock if the owner still has another settlement-less stand to make
+      const owner = this.players[b.playerId];
+      if (!owner) continue;
+      let shocked = 0;
+      for (const u of owner.aliveUnits) {
+        if (u.isHero) continue;
+        u.loseMorale(30);
+        shocked++;
+      }
+      if (shocked > 0 && b.playerId === this.humanPlayerId) {
+        this.pendingEventMessages.push('💔 ¡Tu asentamiento ha caído! Las tropas pierden la moral');
+      }
     }
 
     // Enemy approach alerts — check every 15s
