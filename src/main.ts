@@ -143,7 +143,9 @@ class GameInstance {
   private _totalResourcesSpent = 0; // food+gold+stone combined
   private _treasuryWarned75 = false; // notified player at 75% of economic victory
   private _buildingSmokeTimers = new Map<number, number>(); // building.id → seconds since last puff
-  private _starvWarnTimer = 0; // throttle starvation notifications (30s cooldown)
+  private _starvWarnTimer     = 0; // throttle starvation notifications (30s cooldown)
+  private _ambushWarnTimer    = 0; // throttle jungle ambush notifications (30s cooldown)
+  private _nightAttackTimer   = 0; // throttle night-attack notifications (60s cooldown)
   private _statusParticleTimers = new Map<number, number>(); // unit.id → time since last status particle
   private _wasNight = false;
   private _wasStorm = false;
@@ -493,7 +495,9 @@ class GameInstance {
 
     this.updateFpsCounter(rawDt);
     if (this._tradeCooldown > 0) this._tradeCooldown = Math.max(0, this._tradeCooldown - rawDt);
-    if (this._starvWarnTimer > 0) this._starvWarnTimer = Math.max(0, this._starvWarnTimer - rawDt);
+    if (this._starvWarnTimer   > 0) this._starvWarnTimer   = Math.max(0, this._starvWarnTimer   - rawDt);
+    if (this._ambushWarnTimer  > 0) this._ambushWarnTimer  = Math.max(0, this._ambushWarnTimer  - rawDt);
+    if (this._nightAttackTimer > 0) this._nightAttackTimer = Math.max(0, this._nightAttackTimer - rawDt);
     this.game.update(dt);
 
     // Register any units produced this frame
@@ -783,6 +787,29 @@ class GameInstance {
       }
       if (humanUnderAttack && Math.random() < 0.05) {
         this.hud.notify('⚔️ ¡Tus tropas están bajo ataque!', 'warning');
+      }
+
+      // Jungle ambush notification: enemy attacks a human unit from jungle cover
+      if (this._ambushWarnTimer <= 0) {
+        const dayT2 = (this.game.gameTime % 480) / 480;
+        const isNight2 = dayT2 > 0.75 || dayT2 < 0.15;
+        for (const evt of this.game.damageEvents) {
+          if (!evt.attacker || evt.target.playerId !== this.game.humanPlayerId) continue;
+          const aTile = this.game.map.getTile(Math.round(evt.attacker.col), Math.round(evt.attacker.row));
+          if ((aTile?.terrain as string) === 'JUNGLE') {
+            this._ambushWarnTimer = 30;
+            this.hud.notify('🌿 ¡EMBOSCADA! Ataque desde la jungla', 'warning');
+            this.camera.shake(0.3, 0.5);
+            break;
+          }
+          // Night attack: enemy hits human unit at night without prior alert
+          if (isNight2 && this._nightAttackTimer <= 0) {
+            this._nightAttackTimer = 60;
+            this.hud.notify('🌙 ¡ATAQUE NOCTURNO! Visibilidad reducida — ¡en guardia!', 'warning');
+            this.camera.shake(0.25, 0.4);
+            break;
+          }
+        }
       }
     }
 
