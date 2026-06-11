@@ -3,7 +3,7 @@ import { GameMap } from './Map';
 import { findPath } from './Pathfinding';
 import { Unit } from './Unit';
 import { Building } from './Building';
-import { Worker } from './Worker';
+import { Worker, WorkerTask } from './Worker';
 import { ResourceNode, ResourceType } from './ResourceNode';
 import { Player } from './Player';
 import { CombatSystem } from './CombatSystem';
@@ -92,6 +92,10 @@ export class Game {
   private _autobraceTimer = 0;
   private _autobraceNotified = false;
   private _towerAlertTimer = 0; // global cooldown between watchtower alarm notifications
+  private _recentHumanDeaths = 0;
+  private _deathWindowTimer  = 30;
+  private _routFired         = false;
+  private _workerFleeTimer   = 0; // throttle worker flee checks
   villageIncomeEvents: { playerId: number; food: number; gold: number }[] = [];
 
   constructor(humanCiv: CivilizationType = CivilizationType.AZTEC) {
@@ -470,6 +474,36 @@ export class Game {
       worker.update(dt, this.map);
     }
 
+    // Worker flee: workers within 5 tiles of any enemy drop their task and run to nearest friendly settlement
+    this._workerFleeTimer -= dt;
+    if (this._workerFleeTimer <= 0) {
+      this._workerFleeTimer = 2;
+      for (const worker of this.allWorkers) {
+        if (worker.task === WorkerTask.MOVING && worker.path.length > 0) continue; // already fleeing
+        const threatened = this.allUnits.some(u =>
+          u.isAlive() && u.playerId !== worker.playerId &&
+          Math.sqrt((u.col - worker.col) ** 2 + (u.row - worker.row) ** 2) <= 5,
+        );
+        if (!threatened) continue;
+        const refuge = this.allBuildings
+          .filter(b => b.playerId === worker.playerId && b.isAlive() &&
+            (b.type === BuildingType.SETTLEMENT || b.type === BuildingType.BARRACKS))
+          .sort((a, b) =>
+            ((worker.col - a.col) ** 2 + (worker.row - a.row) ** 2) -
+            ((worker.col - b.col) ** 2 + (worker.row - b.row) ** 2),
+          )[0];
+        if (!refuge) continue;
+        const near = this.map.findWalkableNear(refuge.col, refuge.row, 3);
+        if (!near) continue;
+        const path = findPath(this.map, { col: Math.round(worker.col), row: Math.round(worker.row) }, { col: near[0], row: near[1] }, 300);
+        if (path.length > 0) {
+          worker.path = path;
+          worker.pathIndex = 0;
+          worker.setTask(WorkerTask.MOVING, near[0], near[1]);
+        }
+      }
+    }
+
     for (const node of this.resourceNodes) {
       node.updateVisibility();
       const wasEmpty = node.isEmpty();
@@ -489,6 +523,8 @@ export class Game {
         if (!evt.attacker.isHero && evt.attacker.morale < 70) {
           evt.attacker.morale = Math.min(70, evt.attacker.morale + 5);
         }
+        // Army rout tracking: count friendly deaths in the 30s window
+        if (evt.target.playerId === this.humanPlayerId) this._recentHumanDeaths++;
       }
     }
 
@@ -532,6 +568,27 @@ export class Game {
         for (const u of p.aliveUnits) {
           if (!u.isHero) u.loseMorale(1.5 * dt);
         }
+      }
+    }
+
+    // Army rout: 5+ human units lost within 30s → mass panic on low-morale survivors
+    this._deathWindowTimer -= dt;
+    if (this._deathWindowTimer <= 0) {
+      this._deathWindowTimer = 30;
+      this._recentHumanDeaths = 0;
+      this._routFired = false;
+    }
+    if (this._recentHumanDeaths >= 5 && !this._routFired) {
+      this._routFired = true;
+      let routCount = 0;
+      for (const u of this.humanPlayer.aliveUnits) {
+        if (!u.isHero && u.morale < 60 && !u.panicked) {
+          u.loseMorale(40);
+          routCount++;
+        }
+      }
+      if (routCount > 0) {
+        this.pendingEventMessages.push(`💀 ¡DESBANDADA GENERAL! ${routCount} unidad${routCount > 1 ? 'es' : ''} en fuga`);
       }
     }
 
