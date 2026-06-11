@@ -263,7 +263,7 @@ export class InputHandler {
     }
   }
 
-  private spreadOffset(idx: number, total: number): [number, number] {
+  spreadOffset(idx: number, total: number): [number, number] {
     if (total === 1) return [0, 0];
     const cols = Math.ceil(Math.sqrt(total));
     const c    = idx % cols - Math.floor(cols / 2);
