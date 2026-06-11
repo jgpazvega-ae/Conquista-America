@@ -200,10 +200,12 @@ export class CombatSystem {
             }
           }
 
-          // Cannon: splash damage + burning status effect (30% chance on direct hit)
+          // Cannon: splash damage + burning + artillery terror (morale shock)
           if (unit.type === UnitType.CANNON) {
             const burnMult = weather ? weather.burnChanceMult : 1.0;
             if (Math.random() < 0.30 * burnMult && target.isAlive()) target.burning = Math.max(target.burning, 4);
+            // Direct hit terror: a cannonball is terrifying, even when it doesn't kill
+            if (target.isAlive() && !target.isHero) target.loseMorale(8);
             const splashDmg = Math.max(1, Math.round(dmg * SPLASH_DAMAGE_RATIO));
             for (const other of allUnits) {
               if (!other.isAlive() || other === target) continue;
@@ -211,6 +213,8 @@ export class CombatSystem {
               if (d <= SPLASH_RADIUS) {
                 const splashActual = other.takeDamage(splashDmg);
                 if (Math.random() < 0.15 * burnMult) other.burning = Math.max(other.burning, 3);
+                // Shrapnel terror: nearby troops are rattled by the blast
+                if (other.isAlive() && !other.isHero) other.loseMorale(5);
                 this.events.push({ attacker: unit, target: other, damage: splashActual, worldX: other.worldX, worldZ: other.worldZ, critical: false });
               }
             }
