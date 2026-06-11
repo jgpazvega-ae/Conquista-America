@@ -569,6 +569,8 @@ export class Game {
     }
 
     this.weatherChangeEvent = this.weather.update(dt);
+    // Wet ground slows movement: rain 0.9×, storm 0.8×, otherwise normal
+    Unit.weatherSpeedMult = this.weather.state === 'STORM' ? 0.8 : this.weather.state === 'RAIN' ? 0.9 : 1.0;
     this.damageEvents = this.combat.update(this.allUnits, this.map, this.weather, this.isNight);
 
     // Track kills per player from this frame's damage events
