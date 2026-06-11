@@ -135,6 +135,10 @@ export class Unit {
   // Recomputed periodically by Game.updateFormations.
   nearOfficer = false;
 
+  // Ranged unit pinned in melee: an enemy melee unit is adjacent → -40% ranged damage.
+  // Set each frame by CombatSystem when the unit fires while threatened.
+  meleePinned = false;
+
   // Ammo (ranged units only; -1 = melee, never depletes)
   ammo    = -1;
   maxAmmo = 0;

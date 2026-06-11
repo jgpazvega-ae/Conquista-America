@@ -583,12 +583,15 @@ export class HUD {
     const officerBadge = unit.nearOfficer && !unit.isHero
       ? `<span title="Bajo el mando de un oficial veterano cercano (campeón Nv.3 o héroe) — +2 defensa" style="color:#ffcc66">🎖️OFICIAL</span>`
       : '';
+    const pinnedBadge = unit.meleePinned
+      ? `<span title="Acorralado en cuerpo a cuerpo — -40% daño a distancia. ¡Retíralo o protégelo con infantería!" style="color:#ff6644">⚠️ACORRALADO</span>`
+      : '';
     this.elUnitStats.innerHTML =
       `<span>⚔️ ${unit.attack}</span>` +
       `<span>🛡️ ${unit.defense}</span>` +
       `<span>💨 ${unit.speed.toFixed(1)}</span>` +
       `<span>🎯 ${unit.attackRange.toFixed(1)}</span>` +
-      woundBadge + holdBadge + entrenchedBadge + fatigueBadge + burnBadge + poisonBadge + berserkBadge + chargeBadge + deployBadge + formBadge + moraleBadge + ammoBadge + orderBadge + officerBadge + warCryBadge + nightBadge + reloadBadge;
+      woundBadge + holdBadge + entrenchedBadge + fatigueBadge + burnBadge + poisonBadge + berserkBadge + chargeBadge + deployBadge + formBadge + moraleBadge + ammoBadge + orderBadge + officerBadge + pinnedBadge + warCryBadge + nightBadge + reloadBadge;
 
     // XP bar (only if unit can still level up)
     const xpEl = document.getElementById('unit-xp-row');
