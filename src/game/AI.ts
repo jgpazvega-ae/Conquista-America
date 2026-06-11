@@ -23,14 +23,15 @@ const GATHER_DURATION  = 40.0; // seconds to mass forces before attacking
 const ATTACK_DURATION  = 25.0; // seconds of active assault before regrouping
 
 interface AIState {
-  buildTimer:   number;
-  workerTimer:  number;
-  trainTimer:   number;
-  upgradeTimer: number;
-  phase:        'gathering' | 'attacking' | 'defending';
-  phaseTimer:   number;
-  defendTimer:  number; // how long we've been in defending phase
-  volleyTimer:  number; // countdown to next AI volley fire
+  buildTimer:    number;
+  workerTimer:   number;
+  trainTimer:    number;
+  upgradeTimer:  number;
+  phase:         'gathering' | 'attacking' | 'defending';
+  phaseTimer:    number;
+  defendTimer:   number; // how long we've been in defending phase
+  volleyTimer:   number; // countdown to next AI volley fire
+  hardBonusTimer: number; // countdown to next hard-mode resource bonus
 }
 
 export class AISystem {
@@ -50,6 +51,7 @@ export class AISystem {
           phase: 'gathering', phaseTimer: Math.random() * 15,
           defendTimer: 0,
           volleyTimer: 12 + Math.random() * 8,
+          hardBonusTimer: 60,
         };
         this.aiStates.set(player.id, state);
       }
@@ -114,27 +116,48 @@ export class AISystem {
           }
         }
       } else {
-        this.waveAttack(player, game);
-        // AI volley fire: every 12-20s during attack, trigger synchronized burst
-        state.volleyTimer -= dt;
-        if (state.volleyTimer <= 0) {
-          state.volleyTimer = 12 + Math.random() * 8;
-          for (const u of player.aliveUnits) {
-            if (u.ammo > 0 && u.state === UnitState.ATTACKING && u.attackTarget?.isAlive()) {
-              u.volleyReady = true;
+        // Tactical retreat: if army morale collapses mid-attack, fall back to regroup
+        const combatUnits = player.aliveUnits.filter(u => !u.isHero);
+        if (combatUnits.length > 0) {
+          const avgMorale = combatUnits.reduce((s, u) => s + u.morale, 0) / combatUnits.length;
+          if (avgMorale < 30) {
+            state.phase     = 'gathering';
+            state.phaseTimer = 0;
+          }
+        }
+        if (state.phase === 'attacking') {
+          this.waveAttack(player, game);
+          // AI volley fire: every 12-20s during attack, trigger synchronized burst
+          state.volleyTimer -= dt;
+          if (state.volleyTimer <= 0) {
+            state.volleyTimer = 12 + Math.random() * 8;
+            for (const u of player.aliveUnits) {
+              if (u.ammo > 0 && u.state === UnitState.ATTACKING && u.attackTarget?.isAlive()) {
+                u.volleyReady = true;
+              }
             }
           }
-        }
-        // AI hero war cry: use when hero is attacking and cooldown is ready
-        for (const u of player.aliveUnits) {
-          if (u.isHero && u.warCryCooldown === 0 && u.state === UnitState.ATTACKING) {
-            u.triggerWarCry(player.aliveUnits);
+          // AI hero war cry: use when hero is attacking and cooldown is ready
+          for (const u of player.aliveUnits) {
+            if (u.isHero && u.warCryCooldown === 0 && u.state === UnitState.ATTACKING) {
+              u.triggerWarCry(player.aliveUnits);
+            }
+          }
+          const allDead = game.allUnits.filter(u => u.playerId !== player.id && u.isAlive()).length === 0;
+          if (state.phaseTimer >= ATTACK_DURATION || allDead) {
+            state.phase = 'gathering';
+            state.phaseTimer = 0;
           }
         }
-        const allDead = game.allUnits.filter(u => u.playerId !== player.id && u.isAlive()).length === 0;
-        if (state.phaseTimer >= ATTACK_DURATION || allDead) {
-          state.phase = 'gathering';
-          state.phaseTimer = 0;
+      }
+
+      // Hard difficulty resource bonus: AI gets periodic supply injections
+      if (game.difficulty === 'hard') {
+        state.hardBonusTimer -= dt;
+        if (state.hardBonusTimer <= 0) {
+          state.hardBonusTimer = 60;
+          player.resources.food += 15;
+          player.resources.gold += 10;
         }
       }
 
