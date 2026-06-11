@@ -66,6 +66,7 @@ export class Game {
   newlyGarrisonedUnits: Unit[] = [];
   newlyCapturedBuildings: { building: Building; fromPlayerId: number; toPlayerId: number }[] = [];
   newWarDeclarations: { fromPlayerId: number; toPlayerId: number }[] = [];
+  newTaunts: { playerId: number; message: string }[] = [];
   newlyLeveledUpUnits: Unit[] = [];
   newlyEliminatedPlayers: Player[] = [];
   newlyVisibleEnemyHeroes: Unit[] = [];
@@ -395,6 +396,7 @@ export class Game {
     this.newlyEliminatedPlayers = [];
     this.newlyVisibleEnemyHeroes = [];
     this.newlyResearchedUpgrades = [];
+    this.newTaunts = [];
 
     // Collect units that leveled up this frame (justLeveledUp reset below)
     for (const u of this.allUnits) {
