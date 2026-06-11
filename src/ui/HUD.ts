@@ -391,7 +391,7 @@ export class HUD {
       const hpColor = hpPct > 50 ? '#22dd55' : hpPct > 25 ? '#ddaa00' : '#dd2222';
       const pop    = p.aliveUnits.length;
       const kills  = this.game.killsByPlayer.get(p.id) ?? 0;
-      const bldgs  = this.game.allBuildings.filter(b => b.playerId === p.id && b.isAlive()).length;
+      const bldgs  = this.game.allBuildings.filter(b => b.playerId === p.id && b.isAlive() && b.isComplete()).length;
       const label  = p.isHuman ? '(Tú)' : CIV_NAMES[p.civType].slice(0, 6);
       if (defeated) {
         return `<div class="sb-row sb-defeated">
@@ -404,8 +404,9 @@ export class HUD {
       return `<div class="sb-row">
         <span class="sb-emoji">${CIV_EMOJIS[p.civType]}</span>
         <span class="sb-name" style="color:${hex(CIV_COLORS[p.civType])}">${label}</span>
-        <span class="sb-pop" title="Unidades / Edificios">👥${pop} 🏛️${bldgs}</span>
+        <span class="sb-pop" title="Unidades vivas">👥${pop}</span>
         <span class="sb-kills" title="Bajas enemigas">⚔️${kills}</span>
+        <span class="sb-bldgs" title="Edificios construidos">🏛️${bldgs}</span>
         <div class="sb-hp-wrap"><div class="sb-hp-fill" style="width:${hpPct}%;background:${hpColor}"></div></div>
       </div>`;
     }).join('');
@@ -604,12 +605,20 @@ export class HUD {
     const pinnedBadge = unit.meleePinned
       ? `<span title="Acorralado en cuerpo a cuerpo — -40% daño a distancia. ¡Retíralo o protégelo con infantería!" style="color:#ff6644">⚠️ACORRALADO</span>`
       : '';
+    const supplyBadge = unit._nearSupplyDepot
+      ? `<span title="Cerca de un Almacén — munición y HP se recargan el doble de rápido (hasta 50% HP)" style="color:#88ffcc">📦SUMIN.</span>`
+      : '';
+    const isHealing = unit.hp < unit.maxHp && unit.hp > 0 &&
+                      unit._damageCooldown <= 0 && unit.state === UnitState.IDLE;
+    const healingBadge = isHealing
+      ? `<span title="Recuperando HP — permanece inactivo para acelerar la cura" style="color:#88ff88">💊CURANDO</span>`
+      : '';
     this.elUnitStats.innerHTML =
       `<span>⚔️ ${unit.attack}</span>` +
       `<span>🛡️ ${unit.defense}</span>` +
       `<span>💨 ${unit.speed.toFixed(1)}</span>` +
       `<span>🎯 ${unit.attackRange.toFixed(1)}</span>` +
-      woundBadge + holdBadge + entrenchedBadge + fatigueBadge + burnBadge + poisonBadge + berserkBadge + chargeBadge + deployBadge + formBadge + moraleBadge + ammoBadge + orderBadge + officerBadge + pinnedBadge + warCryBadge + nightBadge + reloadBadge;
+      woundBadge + holdBadge + entrenchedBadge + fatigueBadge + burnBadge + poisonBadge + berserkBadge + chargeBadge + deployBadge + formBadge + moraleBadge + ammoBadge + orderBadge + officerBadge + pinnedBadge + supplyBadge + healingBadge + warCryBadge + nightBadge + reloadBadge;
 
     // XP bar (only if unit can still level up)
     const xpEl = document.getElementById('unit-xp-row');

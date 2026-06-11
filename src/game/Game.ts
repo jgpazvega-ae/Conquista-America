@@ -945,25 +945,22 @@ export class Game {
     this._formationTimer = 0;
 
     const active = this.allUnits.filter(u => u.isAlive() && u.garrisonedIn === null);
-    // Officers: level-3 champions (and heroes) project a defensive aura
-    const officers = active.filter(u => u.isHero || u.level >= 3);
     for (const u of active) {
       let allies = 0;
+      let hasOfficer = false;
       for (const o of active) {
         if (o === u || o.playerId !== u.playerId) continue;
         const dc = u.col - o.col, dr = u.row - o.row;
-        if (dc * dc + dr * dr <= 9) {
+        const d2 = dc * dc + dr * dr;
+        if (d2 <= 9) {
           allies++;
-          if (allies >= 3) break;
+        }
+        if (!hasOfficer && (o.isHero || o.level >= 3) && d2 <= 25) {
+          hasOfficer = true;
         }
       }
       u.inFormation = allies >= 3;
-      // Officer aura: any level-3 champion / hero ally within 5 tiles (excluding self)
-      u.nearOfficer = officers.some(o => {
-        if (o === u || o.playerId !== u.playerId) return false;
-        const dc = u.col - o.col, dr = u.row - o.row;
-        return dc * dc + dr * dr <= 25;
-      });
+      u.nearOfficer = hasOfficer;
     }
   }
 

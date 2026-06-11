@@ -131,7 +131,7 @@ export class Unit {
   // Recomputed periodically by Game.updateFormations.
   inFormation = false;
 
-  // Officer aura: a level-3 champion ally within 5 tiles grants +2 defense.
+  // Officer aura: a level-3 champion ally or hero within 5 tiles grants +2 defense.
   // Recomputed periodically by Game.updateFormations.
   nearOfficer = false;
 

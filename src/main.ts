@@ -157,6 +157,8 @@ class GameInstance {
   private _wasStorm = false;
   private _berserkUnits = new Set<number>(); // unit ids currently in berserk
   private _hintsShown = new Set<string>(); // one-time contextual tutorial hints
+  private _advantageTimer   = 0;  // seconds player has held >65% military advantage
+  private _advantageCooldown = 0; // prevents repeated "press the attack" alerts (90s)
 
   /** Show a tutorial hint at most once per match. */
   private hintOnce(key: string, msg: string) {
@@ -528,6 +530,7 @@ class GameInstance {
     if (this._chargeResistTimer   > 0) this._chargeResistTimer   = Math.max(0, this._chargeResistTimer   - rawDt);
     if (this._idleArmyCooldown    > 0) this._idleArmyCooldown    = Math.max(0, this._idleArmyCooldown    - rawDt);
     if (this._lowMoraleCooldown   > 0) this._lowMoraleCooldown   = Math.max(0, this._lowMoraleCooldown   - rawDt);
+    if (this._advantageCooldown   > 0) this._advantageCooldown   = Math.max(0, this._advantageCooldown   - rawDt);
     this.game.update(dt);
 
     // Register any units produced this frame
@@ -1105,6 +1108,30 @@ class GameInstance {
     if (idleCount > 0 && this.game.gameTime - this._lastIdleWarnAt >= 30) {
       this._lastIdleWarnAt = this.game.gameTime;
       this.hud.notify(`⚠️ ${idleCount} trabajador${idleCount > 1 ? 'es' : ''} sin tarea`, 'warning');
+    }
+
+    // "Press the attack" prompt: when player holds a strong military advantage for 30s,
+    // nudge them to capitalize before the enemy can recover or be reinforced
+    if (this.game.status === 'PLAYING' && this.game.gameTime > 120 && this._advantageCooldown <= 0) {
+      const myPop = this.game.humanPlayer.aliveUnits.length;
+      let enemyMax = 0;
+      for (const p of this.game.players) {
+        if (p.id === this.game.humanPlayerId || p.isDefeated()) continue;
+        enemyMax = Math.max(enemyMax, p.aliveUnits.length);
+      }
+      const total = myPop + enemyMax;
+      const ratio = total > 0 ? myPop / total : 0.5;
+      if (ratio >= 0.65 && myPop >= 5) {
+        this._advantageTimer += rawDt;
+        if (this._advantageTimer >= 30) {
+          this._advantageTimer = 0;
+          this._advantageCooldown = 90;
+          this.hud.notify('⚔️ ¡VENTAJA MILITAR! Presiona el ataque ahora antes de que el enemigo refuerce', 'success');
+          this.hintOnce('pressAttack', '💡 Con más tropas que el enemigo, ataca sus edificios clave. Destruye su Asentamiento para la victoria militar.');
+        }
+      } else {
+        this._advantageTimer = 0;
+      }
     }
 
     // Settlement under attack warning
