@@ -95,6 +95,12 @@ export class AISystem {
             if (b.playerId === player.id && b.garrison.length > 0) game.ejectGarrison(b);
           }
         }
+      } else if (player.aliveUnits.length <= 2 && player.aliveUnits.length > 0 &&
+                 !game.allBuildings.some(b => b.playerId === player.id && b.type === BuildingType.SETTLEMENT && b.isAlive())) {
+        // Ceasefire: no settlement + ≤2 survivors → units stand down (avoid tedious hunt)
+        for (const u of player.aliveUnits) {
+          if (u.state !== UnitState.MOVING) { u.attackTarget = null; u.attackBuildingTarget = null; }
+        }
       } else if (player.aliveUnits.length <= 3 && player.aliveUnits.length > 0) {
         // Desperate last stand: few survivors ignore gathering and charge
         this.waveAttack(player, game);
