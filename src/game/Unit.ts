@@ -131,6 +131,10 @@ export class Unit {
   // Recomputed periodically by Game.updateFormations.
   inFormation = false;
 
+  // Officer aura: a level-3 champion ally within 5 tiles grants +2 defense.
+  // Recomputed periodically by Game.updateFormations.
+  nearOfficer = false;
+
   // Ammo (ranged units only; -1 = melee, never depletes)
   ammo    = -1;
   maxAmmo = 0;

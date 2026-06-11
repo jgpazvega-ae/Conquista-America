@@ -925,6 +925,8 @@ export class Game {
     this._formationTimer = 0;
 
     const active = this.allUnits.filter(u => u.isAlive() && u.garrisonedIn === null);
+    // Officers: level-3 champions (and heroes) project a defensive aura
+    const officers = active.filter(u => u.isHero || u.level >= 3);
     for (const u of active) {
       let allies = 0;
       for (const o of active) {
@@ -936,6 +938,12 @@ export class Game {
         }
       }
       u.inFormation = allies >= 3;
+      // Officer aura: any level-3 champion / hero ally within 5 tiles (excluding self)
+      u.nearOfficer = officers.some(o => {
+        if (o === u || o.playerId !== u.playerId) return false;
+        const dc = u.col - o.col, dr = u.row - o.row;
+        return dc * dc + dr * dr <= 25;
+      });
     }
   }
 
