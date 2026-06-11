@@ -617,6 +617,26 @@ input.toggle { width: 22px; height: 22px; accent-color: #d4880a; }
 .sb-kills  { color: #ff9966; min-width: 28px; font-size: 10px; }
 .sb-hp-wrap { width: 44px; height: 5px; background: rgba(255,255,255,0.12); border-radius: 3px; overflow: hidden; }
 .sb-hp-fill { height: 100%; border-radius: 3px; transition: width 0.4s; }
+.sb-defeated { opacity: 0.6; }
+
+/* Military momentum indicator */
+#momentum-bar {
+  position: absolute; top: 200px; right: 8px; z-index: 110;
+  width: 132px; pointer-events: none;
+  background: rgba(8,4,1,0.85); border: 1px solid rgba(200,160,80,0.18);
+  border-radius: 6px; padding: 5px 8px; backdrop-filter: blur(4px);
+}
+#momentum-bar.hidden { display: none; }
+#momentum-label { font-size: 10px; font-weight: 700; margin-bottom: 4px; transition: color 0.4s; }
+#momentum-track {
+  position: relative; width: 100%; height: 6px;
+  background: rgba(255,255,255,0.10); border-radius: 3px; overflow: hidden;
+}
+#momentum-fill { height: 100%; border-radius: 3px; transition: width 0.5s, background 0.5s; }
+#momentum-marker {
+  position: absolute; top: -1px; width: 1px; height: 8px;
+  background: rgba(255,255,255,0.6); transform: translateX(-50%);
+}
 
 /* ═══════════════════════════════════════ CIVILIZATION POWER BUTTON ══ */
 .power-btn {
