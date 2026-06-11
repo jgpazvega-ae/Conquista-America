@@ -939,6 +939,13 @@ class GameInstance {
       }
     }
 
+    // AI civilization taunts during attack phase
+    for (const taunt of this.game.newTaunts) {
+      if (taunt.playerId !== this.game.humanPlayerId) {
+        this.hud.notify(taunt.message, 'warning');
+      }
+    }
+
     // Civilization elimination announcements (American Conquest: dramatic defeat message)
     const civNames: Record<string, string> = {
       AZTEC: 'Los Aztecas', MAYA: 'Los Mayas', INCA: 'Los Incas', CONQUISTADOR: 'Los Conquistadores',

@@ -1,4 +1,4 @@
-import { UnitState, UnitType } from './types';
+import { UnitState, UnitType, CivilizationType } from './types';
 import type { Unit } from './Unit';
 import type { Player } from './Player';
 import type { Game } from './Game';
@@ -32,6 +32,7 @@ interface AIState {
   defendTimer:   number; // how long we've been in defending phase
   volleyTimer:   number; // countdown to next AI volley fire
   hardBonusTimer: number; // countdown to next hard-mode resource bonus
+  tauntTimer:    number; // countdown to next taunt during attack phase
 }
 
 export class AISystem {
@@ -52,6 +53,7 @@ export class AISystem {
           defendTimer: 0,
           volleyTimer: 12 + Math.random() * 8,
           hardBonusTimer: 60,
+          tauntTimer: 40 + Math.random() * 30,
         };
         this.aiStates.set(player.id, state);
       }
@@ -165,6 +167,27 @@ export class AISystem {
           player.resources.food += 15;
           player.resources.gold += 10;
         }
+      }
+
+      // Civ-flavored taunts during attack phase (once per ~60-90s, only vs human)
+      if (state.phase === 'attacking') {
+        state.tauntTimer -= dt;
+        if (state.tauntTimer <= 0) {
+          state.tauntTimer = 60 + Math.random() * 30;
+          const taunts: Record<CivilizationType, string[]> = {
+            [CivilizationType.AZTEC]:        ['⚔️ ¡Los guerreros Jaguar no conocen la derrota!', '🐆 ¡Tláloc demanda tu sangre!', '☀️ ¡El sol exige tu sacrificio!'],
+            [CivilizationType.MAYA]:         ['🔭 Las estrellas ya profetizaron tu fin.', '🏛️ ¡Chichen Itzá jamás caerá!', '🐍 ¡La serpiente emplumada despertó!'],
+            [CivilizationType.INCA]:         ['🦅 ¡Los hijos del Sol marchan!', '🛤️ ¡Todos los caminos llevan a Cuzco!', '🏔️ ¡El Sapa Inca nos guía!'],
+            [CivilizationType.CONQUISTADOR]: ['💣 ¡Por el Rey y la Gloria!', '⚔️ ¡Santiago y cierra España!', '🔥 ¡La pólvora decide todo!'],
+          };
+          const msgs = taunts[player.civType] ?? [];
+          if (msgs.length > 0) {
+            const msg = msgs[Math.floor(Math.random() * msgs.length)];
+            game.newTaunts.push({ playerId: player.id, message: msg });
+          }
+        }
+      } else {
+        state.tauntTimer = Math.max(state.tauntTimer, 20); // reset minimum when not attacking
       }
 
       if (state.buildTimer >= AI_BUILD_INTERVAL * scale && player.resources.stone >= 50) {

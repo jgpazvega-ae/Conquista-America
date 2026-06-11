@@ -336,16 +336,26 @@ export class HUD {
       const settle = this.game.allBuildings.find(
         b => b.playerId === p.id && b.type === BuildingType.SETTLEMENT,
       );
-      const hpPct = settle?.isAlive() ? (settle.hp / settle.maxHp) * 100 : 0;
+      const defeated = p.isDefeated();
+      const hpPct  = settle?.isAlive() ? (settle.hp / settle.maxHp) * 100 : 0;
       const hpColor = hpPct > 50 ? '#22dd55' : hpPct > 25 ? '#ddaa00' : '#dd2222';
       const pop    = p.aliveUnits.length;
       const kills  = this.game.killsByPlayer.get(p.id) ?? 0;
+      const bldgs  = this.game.allBuildings.filter(b => b.playerId === p.id && b.isAlive()).length;
       const label  = p.isHuman ? '(Tú)' : CIV_NAMES[p.civType].slice(0, 6);
+      if (defeated) {
+        return `<div class="sb-row sb-defeated">
+          <span class="sb-emoji" style="opacity:0.5">${CIV_EMOJIS[p.civType]}</span>
+          <span class="sb-name" style="color:#666">${label}</span>
+          <span style="color:#666;font-size:10px">☠️ ELIMINADO</span>
+          <span class="sb-kills" title="Bajas totales" style="color:#555">⚔️${kills}</span>
+        </div>`;
+      }
       return `<div class="sb-row">
         <span class="sb-emoji">${CIV_EMOJIS[p.civType]}</span>
         <span class="sb-name" style="color:${hex(CIV_COLORS[p.civType])}">${label}</span>
-        <span class="sb-pop">👥${pop}</span>
-        <span class="sb-kills" title="Bajas">⚔️${kills}</span>
+        <span class="sb-pop" title="Unidades / Edificios">👥${pop} 🏛️${bldgs}</span>
+        <span class="sb-kills" title="Bajas enemigas">⚔️${kills}</span>
         <div class="sb-hp-wrap"><div class="sb-hp-fill" style="width:${hpPct}%;background:${hpColor}"></div></div>
       </div>`;
     }).join('');
@@ -857,7 +867,8 @@ export class HUD {
       const ownerLabel = owner?.isHuman ? '(Tú)' : CIV_NAMES[owner?.civType ?? 0];
       let status: string;
       if (!building.isComplete()) {
-        status = `🔨 ${Math.round(building.buildProgress * 100)}% construido`;
+        const etaSecs = Math.ceil(building.buildTime * (1 - building.buildProgress));
+        status = `🔨 ${Math.round(building.buildProgress * 100)}% construido — listo en ${etaSecs}s`;
       } else if (building.productionQueue?.length > 0) {
         const item = building.productionQueue[0];
         const rem  = Math.ceil(item.totalTime - item.elapsed);
