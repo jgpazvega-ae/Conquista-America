@@ -1122,6 +1122,20 @@ input.toggle { width: 22px; height: 22px; accent-color: #d4880a; }
   border-radius: 6px; font-variant-numeric: tabular-nums;
 }
 
+/* Hero respawn countdown chip */
+#hero-respawn-chip {
+  font-size: 11px; font-weight: 700; color: #ffaa44;
+  padding: 3px 9px;
+  background: rgba(60,20,0,0.7);
+  border: 1px solid rgba(255,140,40,0.4);
+  border-radius: 6px; animation: hero-respawn-pulse 1.2s ease-in-out infinite;
+}
+#hero-respawn-chip b { color: #ffdd88; }
+@keyframes hero-respawn-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+
 /* Auto-save flash indicator */
 #autosave-indicator {
   position: absolute; top: 44px; right: 12px; z-index: 130;
