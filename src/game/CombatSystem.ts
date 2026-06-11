@@ -138,6 +138,8 @@ export class CombatSystem {
           }
           // Close ranks: formation fighters shield each other
           if (target.inFormation) dmg = Math.max(1, dmg - 2);
+          // Officer aura: a nearby level-3 champion / hero steadies the line (+2 def)
+          if (target.nearOfficer) dmg = Math.max(1, dmg - 2);
           // Routed targets are cut down more easily
           if (target.panicked) dmg = Math.round(dmg * 1.25);
           // Flanking bonus: +25% damage when 2 or more allies attack the same target
