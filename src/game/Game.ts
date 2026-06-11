@@ -96,6 +96,7 @@ export class Game {
   private _deathWindowTimer  = 30;
   private _routFired         = false;
   private _workerFleeTimer   = 0; // throttle worker flee checks
+  private _popPressureNotified = false;
   villageIncomeEvents: { playerId: number; food: number; gold: number }[] = [];
 
   constructor(humanCiv: CivilizationType = CivilizationType.AZTEC) {
@@ -416,6 +417,25 @@ export class Game {
       if (b.garrison.length === 0) continue;
       if (b.isAlive()) {
         b.garrison = b.garrison.filter(u => u.isAlive());
+        // Auto-sortie: when building drops to 50% HP under active attack, defenders sally out
+        if (b.hp < b.maxHp * 0.5 && b.garrison.length > 0) {
+          const attackers = this.allUnits.filter(
+            u => u.isAlive() && u.playerId !== b.playerId && u.attackBuildingTarget === b,
+          );
+          if (attackers.length > 0) {
+            const ejected = this.ejectGarrison(b);
+            for (const u of ejected) {
+              const nearest = attackers.reduce((best, e) =>
+                u.distanceTo(e) < u.distanceTo(best) ? e : best,
+              );
+              u.attackTarget = nearest;
+              u.state = UnitState.ATTACKING;
+            }
+            if (ejected.length > 0 && b.playerId === this.humanPlayerId) {
+              this.pendingEventMessages.push(`⚔️ ¡La guarnición sale a defender! ${ejected.length} guerrero${ejected.length > 1 ? 's' : ''} contraatacan`);
+            }
+          }
+        }
       } else {
         const survivors = this.ejectGarrison(b);
         for (const u of survivors) u.takeDamage(25);
@@ -585,6 +605,24 @@ export class Game {
         for (const u of p.aliveUnits) {
           if (!u.isHero) u.loseMorale(1.5 * dt);
         }
+      }
+    }
+
+    // Population pressure: at ≥90% pop cap troops are overcrowded and morale suffers
+    {
+      const cap   = this.getPopCap(this.humanPlayerId);
+      const count = this.humanPlayer.aliveUnits.length;
+      const ratio = count / cap;
+      if (ratio >= 0.9) {
+        for (const u of this.humanPlayer.aliveUnits) {
+          if (!u.isHero) u.loseMorale(0.5 * dt);
+        }
+        if (!this._popPressureNotified) {
+          this._popPressureNotified = true;
+          this.pendingEventMessages.push(`👥 ¡Tropas abarrotadas! ${count}/${cap} unidades — construye un Almacén para ampliar el límite`);
+        }
+      } else if (ratio < 0.8) {
+        this._popPressureNotified = false;
       }
     }
 
