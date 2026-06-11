@@ -544,10 +544,17 @@ class GameInstance {
     for (const node of this.game.newlyDepletedNodes) {
       const fog = this.game.fog.getFog(this.game.humanPlayerId);
       const vis = fog ? fog.getVisibility(node.col, node.row) : 1;
-      if (vis !== 0 /* UNEXPLORED */) {
+      if (vis === 0 /* UNEXPLORED */) continue;
+      // Only alert if the player's own workers are gathering here — avoids spam for
+      // distant/enemy nodes the player doesn't care about
+      const myWorkersHere = this.game.allWorkers.some(w =>
+        w.playerId === this.game.humanPlayerId &&
+        Math.abs(w.col - node.col) <= 2 && Math.abs(w.row - node.row) <= 2,
+      );
+      if (myWorkersHere) {
         this.audio.playResourceDepleted();
         const typeLabel = node.type === ResourceType.FOOD ? 'Alimentos' : node.type === ResourceType.GOLD ? 'Oro' : 'Piedra';
-        this.hud.notify(`⚠️ Yacimiento de ${typeLabel} agotado`, 'warning');
+        this.hud.notify(`⚠️ Yacimiento de ${typeLabel} agotado — reasigna tus trabajadores (Q)`, 'warning');
       }
     }
 
