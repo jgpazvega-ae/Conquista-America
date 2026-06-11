@@ -557,6 +557,15 @@ class GameInstance {
           this.renderer.effects.createExplosion(wx, 0.6, wz, 0.7);
           this.renderer.effects.createDustCloud(wx, wz);
         }
+      } else {
+        // Enemy wonder completed — dramatic warning
+        if (b.type === BuildingType.WONDER) {
+          const def = BUILDING_DEFS[b.type];
+          this.hud.notify(`⚠️ ¡El enemigo completó ${def.name}! ¡Destrúyela antes de 3 minutos o perderás!`, 'warning');
+          this.camera.shake(0.6, 1.0);
+          this.renderer.effects.createExplosion(b.col * TILE_SIZE, 0.6, b.row * TILE_SIZE, 1.5);
+          this.audio.playVictory();
+        }
       }
     }
 

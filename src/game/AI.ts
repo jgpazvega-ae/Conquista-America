@@ -478,6 +478,15 @@ export class AISystem {
     // Fallback: always ensure at least 1 barracks and 1 storehouse
     if (!buildType && countOf(BuildingType.BARRACKS) === 0)  buildType = BuildingType.BARRACKS;
     if (!buildType && countOf(BuildingType.STOREHOUSE) < 2)  buildType = BuildingType.STOREHOUSE;
+    // Late-game wonder rush: once all other buildings are in place and resources are ample, build a wonder
+    if (!buildType && countOf(BuildingType.WONDER) === 0 && game.gameTime > 300) {
+      const wonderDef = BUILDING_DEFS[BuildingType.WONDER];
+      if (player.resources.food >= wonderDef.cost.food &&
+          player.resources.gold >= wonderDef.cost.gold &&
+          player.resources.stone >= wonderDef.cost.stone) {
+        buildType = BuildingType.WONDER;
+      }
+    }
     if (!buildType) return;
 
     const def = BUILDING_DEFS[buildType];
