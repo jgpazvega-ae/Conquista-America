@@ -149,6 +149,8 @@ class GameInstance {
   private _stoneCritWarnTimer  = 0; // throttle low-stone warnings (60s cooldown)
   private _goldCritWarnTimer   = 0; // throttle low-gold warnings (60s cooldown)
   private _chargeResistTimer   = 0; // throttle phalanx charge-resist notification (20s cooldown)
+  private _idleArmyTimer       = 0; // time all human military units have been idle
+  private _idleArmyCooldown    = 0; // prevents repeated reminders (120s between alerts)
   private _statusParticleTimers = new Map<number, number>(); // unit.id → time since last status particle
   private _wasNight = false;
   private _wasStorm = false;
@@ -523,6 +525,7 @@ class GameInstance {
     if (this._stoneCritWarnTimer  > 0) this._stoneCritWarnTimer  = Math.max(0, this._stoneCritWarnTimer  - rawDt);
     if (this._goldCritWarnTimer   > 0) this._goldCritWarnTimer   = Math.max(0, this._goldCritWarnTimer   - rawDt);
     if (this._chargeResistTimer   > 0) this._chargeResistTimer   = Math.max(0, this._chargeResistTimer   - rawDt);
+    if (this._idleArmyCooldown    > 0) this._idleArmyCooldown    = Math.max(0, this._idleArmyCooldown    - rawDt);
     this.game.update(dt);
 
     // Register any units produced this frame
@@ -980,6 +983,22 @@ class GameInstance {
     if (this.game.humanPlayer.resources.gold < 20 && this._goldCritWarnTimer <= 0) {
       this.hud.notify('⚜️ ¡ORO CRÍTICO! Captura aldeas o espera ingresos para contratar tropas', 'warning');
       this._goldCritWarnTimer = 60;
+    }
+
+    // Idle army reminder: nudge player if all military units have been idle for 60s
+    if (this.game.status === 'PLAYING') {
+      const military = this.game.humanPlayer.aliveUnits.filter(u => u.garrisonedIn === null);
+      const allIdle  = military.length > 0 && military.every(u => u.state === UnitState.IDLE || u.state === UnitState.HOLD);
+      if (allIdle) {
+        this._idleArmyTimer += rawDt;
+        if (this._idleArmyTimer >= 60 && this._idleArmyCooldown <= 0) {
+          this.hud.notify('💤 Tus tropas llevan mucho tiempo inactivas — ¿explorar, expandir o atacar?', 'info');
+          this._idleArmyCooldown = 120;
+          this._idleArmyTimer    = 0;
+        }
+      } else {
+        this._idleArmyTimer = 0;
+      }
     }
 
     // Objective completion notifications
