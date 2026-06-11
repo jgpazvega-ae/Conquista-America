@@ -562,6 +562,23 @@ export class Game {
       }
     }
 
+    // Hero auto-rally: when the hero's morale drops below 40, they steady their troops within 8 tiles
+    {
+      const hero = this.humanPlayer.aliveUnits.find(u => u.isHero);
+      if (hero && hero.morale < 40 && hero.rallyCooldown <= 0) {
+        hero.rallyCooldown = 90;
+        let rallied = 0;
+        for (const u of this.humanPlayer.aliveUnits) {
+          if (u === hero) continue;
+          const d = Math.sqrt((u.col - hero.col) ** 2 + (u.row - hero.row) ** 2);
+          if (d <= 8) { u.morale = Math.min(80, u.morale + 20); rallied++; }
+        }
+        if (rallied > 0) {
+          this.pendingEventMessages.push(`🛡️ ¡${hero.heroName ?? 'Tu héroe'} arenga a las tropas! ${rallied} unidad${rallied > 1 ? 'es' : ''} recuperan moral`);
+        }
+      }
+    }
+
     // Starvation: food < 10 → troops are hungry, morale breaks (AC mechanic: supply lines matter)
     for (const p of this.players) {
       if (p.resources.food < 10) {
@@ -1011,7 +1028,9 @@ export class Game {
         u => u.isAlive() && u.playerId === unit.playerId && u.attackBuildingTarget === bldg,
       ).length;
       const assaultMult = assaulters >= 3 ? 1.5 : 1.0;
-      const rawDmg = Math.max(1, Math.round((unit.attack - 5) * assaultMult)); // buildings have some armor
+      // Cannon siege specialist: 3× damage vs buildings (AC: cannons were wall-breakers)
+      const siegeMult = unit.type === UnitType.CANNON ? 3.0 : 1.0;
+      const rawDmg = Math.max(1, Math.round((unit.attack - 5) * assaultMult * siegeMult)); // buildings have some armor
       bldg.takeDamage(rawDmg);
       if (!bldg.isAlive()) {
         this.newlyDestroyedBuildings.push(bldg);
