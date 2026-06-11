@@ -104,6 +104,11 @@ export class Unit {
   // Entrench (X key): dig in for +5 defense; cleared on any movement order
   entrenched = false;
 
+  // Battle fatigue: prolonged combat lowers effectiveness
+  combatTimer      = 0;   // seconds spent continuously in ATTACKING state
+  fatigued         = false;
+  private _preFatigueAttack = 0;
+
   // Stationary defense: seconds spent holding position (IDLE/HOLD) without moving
   stationaryTimer = 0;
 
@@ -821,6 +826,24 @@ export class Unit {
       this.stationaryTimer = Math.min(10, this.stationaryTimer + dt);
     } else {
       this.stationaryTimer = 0;
+    }
+
+    // Battle fatigue: ≥60s continuous combat reduces attack by 10%; rest clears it
+    if (this.state === UnitState.ATTACKING) {
+      this.combatTimer += dt;
+      if (this.combatTimer >= 60 && !this.fatigued && !this.isHero) {
+        this.fatigued          = true;
+        this._preFatigueAttack = this.attack;
+        this.attack            = Math.max(1, Math.round(this.attack * 0.9));
+      }
+    } else if (this.fatigued) {
+      this.combatTimer = Math.max(0, this.combatTimer - dt * 2); // fatigue drains at 2×
+      if (this.combatTimer <= 0) {
+        this.fatigued = false;
+        this.attack   = this._preFatigueAttack; // restore pre-fatigue attack
+      }
+    } else {
+      this.combatTimer = Math.max(0, this.combatTimer - dt);
     }
 
     // Morale regeneration: faster near own settlement; rally at 50 ends panic

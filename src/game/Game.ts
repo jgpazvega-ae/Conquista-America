@@ -123,9 +123,27 @@ export class Game {
     civs.forEach((civ, idx) => {
       const isHuman = idx === this.humanPlayerId;
       const player = new Player(idx, civ, isHuman);
+      // Civ-specific starting resource bonuses
+      switch (civ) {
+        case CivilizationType.AZTEC:         player.resources.food  += 150; break; // chinampas surplus
+        case CivilizationType.MAYA:          player.resources.gold  +=  50; break; // trade routes
+        case CivilizationType.INCA:          player.resources.stone += 100; break; // Andean quarrying
+        case CivilizationType.CONQUISTADOR:  player.resources.gold  += 150; break; // gold seekers
+      }
       this.players.push(player);
       this.spawnUnitsFor(player);
     });
+  }
+
+  /** Apply civ-specific trait bonuses to a newly created unit. */
+  private applyCivTraits(unit: Unit, civ: CivilizationType) {
+    if (unit.isHero) return; // heroes already have custom stats
+    switch (civ) {
+      case CivilizationType.AZTEC:        unit.morale = Math.min(100, unit.morale + 10); break; // warrior culture
+      case CivilizationType.MAYA:         unit.sight  = Math.min(18,  unit.sight  +  1); break; // astronomical science
+      case CivilizationType.INCA:         unit.hp     = Math.min(unit.maxHp, unit.hp + 15); unit.maxHp += 15; break; // highland endurance
+      case CivilizationType.CONQUISTADOR: unit.attack = Math.min(Math.round(unit.def.stats.attack * 1.25), unit.attack + 2); break; // steel weapons
+    }
   }
 
   private static readonly HERO_DEFS: Record<CivilizationType, { name: string; unitType: UnitType }> = {
@@ -177,6 +195,7 @@ export class Game {
       if (!pos) continue;
       occupied.add(`${pos[0]},${pos[1]}`);
       const unit = new Unit(unitType, player.civType, player.id, pos[0], pos[1], color);
+      this.applyCivTraits(unit, player.civType);
       player.addUnit(unit);
       this.allUnits.push(unit);
       placed++;
@@ -808,7 +827,8 @@ export class Game {
     const pos = this.map.findWalkableNear(building.col, building.row + 3, 6);
     if (!pos) return;
     const unit = new Unit(unitType, player.civType, player.id, pos[0], pos[1], CIV_COLORS[player.civType]);
-    // Apply player upgrades to new unit
+    // Apply civ traits and player upgrades to new unit
+    this.applyCivTraits(unit, player.civType);
     if (player.upgrades.metallurgy)    unit.attack += 6;
     if (player.upgrades.logistics)     unit.speed  += 0.4;
     if (player.upgrades.fortification) { unit.maxHp += 50; unit.hp += 50; }
