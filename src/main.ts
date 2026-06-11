@@ -151,6 +151,7 @@ class GameInstance {
   private _chargeResistTimer   = 0; // throttle phalanx charge-resist notification (20s cooldown)
   private _idleArmyTimer       = 0; // time all human military units have been idle
   private _idleArmyCooldown    = 0; // prevents repeated reminders (120s between alerts)
+  private _lowMoraleCooldown   = 0; // throttle army-wide low-morale warnings (45s)
   private _statusParticleTimers = new Map<number, number>(); // unit.id → time since last status particle
   private _wasNight = false;
   private _wasStorm = false;
@@ -526,6 +527,7 @@ class GameInstance {
     if (this._goldCritWarnTimer   > 0) this._goldCritWarnTimer   = Math.max(0, this._goldCritWarnTimer   - rawDt);
     if (this._chargeResistTimer   > 0) this._chargeResistTimer   = Math.max(0, this._chargeResistTimer   - rawDt);
     if (this._idleArmyCooldown    > 0) this._idleArmyCooldown    = Math.max(0, this._idleArmyCooldown    - rawDt);
+    if (this._lowMoraleCooldown   > 0) this._lowMoraleCooldown   = Math.max(0, this._lowMoraleCooldown   - rawDt);
     this.game.update(dt);
 
     // Register any units produced this frame
@@ -1018,6 +1020,20 @@ class GameInstance {
         }
       } else {
         this._idleArmyTimer = 0;
+      }
+
+      // Army-wide low-morale warning: alert when a sizable force is wavering so the
+      // player can rally (hero war cry Y, regroup C, temple, retreat R) before a rout
+      if (this._lowMoraleCooldown <= 0) {
+        const combat = military.filter(u => !u.isHero);
+        if (combat.length >= 4) {
+          const shaky = combat.filter(u => u.panicked || u.morale < 35).length;
+          if (shaky >= combat.length * 0.4) {
+            this.hud.notify('📉 ¡La moral de tu ejército se desmorona! Usa el grito de guerra (Y), reagrupa con el héroe (C) o retírate (R)', 'warning');
+            this.audio.playRetreat();
+            this._lowMoraleCooldown = 45;
+          }
+        }
       }
     }
 
