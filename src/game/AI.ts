@@ -126,7 +126,13 @@ export class AISystem {
         // Regrouping: loose formation for faster repositioning
         this.applyFormation(player, null);
         this.rallyTroops(player, game);
-        if (state.phaseTimer >= GATHER_DURATION * scale || player.aliveUnits.length >= rallyCap) {
+        // Strategy personality: aggressive civs (high militaryRatio) rush with shorter
+        // gather times and smaller armies; economic/defensive civs mass larger forces first
+        const milRatio = STRATEGY_BY_CIV[player.civType]?.militaryRatio ?? 0.6;
+        const gatherMult = 1.3 - milRatio * 0.7;          // 0.8 (aggressive) .. 1.1 (turtle)
+        const rallyMult  = 0.6 + (1 - milRatio) * 0.8;    // ~0.84 (aggressive) .. ~1.2 (turtle)
+        if (state.phaseTimer >= GATHER_DURATION * scale * gatherMult ||
+            player.aliveUnits.length >= Math.round(rallyCap * rallyMult)) {
           state.phase = 'attacking';
           state.phaseTimer = 0;
           // Offensive stance: charge in wedge (+25% atk)
