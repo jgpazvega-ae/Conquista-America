@@ -162,6 +162,8 @@ export class CombatSystem {
           }
           // Close ranks: formation fighters shield each other
           if (target.inFormation) dmg = Math.max(1, dmg - 2);
+          // Fire vulnerability: burning targets take +10% damage (heat and smoke weaken defense)
+          if (target.burning > 0) dmg = Math.round(dmg * 1.10);
           // Officer aura: a nearby level-3 champion / hero steadies the line (+2 def)
           if (target.nearOfficer) dmg = Math.max(1, dmg - 2);
           // Routed targets are cut down more easily; cavalry pursuit is especially lethal

@@ -116,6 +116,7 @@ export class Game {
   private _killsThisCycle        = new Map<number, number>(); // kills per player in current momentum window
   private _lightningTimer        = 0;    // throttle storm lightning strikes (every 5s)
   private _lowNodeWarned         = new Set<number>(); // resource node ids already warned as low
+  private _firstBloodPlayers     = new Set<number>(); // player ids that have already scored their first kill
   villageIncomeEvents: { playerId: number; food: number; gold: number }[] = [];
 
   constructor(humanCiv: CivilizationType = CivilizationType.AZTEC) {
@@ -720,6 +721,16 @@ export class Game {
         const nightKillCap   = this.isNight ? 80 : 70;
         if (!evt.attacker.isHero && evt.attacker.morale < nightKillCap) {
           evt.attacker.morale = Math.min(nightKillCap, evt.attacker.morale + nightKillBoost);
+        }
+        // First blood: player's first kill in the match — all their units surge with confidence (+25 morale)
+        if (!this._firstBloodPlayers.has(evt.attacker.playerId)) {
+          this._firstBloodPlayers.add(evt.attacker.playerId);
+          const attPlayer = this.players[evt.attacker.playerId];
+          if (attPlayer) {
+            for (const u of attPlayer.aliveUnits) { if (!u.isHero) u.morale = Math.min(100, u.morale + 25); }
+            if (evt.attacker.playerId === this.humanPlayerId)
+              this.pendingEventMessages.push('⚔️ ¡Primera sangre! Tu ejército se enardece (+25 moral a todos)');
+          }
         }
         // Hero kill ripple: when a hero lands a killing blow, nearby allies gain morale (American Conquest: champion's presence inspires the line)
         if (evt.attacker.isHero) {
