@@ -1298,6 +1298,15 @@ export class Game {
         if (b.type !== BuildingType.VILLAGE || b.playerId < 0 || !b.isAlive()) continue;
         const curr = incomeByPlayer.get(b.playerId) ?? { food: 0, gold: 0 };
         curr.food += 10; curr.gold += 6;
+        // MAYA trade network: adjacent friendly villages earn +2 bonus gold (trade routes)
+        const owner = this.players[b.playerId];
+        if (owner?.civType === CivilizationType.MAYA) {
+          const hasNeighbour = this.allBuildings.some(
+            v => v !== b && v.type === BuildingType.VILLAGE && v.playerId === b.playerId &&
+                 v.isAlive() && Math.hypot(v.col - b.col, v.row - b.row) <= 10,
+          );
+          if (hasNeighbour) curr.gold += 2;
+        }
         incomeByPlayer.set(b.playerId, curr);
       }
       for (const [pid, income] of incomeByPlayer) {

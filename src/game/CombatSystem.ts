@@ -251,7 +251,9 @@ export class CombatSystem {
           // Entrenched ranged: prepared position grants 20% faster reload
           const entrenchedBonus = (unit.entrenched && !unit.outOfAmmo && unit.attackRange > 1.5 &&
             unit.type !== UnitType.CANNON) ? 0.80 : 1.0;
-          unit.attackTimer = unit.attackCooldown * (isVolley ? 1.5 : 1.0) * entrenchedBonus;
+          // Low morale: hesitant fighters attack 15% slower when morale < 30
+          const moralePenalty = (!unit.isHero && unit.morale < 30) ? 1.15 : 1.0;
+          unit.attackTimer = unit.attackCooldown * (isVolley ? 1.5 : 1.0) * entrenchedBonus * moralePenalty;
           // Ammo consumption (volley costs 2 rounds)
           if (unit.ammo > 0) unit.ammo = Math.max(0, unit.ammo - (isVolley ? 2 : 1));
 
@@ -318,6 +320,10 @@ export class CombatSystem {
           // Slinger: stone impact staggers the target (-40% speed for 2s; infantry only)
           if (unit.type === UnitType.SLINGER && target.isAlive() && target.attackRange <= 1.5) {
             target.slowed = Math.max(target.slowed, 2);
+          }
+          // Atlatl javelin stagger: 20% chance to slow target 1s (javelin weight disrupts movement)
+          if (unit.type === UnitType.ATLATL && target.isAlive() && target.attackRange <= 1.5 && Math.random() < 0.20) {
+            target.slowed = Math.max(target.slowed, 1);
           }
           // Atlatl: javelin has small splash (0.8-tile radius, 40% damage) — punishes packed formations
           if (unit.type === UnitType.ATLATL && target.isAlive()) {
