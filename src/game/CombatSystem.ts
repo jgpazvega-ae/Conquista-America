@@ -201,8 +201,11 @@ export class CombatSystem {
           if (isVolley) dmg = Math.round(dmg * 2.5);
           // Weather: rain/storm reduces gunpowder & all-ranged effectiveness
           if (weather) dmg = Math.max(1, Math.round(dmg * weather.damageMultiplier(unit.type)));
-          // Night: +15% damage on both sides — darkness breeds surprise and chaos
-          if (isNight) dmg = Math.round(dmg * 1.15);
+          // Night: melee thrives in the dark (+15%); gunpowder weapons struggle with poor visibility (-10%)
+          if (isNight) {
+            const isPowder = unit.type === UnitType.ARQUEBUSIER || unit.type === UnitType.CANNON;
+            dmg = Math.round(dmg * (isPowder ? 0.9 : 1.15));
+          }
           // Veteran toughness: level-3 Champions absorb 15% of incoming damage
           if (target.level >= 3) dmg = Math.max(1, Math.round(dmg * 0.85));
           // Melee pin: ranged unit threatened by adjacent enemy melee fires at -40%

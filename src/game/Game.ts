@@ -1269,7 +1269,7 @@ export class Game {
         this.newlyDestroyedBuildings.push(bldg);
         // Award XP to the unit that delivers the killing blow to a building
         unit.gainXP(15);
-        // Cavalry raid: loot gold from the destroyed building's owner
+        // Cavalry raid: steal gold directly from the destroyed building's owner
         if (unit.type === UnitType.CAVALRY) {
           const raider = this.players[unit.playerId];
           const victim = this.players.find(p => p.id === bldg.playerId);
@@ -1278,7 +1278,32 @@ export class Game {
             if (stolen > 0) {
               victim.resources.gold  -= stolen;
               raider.resources.gold  += stolen;
-              this.pendingEventMessages.push(`🐎 ¡Raída de caballería! +${stolen} ⚜️ saqueados`);
+              if (unit.playerId === this.humanPlayerId)
+                this.pendingEventMessages.push(`🐎 ¡Raída de caballería! +${stolen} ⚜️ saqueados`);
+            }
+          }
+        }
+        // General pillage: any unit that destroys a building gains resources from the ruins
+        {
+          const pillager = this.players[unit.playerId];
+          if (pillager && unit.type !== UnitType.CAVALRY) { // cavalry loot handled above
+            let foodGain = 0, goldGain = 0;
+            switch (bldg.type) {
+              case BuildingType.SETTLEMENT: foodGain = 15; goldGain = 8;  break;
+              case BuildingType.BARRACKS:   goldGain = 10;                break;
+              case BuildingType.TEMPLE:     goldGain = 12;                break;
+              case BuildingType.STOREHOUSE: foodGain = 20; goldGain = 10; break;
+              case BuildingType.VILLAGE:    foodGain = 8;  goldGain = 4;  break;
+              default:                      goldGain = 5;                  break;
+            }
+            pillager.resources.food = Math.min(2000, pillager.resources.food + foodGain);
+            pillager.resources.gold = Math.min(2000, pillager.resources.gold + goldGain);
+            if (unit.playerId === this.humanPlayerId && (foodGain > 0 || goldGain > 0)) {
+              this.pendingEventMessages.push(
+                `🏴 ¡${bldg.def.name} destruido! Saqueo: ${foodGain > 0 ? `+${foodGain}🌽 ` : ''}+${goldGain}⚜️`,
+              );
+            } else if (bldg.playerId === this.humanPlayerId) {
+              this.pendingEventMessages.push(`⚠️ ¡${bldg.def.name} destruido! El enemigo saquea los restos`);
             }
           }
         }

@@ -851,7 +851,9 @@ export class Unit {
         this.attack            = Math.max(1, Math.round(this.attack * 0.9));
       }
     } else if (this.fatigued) {
-      this.combatTimer = Math.max(0, this.combatTimer - dt * 2); // fatigue drains at 2×
+      // HOLD command doubles recovery speed — troops resting in position shake off fatigue faster
+      const recoveryRate = this.state === UnitState.HOLD ? 4 : 2;
+      this.combatTimer = Math.max(0, this.combatTimer - dt * recoveryRate);
       if (this.combatTimer <= 0) {
         this.fatigued = false;
         this.attack   = this._preFatigueAttack; // restore pre-fatigue attack
