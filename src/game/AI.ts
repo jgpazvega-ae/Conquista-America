@@ -175,11 +175,27 @@ export class AISystem {
               u.triggerWarCry(player.aliveUnits);
             }
           }
+          // AI civilization power: activate at full strength during attack when ready
+          if (player.powerCooldown <= 0 && player.aliveUnits.length >= 4 && !player.powerActive) {
+            this.activateAIPower(player);
+          }
           const allDead = game.allUnits.filter(u => u.playerId !== player.id && u.isAlive()).length === 0;
           if (state.phaseTimer >= ATTACK_DURATION || allDead) {
             state.phase = 'gathering';
             state.phaseTimer = 0;
           }
+        }
+      }
+
+      // Tick AI civilization power timers
+      if (player.powerCooldown > 0) {
+        player.powerCooldown = Math.max(0, player.powerCooldown - dt);
+      }
+      if (player.powerActive && player.powerActiveTimer > 0) {
+        player.powerActiveTimer = Math.max(0, player.powerActiveTimer - dt);
+        if (player.powerActiveTimer <= 0) {
+          player.powerActive = false;
+          this.removeAIPower(player);
         }
       }
 
@@ -696,6 +712,67 @@ export class AISystem {
             worker.task = WorkerTask.MOVING;
           }
         }
+      }
+    }
+  }
+
+  /** Activate an AI player's civilization power during an attack wave. */
+  private activateAIPower(player: Player) {
+    const COOLDOWNS: Record<CivilizationType, number> = {
+      [CivilizationType.AZTEC]: 40, [CivilizationType.INCA]: 80,
+      [CivilizationType.MAYA]: 60,  [CivilizationType.CONQUISTADOR]: 70,
+    };
+    const DURATIONS: Record<CivilizationType, number> = {
+      [CivilizationType.AZTEC]: 0, [CivilizationType.INCA]: 25,
+      [CivilizationType.MAYA]: 0,  [CivilizationType.CONQUISTADOR]: 20,
+    };
+    player.powerCooldown = COOLDOWNS[player.civType] ?? 60;
+
+    switch (player.civType) {
+      case CivilizationType.AZTEC: {
+        // Sacrifice the weakest non-hero unit for a resource boost
+        const weak = player.aliveUnits.filter(u => !u.isHero).sort((a, b) => a.hp - b.hp)[0];
+        if (weak) {
+          weak.takeDamage(weak.hp + 9999);
+          player.resources.gold = Math.min(2000, player.resources.gold + 60);
+        }
+        break;
+      }
+      case CivilizationType.INCA:
+        for (const u of player.aliveUnits) {
+          u.incaBuff = true; u._preBuffAttack = u.attack; u._preBuffSpeed = u.speed;
+          u.attack = Math.round(u.attack * 1.3);
+          u.speed  = Math.min(u.speed * 1.3, u.def.stats.speed * 3);
+        }
+        player.powerActive = true; player.powerActiveTimer = DURATIONS[player.civType];
+        break;
+      case CivilizationType.MAYA:
+        // All Maya units get a morale surge (prophetic revelation)
+        for (const u of player.aliveUnits) {
+          if (!u.isHero) u.morale = Math.min(100, u.morale + 30);
+        }
+        break;
+      case CivilizationType.CONQUISTADOR:
+        for (const u of player.aliveUnits) {
+          u.conquBuff = true; u._preBuffAttack = u.attack;
+          u.attack = Math.round(u.attack * 1.8);
+        }
+        player.powerActive = true; player.powerActiveTimer = DURATIONS[player.civType];
+        break;
+    }
+  }
+
+  /** Remove expired buff from AI player units. */
+  private removeAIPower(player: Player) {
+    for (const u of player.aliveUnits) {
+      if (u.incaBuff) {
+        if (u._preBuffAttack > 0) u.attack = u.fatigued ? Math.round(u._preBuffAttack * 0.9) : u._preBuffAttack;
+        if (u._preBuffSpeed  > 0) u.speed  = u._preBuffSpeed;
+        u.incaBuff = false; u._preBuffAttack = 0; u._preBuffSpeed = 0;
+      }
+      if (u.conquBuff) {
+        if (u._preBuffAttack > 0) u.attack = u.fatigued ? Math.round(u._preBuffAttack * 0.9) : u._preBuffAttack;
+        u.conquBuff = false; u._preBuffAttack = 0;
       }
     }
   }

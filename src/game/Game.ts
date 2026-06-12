@@ -341,6 +341,11 @@ export class Game {
     const settlementsByPlayer = new Map<number, { col: number; row: number }[]>();
     const templesByPlayer     = new Map<number, { col: number; row: number }[]>();
     const storehousesByPlayer = new Map<number, { col: number; row: number }[]>();
+    const unitsByPlayer = new Map<number, Unit[]>();
+    for (const u of this.allUnits) {
+      if (!unitsByPlayer.has(u.playerId)) unitsByPlayer.set(u.playerId, []);
+      unitsByPlayer.get(u.playerId)!.push(u);
+    }
     for (const b of this.allBuildings) {
       if (!b.isAlive() || !b.isComplete()) continue;
       if (b.type === BuildingType.SETTLEMENT) {
@@ -370,6 +375,11 @@ export class Game {
       const storehouses = storehousesByPlayer.get(unit.playerId) ?? [];
       unit._nearSupplyDepot = storehouses.some(
         s => Math.abs(unit.col - s.col) <= 4 && Math.abs(unit.row - s.row) <= 4,
+      );
+      // Isolated penalty: no friendly alive unit within 6 tiles → half morale regen
+      const allyUnits = unitsByPlayer.get(unit.playerId) ?? [];
+      unit._isolated = allyUnits.filter(u => u !== unit && u.isAlive()).every(
+        ally => Math.abs(unit.col - ally.col) > 6 || Math.abs(unit.row - ally.row) > 6,
       );
       unit.update(dt, this.map);
 

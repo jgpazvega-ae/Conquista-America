@@ -85,6 +85,7 @@ export class Unit {
   _idleHealTimer   = 0;     // accumulates while healing
   _nearSettlement  = false; // set each frame by Game.ts; boosts idle heal rate
   _nearSupplyDepot = false; // true when within 4 tiles of a friendly complete Storehouse
+  _isolated        = false; // set each frame by Game.ts; no friendly unit within 6 tiles
   wantsRetreat     = false; // set by takeDamage when HP < 20%; cleared by Game
 
   // Status effects (damage over time)
@@ -867,6 +868,7 @@ export class Unit {
       this._moraleCooldown -= dt;
     } else if (this.morale < 100) {
       let regen = this._nearSettlement ? 9 : 4;
+      if (this._isolated) regen *= 0.5; // lone units struggle to recover morale
       if (this.inFormation) regen *= 1.5; // close ranks steady the nerves
       // Home terrain bonus: natives recover morale faster on their ancestral lands
       const tile = map.getTile(this.col, this.row);
