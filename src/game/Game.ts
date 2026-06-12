@@ -114,6 +114,8 @@ export class Game {
   private _rubberBandTimer       = 0;    // throttle rubber-band difficulty check (every 30s)
   private _momentumTimer         = 0;    // throttle battle-momentum check (every 45s)
   private _killsThisCycle        = new Map<number, number>(); // kills per player in current momentum window
+  private _lightningTimer        = 0;    // throttle storm lightning strikes (every 5s)
+  private _lowNodeWarned         = new Set<number>(); // resource node ids already warned as low
   villageIncomeEvents: { playerId: number; food: number; gold: number }[] = [];
 
   constructor(humanCiv: CivilizationType = CivilizationType.AZTEC) {
@@ -681,8 +683,26 @@ export class Game {
       node.updateVisibility();
       const wasEmpty = node.isEmpty();
       node.updateRegen(dt);
-      if (!wasEmpty && node.isEmpty()) this.newlyDepletedNodes.push(node);
+      if (!wasEmpty && node.isEmpty()) {
+        this.newlyDepletedNodes.push(node);
+        this._lowNodeWarned.delete(node.id); // reset warning so it can re-fire after regen
+      }
       if (node.justRegenerated) this.newlyRegeneratedNodes.push(node);
+      // Low-resource warning: fire once when node drops below 20% while a human worker is on it
+      if (!this._lowNodeWarned.has(node.id) && !node.isEmpty() &&
+          node.amount / node.maxAmount < 0.2) {
+        const gatherTasks = new Set([WorkerTask.GATHERING_FOOD, WorkerTask.GATHERING_GOLD, WorkerTask.GATHERING_STONE]);
+        const humanWorking = this.allWorkers.some(
+          w => w.playerId === this.humanPlayerId &&
+          gatherTasks.has(w.task) &&
+          Math.hypot(w.col - node.col, w.row - node.row) <= 2,
+        );
+        if (humanWorking) {
+          this._lowNodeWarned.add(node.id);
+          const icon = node.type === ResourceType.FOOD ? '🌽' : node.type === ResourceType.GOLD ? '⚜️' : '🪨';
+          this.pendingEventMessages.push(`${icon} ¡Recurso casi agotado! Un trabajador tuyo necesita una nueva fuente pronto`);
+        }
+      }
     }
 
     this.weatherChangeEvent = this.weather.update(dt);
@@ -746,6 +766,31 @@ export class Game {
       for (const u of this.allUnits) {
         if (u.isAlive() && !u.isHero) u.loseMorale(0.5 * dt);
       }
+      // Storm lightning: every 5s, open-terrain units risk a lightning strike (3% each)
+      this._lightningTimer += dt;
+      if (this._lightningTimer >= 5) {
+        this._lightningTimer = 0;
+        const openTerrain = new Set([TerrainType.GRASS, TerrainType.DESERT, TerrainType.BEACH]);
+        for (const u of this.allUnits) {
+          if (!u.isAlive() || u.garrisonedIn !== null || u.isHero) continue;
+          const tile = this.map.getTile(Math.round(u.col), Math.round(u.row));
+          if (!tile || !openTerrain.has(tile.terrain)) continue;
+          if (Math.random() > 0.03) continue; // 3% chance
+          const dmg = 15 + Math.floor(Math.random() * 11); // 15–25 lightning damage
+          u.takeDamage(dmg);
+          u.burning = Math.max(u.burning, 3);
+          // Nearby allies panic from the terrifying strike
+          for (const ally of this.allUnits) {
+            if (!ally.isAlive() || ally === u || ally.playerId !== u.playerId) continue;
+            if (Math.hypot(ally.col - u.col, ally.row - u.row) <= 3) ally.loseMorale(12);
+          }
+          if (u.playerId === this.humanPlayerId && u.isAlive()) {
+            this.pendingEventMessages.push(`⚡ ¡Rayo! Una de tus tropas ha sido alcanzada durante la tormenta`);
+          }
+        }
+      }
+    } else {
+      this._lightningTimer = 0; // reset when storm ends
     }
 
     // Hero auto-rally: when the hero's morale drops below 40, they steady their troops within 8 tiles
