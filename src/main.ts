@@ -711,9 +711,16 @@ class GameInstance {
     // Notify player when day/night phase transitions
     if (isNight !== this._wasNight) {
       this._wasNight = isNight;
-      this.hud.notify(isNight ? '🌙 Anochece — visión -40% · combate +15% daño ambos bandos' : '☀️ Amanece — visión restaurada', 'info');
-      if (isNight) this.hintOnce('nightCombat', '💡 De noche: la visión cae un 40% pero el daño de combate sube 15% para ambos bandos. ¡Los ataques sorpresa nocturnos son devastadores!');
-      if (!isNight) this.hintOnce('highGround', '💡 El terreno importa en combate: las tierras altas y montañas dan bonificación de ataque. El desierto expone a tus arqueros.');
+      const humanCiv = this.game.humanPlayer.civType;
+      const isNative = humanCiv === CivilizationType.AZTEC || humanCiv === CivilizationType.MAYA || humanCiv === CivilizationType.INCA;
+      if (isNight) {
+        this.hud.notify('🌙 Anochece — visión -40% · cuerpo a cuerpo +15% · pólvora -10%', 'info');
+        if (isNative) this.hintOnce('nightMelee', '💡 ¡La noche favorece a tus guerreros! El daño cuerpo a cuerpo sube 15% y la pólvora enemiga pierde 10%. ¡Ataca de noche!');
+        else this.hintOnce('nightCombat', '💡 De noche: la visión cae un 40%. Tus armas de pólvora pierden 10% de daño — despliega cuerpo a cuerpo en la oscuridad.');
+      } else {
+        this.hud.notify('☀️ Amanece — visión restaurada · pólvora recupera potencia', 'info');
+        this.hintOnce('highGround', '💡 El terreno importa en combate: las tierras altas y montañas dan bonificación de ataque. El desierto expone a tus arqueros.');
+      }
     }
     // Storm start/end notifications
     const isStorm = this.game.stormTimer > 0;
