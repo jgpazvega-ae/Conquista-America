@@ -188,6 +188,8 @@ class GameInstance {
   private _flankWarnTimer       = 0; // throttle flanking warning notification (45s cooldown)
   private _grandBattleCooldown  = 0; // throttle "¡Gran Batalla!" notification (60s cooldown)
   private _powerReadyFired      = false; // true once power-ready alert fired this cycle
+  private _spottedEnemyIds      = new Set<number>(); // unit IDs already seen once (first-sight tracking)
+  private _enemyArmySpottedAt   = -999; // gameTime when last "enemy army spotted" fired
 
   /** Show a tutorial hint at most once per match. */
   private hintOnce(key: string, msg: string) {
@@ -876,6 +878,16 @@ class GameInstance {
             const stars = evt.target.level >= 3 ? '★★' : '★';
             this.hud.addKillFeedEntry(`⚔️ ${evt.target.def.name} ${stars} eliminado`);
           }
+          // Combat combo kill feed entries (human attacker only)
+          if (evt.attacker && evt.attacker.playerId === this.game.humanPlayerId) {
+            if (evt.attacker.type === UnitType.CAVALRY && evt.target.panicked) {
+              this.hud.addKillFeedEntry('⚡ ¡PERSECUCIÓN! Caballería acabó con tropa en fuga');
+            } else if (evt.target.slowed > 0 &&
+                       (evt.attacker.type === UnitType.ARCHER || evt.attacker.type === UnitType.ATLATL ||
+                        evt.attacker.type === UnitType.ARQUEBUSIER)) {
+              this.hud.addKillFeedEntry('🌀 ¡COMBO! Ranged remata a tropa aturdida por la honda');
+            }
+          }
           // Hero death notification + dramatic slow-motion
           if (evt.target.isHero && evt.target.playerId === this.game.humanPlayerId) {
             this.hud.notify(`☠️ ${evt.target.heroName} ha caído — regresará en 60s`, 'warning');
@@ -1081,6 +1093,30 @@ class GameInstance {
       this.camera.shake(0.4, 0.7);
     }
 
+    // Enemy army first-sight: when 3+ enemy units become visible for the first time together
+    {
+      const humanFog = this.game.fog.getFog(this.game.humanPlayerId);
+      if (humanFog && this.game.status === 'PLAYING' &&
+          this.game.gameTime - this._enemyArmySpottedAt >= 120) {
+        let newlySpotted = 0;
+        for (const u of this.game.allUnits) {
+          if (u.playerId === this.game.humanPlayerId || !u.isAlive() || this._spottedEnemyIds.has(u.id)) continue;
+          if (humanFog.canSeeUnit(u, this.game.humanPlayerId)) {
+            this._spottedEnemyIds.add(u.id);
+            newlySpotted++;
+          }
+        }
+        if (newlySpotted >= 3) {
+          this._enemyArmySpottedAt = this.game.gameTime;
+          this.hud.notify(`👁️ ¡EJÉRCITO ENEMIGO AVISTADO! ${newlySpotted} tropas detectadas`, 'warning');
+          this.camera.shake(0.25, 0.4);
+        } else if (newlySpotted === 0) {
+          // Also track units individually even outside army detection
+          // (covered above per unit) — no extra action needed
+        }
+      }
+    }
+
     // Starvation warning: throttled to avoid spam
     if (this.game.humanPlayer.resources.food < 10 && this._starvWarnTimer <= 0) {
       this.hud.notify('🍂 ¡HAMBRE! Las tropas pierden moral — construye un Almacén o entrena menos unidades', 'warning');
@@ -1187,7 +1223,12 @@ class GameInstance {
     const idleCount = humanWorkers.filter(w => (w.task as string) === 'IDLE').length;
     if (idleCount > 0 && this.game.gameTime - this._lastIdleWarnAt >= 30) {
       this._lastIdleWarnAt = this.game.gameTime;
-      this.hud.notify(`⚠️ ${idleCount} trabajador${idleCount > 1 ? 'es' : ''} sin tarea`, 'warning');
+      const res = this.game.humanPlayer.resources;
+      const suggestion = res.food < 50 ? '— recoge 🌽 comida urgente (Q)'
+        : res.gold < 30 ? '— recoge ⚜️ oro (Q)'
+        : res.stone < 30 ? '— recoge 🪨 piedra (Q)'
+        : '(Q para asignar al recurso más escaso)';
+      this.hud.notify(`⚠️ ${idleCount} trabajador${idleCount > 1 ? 'es' : ''} sin tarea ${suggestion}`, 'warning');
     }
 
     // "Press the attack" prompt: when player holds a strong military advantage for 30s,
