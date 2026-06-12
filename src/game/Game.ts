@@ -1237,6 +1237,16 @@ export class Game {
   private _formationTimer = 0;
 
   /** Close ranks: a unit with 3+ allies within 3 tiles fights in formation. Throttled to ~1 Hz. */
+  // Complementary unit-type pairs that grant a synergy bonus when within 5 tiles of each other.
+  // Inspired by American Conquest combined-arms doctrine.
+  private static readonly SYNERGY_PAIRS: [UnitType, UnitType][] = [
+    [UnitType.EAGLE_WARRIOR,  UnitType.JAGUAR_KNIGHT],  // Aztec elite melee duo
+    [UnitType.QUECHUA,        UnitType.ANTIS_WARRIOR],  // Inca highland warriors
+    [UnitType.AHAU_WARRIOR,   UnitType.ARCHER],          // Maya hero + archers
+    [UnitType.CAVALRY,        UnitType.ARQUEBUSIER],     // Conquistador combined arms
+    [UnitType.CUACHIC,        UnitType.ATLATL],          // Aztec elite + javelin support
+  ];
+
   private updateFormations(dt: number) {
     this._formationTimer += dt;
     if (this._formationTimer < 0.8) return;
@@ -1246,19 +1256,23 @@ export class Game {
     for (const u of active) {
       let allies = 0;
       let hasOfficer = false;
+      let hasSynergy = false;
       for (const o of active) {
         if (o === u || o.playerId !== u.playerId) continue;
         const dc = u.col - o.col, dr = u.row - o.row;
         const d2 = dc * dc + dr * dr;
-        if (d2 <= 9) {
-          allies++;
-        }
-        if (!hasOfficer && (o.isHero || o.level >= 3) && d2 <= 25) {
-          hasOfficer = true;
+        if (d2 <= 9) allies++;
+        if (!hasOfficer && (o.isHero || o.level >= 3) && d2 <= 25) hasOfficer = true;
+        // Synergy: check if this unit forms a complementary pair with an ally within 5 tiles
+        if (!hasSynergy && d2 <= 25) {
+          hasSynergy = Game.SYNERGY_PAIRS.some(
+            ([a, b]) => (u.type === a && o.type === b) || (u.type === b && o.type === a),
+          );
         }
       }
       u.inFormation = allies >= 3;
       u.nearOfficer = hasOfficer;
+      u.nearSynergy = hasSynergy;
     }
   }
 
