@@ -445,6 +445,18 @@ export class Game {
       if (u.justLeveledUp) { this.newlyLeveledUpUnits.push(u); u.justLeveledUp = false; }
     }
 
+    // Rally contagion: a unit that just recovered from panic spreads hope to nearby allies (+5 morale)
+    for (const u of this.allUnits) {
+      if (!u.justRallied) continue;
+      u.justRallied = false;
+      for (const ally of this.allUnits) {
+        if (!ally.isAlive() || ally === u || ally.playerId !== u.playerId || ally.isHero || ally.panicked) continue;
+        if (Math.hypot(ally.col - u.col, ally.row - u.row) <= 4) {
+          ally.morale = Math.min(100, ally.morale + 5);
+        }
+      }
+    }
+
     // Track civilization eliminations: fire event first time a player loses their last settlement
     for (const p of this.players) {
       if (p.id === this.humanPlayerId) continue;
@@ -1434,6 +1446,22 @@ export class Game {
         b.transferTo(newOwner, CIV_COLORS[civ]);
         for (const u of units) u.captureTarget = null;
         this.newlyCapturedBuildings.push({ building: b, fromPlayerId: oldOwner, toPlayerId: newOwner });
+        // Village capture celebration: nearby allied units gain morale from the victory
+        if (b.type === BuildingType.VILLAGE) {
+          const newOwnerPlayer = this.players[newOwner];
+          if (newOwnerPlayer) {
+            let celebrated = 0;
+            for (const u of newOwnerPlayer.aliveUnits) {
+              if (Math.hypot(u.col - b.col, u.row - b.row) <= 10) {
+                u.morale = Math.min(100, u.morale + 15);
+                celebrated++;
+              }
+            }
+            if (newOwner === this.humanPlayerId && celebrated > 0) {
+              this.pendingEventMessages.push(`🏰 ¡Aldea capturada! ${celebrated} tropas celebran la victoria (+15 moral)`);
+            }
+          }
+        }
       }
     }
 

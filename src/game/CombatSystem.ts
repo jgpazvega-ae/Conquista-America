@@ -203,6 +203,8 @@ export class CombatSystem {
           if (unit.heroPowerBuff) dmg = Math.round(dmg * 1.15);
           // Inspired fury: +15% damage for 5s after landing a kill at ≥80 morale
           if (unit.inspiredTimer > 0) dmg = Math.round(dmg * 1.15);
+          // Champion last stand: level-3 unit at <25% HP fights with desperate fury (+25% dmg)
+          if (unit.lastStandTimer > 0) dmg = Math.round(dmg * 1.25);
           // Hero war cry buff: +25% attack for 12s
           if (unit.buffAttackTimer > 0) dmg = Math.round(dmg * 1.25);
           // Volley: synchronized burst for 2.5× damage, longer reload
