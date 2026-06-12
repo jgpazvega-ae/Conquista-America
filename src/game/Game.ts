@@ -116,6 +116,7 @@ export class Game {
   private _killsThisCycle        = new Map<number, number>(); // kills per player in current momentum window
   private _lightningTimer        = 0;    // throttle storm lightning strikes (every 5s)
   private _lowNodeWarned         = new Set<number>(); // resource node ids already warned as low
+  private _warDrumTimer               = 90.0; // countdown to next settlement war drum pulse
   private _sortiedBuildings           = new Set<number>(); // building ids that already triggered a garrison sortie
   private _emergencyConscriptionFired = false; // one-time free militia spawn when human drops to < 3 units
   villageIncomeEvents: { playerId: number; food: number; gold: number }[] = [];
@@ -926,6 +927,34 @@ export class Game {
           if (Math.hypot(other.col - burner.col, other.row - burner.row) > spreadRadius) continue;
           other.burning = Math.max(other.burning, 3); // 3s burn; doesn't extend existing longer burns
         }
+      }
+    }
+
+    // Rain/storm suppresses fire: wet conditions extinguish burning units 2× faster
+    if (this.weather.state === 'RAIN' || this.weather.state === 'STORM') {
+      for (const u of this.allUnits) {
+        if (u.isAlive() && u.burning > 0) u.burning = Math.max(0, u.burning - dt);
+      }
+    }
+
+    // War drum pulse: every 90s the settlement beats war drums (+10 morale for nearby troops)
+    this._warDrumTimer -= dt;
+    if (this._warDrumTimer <= 0) {
+      this._warDrumTimer = 90.0;
+      const settle = this.allBuildings.find(
+        b => b.playerId === this.humanPlayerId && b.type === BuildingType.SETTLEMENT && b.isAlive(),
+      );
+      if (settle) {
+        let rallied = 0;
+        for (const u of this.humanPlayer.aliveUnits) {
+          if (u.isHero || u.panicked) continue;
+          if (Math.hypot(u.col - settle.col, u.row - settle.row) <= 8) {
+            u.morale = Math.min(100, u.morale + 10);
+            rallied++;
+          }
+        }
+        if (rallied > 0)
+          this.pendingEventMessages.push(`🥁 ¡Tambores de guerra! ${rallied} guerrer${rallied > 1 ? 'os' : 'o'} cerca del asentamiento se enardecen (+10 moral)`);
       }
     }
 
