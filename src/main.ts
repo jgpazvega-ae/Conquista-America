@@ -78,7 +78,7 @@ async function boot() {
   civSelect.setOnStart(async (civ) => {
     const diff = civSelect.getDifficulty();
     civSelect.hide();
-    narrative.play(civ, () => { void startGame(civ, diff); });
+    narrative.play(civ, () => { startGame(civ, diff).catch(showFatalError); });
   });
 }
 
@@ -86,8 +86,33 @@ function showCivSelect(screen: CivSelectScreen, preferred: CivilizationType) {
   screen.show(preferred);
 }
 
+// ── Error screen ──────────────────────────────────────────────────────────────
+function showFatalError(err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  console.error('[Conquista] Fatal init error:', err);
+  // Hide loading overlay if still visible
+  document.getElementById('loading-screen')?.classList.add('hidden');
+  // Show a user-readable overlay instead of a black screen
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:#0a0502;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#e8d5a0;font-family:system-ui;padding:32px;text-align:center';
+  overlay.innerHTML =
+    `<div style="font-size:3rem">⚠️</div>` +
+    `<div style="font-size:1.4rem;font-weight:700">Error al iniciar el juego</div>` +
+    `<div style="font-size:0.9rem;color:#aa8866;max-width:480px">${msg}</div>` +
+    `<div style="font-size:0.8rem;color:#666">Intenta recargar la página (F5). Si el problema persiste, tu navegador puede no soportar WebGL.</div>` +
+    `<button onclick="location.reload()" style="margin-top:8px;padding:10px 28px;background:#c4780a;color:#fff;border:none;border-radius:8px;font-size:1rem;cursor:pointer">🔄 Recargar</button>`;
+  document.body.appendChild(overlay);
+}
+
 // ── Game lifecycle ─────────────────────────────────────────────────────────────
 async function startGame(civ: CivilizationType, difficulty: Difficulty = 'normal') {
+  // WebGL availability check — fail fast with a clear message
+  const testCanvas = document.createElement('canvas');
+  const gl = testCanvas.getContext('webgl2') ?? testCanvas.getContext('webgl');
+  if (!gl) {
+    throw new Error('WebGL no está disponible en este navegador o dispositivo. Intenta con Chrome, Firefox o Edge actualizados.');
+  }
+
   const appEl = document.getElementById('app')!;
   appEl.classList.remove('hidden');
 
@@ -1204,6 +1229,13 @@ class GameInstance {
       this.hintOnce('ammo', '💡 Sin munición: las unidades a distancia combaten cuerpo a cuerpo. Retíralas a tu asentamiento para reabastecer automáticamente.');
     } else if (this.game.humanPlayer.aliveUnits.some(u => u.lowAmmo)) {
       this.hintOnce('lowAmmo', '💡 Munición baja (🏹 en ámbar). Retira tus arqueros/ballesteros al asentamiento propio para reabastecer. Pulsa V para descarga sincronizada.');
+    }
+    // War cry ready hint: after 3 minutes, remind player if hero war cry is available
+    if (this.game.gameTime > 180) {
+      const hero = this.game.humanPlayer.aliveUnits.find(u => u.isHero);
+      if (hero && hero.isAlive() && hero.warCryCooldown === 0) {
+        this.hintOnce('warCryReady', '💡 Tu héroe tiene el Grito de Guerra listo — pulsa Y junto a tus tropas para dar +25% de ataque por 12s');
+      }
     }
 
     this.hud.update(selectedNow);

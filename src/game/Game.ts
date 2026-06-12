@@ -580,9 +580,11 @@ export class Game {
     for (const evt of this.damageEvents) {
       if (!evt.target.isAlive() && evt.attacker) {
         this.killsByPlayer.set(evt.attacker.playerId, (this.killsByPlayer.get(evt.attacker.playerId) ?? 0) + 1);
-        // Kill morale boost: victory euphoria (+5 morale, capped at 70)
-        if (!evt.attacker.isHero && evt.attacker.morale < 70) {
-          evt.attacker.morale = Math.min(70, evt.attacker.morale + 5);
+        // Kill morale boost: victory euphoria (+5 morale, cap 70; night raids cap 80)
+        const nightKillBoost = this.isNight ? 10 : 5;
+        const nightKillCap   = this.isNight ? 80 : 70;
+        if (!evt.attacker.isHero && evt.attacker.morale < nightKillCap) {
+          evt.attacker.morale = Math.min(nightKillCap, evt.attacker.morale + nightKillBoost);
         }
         // Army rout tracking: count friendly deaths in the 30s window
         if (evt.target.playerId === this.humanPlayerId) this._recentHumanDeaths++;
