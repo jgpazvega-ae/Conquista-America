@@ -149,6 +149,9 @@ export class Unit {
   // Inspired fury: landing a killing blow at ≥80 morale grants +15% damage for 5s.
   inspiredTimer = 0;
 
+  // Ambush ready: JAGUAR_KNIGHT/CUACHIC held still for ≥5s — first strike deals +35% damage.
+  ambushReady = false;
+
   // Ranged unit pinned in melee: an enemy melee unit is adjacent → -40% ranged damage.
   // Set each frame by CombatSystem when the unit fires while threatened.
   meleePinned = false;
@@ -862,6 +865,10 @@ export class Unit {
       this.stationaryTimer = Math.min(10, this.stationaryTimer + dt);
     } else {
       this.stationaryTimer = 0;
+    }
+    // Ambush: melee stalkers prime a devastating first strike after holding still ≥5s
+    if ((this.type === UnitType.JAGUAR_KNIGHT || this.type === UnitType.CUACHIC) && this.stationaryTimer >= 5) {
+      this.ambushReady = true;
     }
 
     // Battle fatigue: ≥60s continuous combat reduces attack by 10%; rest clears it

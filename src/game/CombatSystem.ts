@@ -203,6 +203,8 @@ export class CombatSystem {
           if (unit.heroPowerBuff) dmg = Math.round(dmg * 1.15);
           // Inspired fury: +15% damage for 5s after landing a kill at ≥80 morale
           if (unit.inspiredTimer > 0) dmg = Math.round(dmg * 1.15);
+          // Ambush striker: JAGUAR_KNIGHT/CUACHIC first attack after ≥5s still — stalk-and-pounce +35%
+          if (unit.ambushReady) { dmg = Math.round(dmg * 1.35); unit.ambushReady = false; unit.stationaryTimer = 0; }
           // Hero war cry buff: +25% attack for 12s
           if (unit.buffAttackTimer > 0) dmg = Math.round(dmg * 1.25);
           // Volley: synchronized burst for 2.5× damage, longer reload
