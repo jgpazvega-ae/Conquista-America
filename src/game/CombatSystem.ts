@@ -211,10 +211,12 @@ export class CombatSystem {
           if (isVolley) dmg = Math.round(dmg * 2.5);
           // Weather: rain/storm reduces gunpowder & all-ranged effectiveness
           if (weather) dmg = Math.max(1, Math.round(dmg * weather.damageMultiplier(unit.type)));
-          // Night: melee thrives in the dark (+15%); gunpowder weapons struggle with poor visibility (-10%)
+          // Night: melee thrives in the dark (+15%); gunpowder weapons struggle (-10%).
+          // Eagle Warriors are trained for night warfare: +40% instead of the standard +15%.
           if (isNight) {
             const isPowder = unit.type === UnitType.ARQUEBUSIER || unit.type === UnitType.CANNON;
-            dmg = Math.round(dmg * (isPowder ? 0.9 : 1.15));
+            const nightMult = isPowder ? 0.9 : (unit.type === UnitType.EAGLE_WARRIOR ? 1.40 : 1.15);
+            dmg = Math.round(dmg * nightMult);
           }
           // Veteran toughness: level-3 Champions absorb 15% of incoming damage
           if (target.level >= 3) dmg = Math.max(1, Math.round(dmg * 0.85));
@@ -257,6 +259,7 @@ export class CombatSystem {
             // Direct hit terror: a cannonball is terrifying, even when it doesn't kill
             if (target.isAlive() && !target.isHero) target.loseMorale(8);
             const splashDmg = Math.max(1, Math.round(dmg * SPLASH_DAMAGE_RATIO));
+            const CANNON_TERROR_RADIUS = 4.0; // morale-shock zone beyond physical splash
             for (const other of allUnits) {
               if (!other.isAlive() || other === target) continue;
               const d = Math.sqrt((other.col - target.col) ** 2 + (other.row - target.row) ** 2);
@@ -266,6 +269,9 @@ export class CombatSystem {
                 // Shrapnel terror: nearby troops are rattled by the blast
                 if (other.isAlive() && !other.isHero) other.loseMorale(5);
                 this.events.push({ attacker: unit, target: other, damage: splashActual, worldX: other.worldX, worldZ: other.worldZ, critical: false });
+              } else if (d <= CANNON_TERROR_RADIUS && other.playerId !== unit.playerId) {
+                // Psychological terror: the thunderclap demoralises troops beyond the kill zone
+                if (!other.isHero) other.loseMorale(3);
               }
             }
           }

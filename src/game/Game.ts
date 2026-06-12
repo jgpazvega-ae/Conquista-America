@@ -116,6 +116,7 @@ export class Game {
   private _killsThisCycle        = new Map<number, number>(); // kills per player in current momentum window
   private _lightningTimer        = 0;    // throttle storm lightning strikes (every 5s)
   private _lowNodeWarned         = new Set<number>(); // resource node ids already warned as low
+  private _emergencyConscriptionFired = false; // one-time free militia spawn when human drops to < 3 units
   villageIncomeEvents: { playerId: number; food: number; gold: number }[] = [];
 
   constructor(humanCiv: CivilizationType = CivilizationType.AZTEC) {
@@ -1033,6 +1034,36 @@ export class Game {
       }
       if (routCount > 0) {
         this.pendingEventMessages.push(`💀 ¡DESBANDADA GENERAL! ${routCount} unidad${routCount > 1 ? 'es' : ''} en fuga`);
+      }
+    }
+
+    // Emergency conscription: human player nearly wiped out (< 3 non-hero units) → free militia at settlement
+    {
+      const nonHeroes = this.humanPlayer.aliveUnits.filter(u => !u.isHero);
+      if (nonHeroes.length < 3 && !this._emergencyConscriptionFired) {
+        const settle = this.allBuildings.find(
+          b => b.playerId === this.humanPlayerId && b.type === BuildingType.SETTLEMENT && b.isAlive(),
+        );
+        if (settle) {
+          this._emergencyConscriptionFired = true;
+          const civDef = CIVILIZATIONS[this.humanPlayer.civType];
+          const unitDef = civDef.units[0];
+          let spawned = 0;
+          for (let i = 0; i < 2; i++) {
+            if (this.humanPlayer.aliveUnits.length >= this.getPopCap(this.humanPlayerId)) break;
+            const pos = this.map.findWalkableNear(settle.col, settle.row + 3, 6);
+            if (!pos) break;
+            const unit = new Unit(unitDef.type, this.humanPlayer.civType, this.humanPlayerId, pos[0], pos[1], CIV_COLORS[this.humanPlayer.civType]);
+            this.applyCivTraits(unit, this.humanPlayer.civType);
+            this.humanPlayer.addUnit(unit);
+            this.allUnits.push(unit);
+            this.newlySpawnedUnits.push(unit);
+            spawned++;
+          }
+          if (spawned > 0) {
+            this.pendingEventMessages.push(`🚨 ¡Conscripción de emergencia! ${spawned} milicianos acuden a defender la patria`);
+          }
+        }
       }
     }
 
