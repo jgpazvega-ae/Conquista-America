@@ -225,7 +225,10 @@ export class CombatSystem {
           }
 
           const actual = target.takeDamage(dmg);
-          unit.attackTimer = unit.attackCooldown * (isVolley ? 1.5 : 1.0);
+          // Entrenched ranged: prepared position grants 20% faster reload
+          const entrenchedBonus = (unit.entrenched && !unit.outOfAmmo && unit.attackRange > 1.5 &&
+            unit.type !== UnitType.CANNON) ? 0.80 : 1.0;
+          unit.attackTimer = unit.attackCooldown * (isVolley ? 1.5 : 1.0) * entrenchedBonus;
           // Ammo consumption (volley costs 2 rounds)
           if (unit.ammo > 0) unit.ammo = Math.max(0, unit.ammo - (isVolley ? 2 : 1));
 
