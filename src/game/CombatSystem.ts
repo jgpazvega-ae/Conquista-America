@@ -191,8 +191,11 @@ export class CombatSystem {
               if (!target.isHero) target.loseMorale(15); // charge breaks enemy morale
             }
           }
-          // Heavy wounds (< 25% HP): attacker fights at reduced effectiveness
-          if (unit.hp < unit.maxHp * 0.25) dmg = Math.round(dmg * 0.8);
+          // Desperate last stand: unit at < 10% HP fights with nothing-to-lose fury (+30%)
+          // overrides the heavy-wounds penalty bracket below
+          if (unit.hp < unit.maxHp * 0.10) dmg = Math.round(dmg * 1.30);
+          // Heavy wounds (< 25% HP): attacker fights at reduced effectiveness (-20%)
+          else if (unit.hp < unit.maxHp * 0.25) dmg = Math.round(dmg * 0.8);
           // Berserk: +25% damage during 12-second kill-streak buff
           if (unit.berserkTimer > 0) dmg = Math.round(dmg * 1.25);
           // Leadership aura: +5% damage when player has any level-3 unit alive
@@ -265,6 +268,13 @@ export class CombatSystem {
                 if (other.isAlive() && !other.isHero) other.loseMorale(5);
                 this.events.push({ attacker: unit, target: other, damage: splashActual, worldX: other.worldX, worldZ: other.worldZ, critical: false });
               }
+            }
+          }
+          // Cannon echo: the thunderous boom rallies nearby allied troops (+5 morale within 5 tiles)
+          if (unit.type === UnitType.CANNON) {
+            for (const ally of allUnits) {
+              if (!ally.isAlive() || ally.playerId !== unit.playerId || ally === unit || ally.type === UnitType.CANNON) continue;
+              if (Math.hypot(ally.col - unit.col, ally.row - unit.row) <= 5) ally.morale = Math.min(100, ally.morale + 5);
             }
           }
           // Jungle melee: 20% chance to poison target

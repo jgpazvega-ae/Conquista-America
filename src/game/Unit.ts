@@ -149,6 +149,9 @@ export class Unit {
   // Inspired fury: landing a killing blow at ≥80 morale grants +15% damage for 5s.
   inspiredTimer = 0;
 
+  // Veteran teaching: level-3 same-type unit within 3 tiles — this unit gains XP 30% faster.
+  _nearVeteranTeacher = false;
+
   // Ranged unit pinned in melee: an enemy melee unit is adjacent → -40% ranged damage.
   // Set each frame by CombatSystem when the unit fires while threatened.
   meleePinned = false;
@@ -1175,7 +1178,7 @@ export class Unit {
   /** Award XP and level up if threshold reached. */
   gainXP(amount: number) {
     if (this.level >= 3) return;
-    this.xp += amount;
+    this.xp += this._nearVeteranTeacher ? Math.round(amount * 1.30) : amount;
     const needed = this.level === 1 ? 50 : 150;
     if (this.xp >= needed) this.levelUp();
   }

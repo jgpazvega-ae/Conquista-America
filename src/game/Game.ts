@@ -1375,6 +1375,11 @@ export class Game {
       u.nearOfficer   = hasOfficer;
       u.nearSynergy   = hasSynergy;
       u.heroPowerBuff = hasHeroPower;
+      // Veteran teaching: level-3 same-type unit within 3 tiles accelerates XP gain (+30%)
+      u._nearVeteranTeacher = u.level < 3 && !u.isHero && active.some(
+        v => v !== u && v.playerId === u.playerId && v.level >= 3 && !v.isHero &&
+             v.type === u.type && Math.hypot(v.col - u.col, v.row - u.row) <= 3.0,
+      );
     }
   }
 
