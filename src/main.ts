@@ -23,7 +23,7 @@ import { ResourceType } from './game/ResourceNode';
 import { findPath } from './game/Pathfinding';
 import { WorkerTask } from './game/Worker';
 import type { Difficulty } from './ui/CivSelect';
-import { activateCivPower } from './game/CivPowers';
+import { activateCivPower, CIV_POWER_DEFS } from './game/CivPowers';
 
 // ── Kill gold rewards ──────────────────────────────────────────────────────────
 function killGoldReward(type: UnitType, isHero: boolean): number {
@@ -186,6 +186,8 @@ class GameInstance {
   private _advantageCooldown = 0; // prevents repeated "press the attack" alerts (90s)
   private _enemyDisarrayCooldown = 0; // prevents repeated enemy-disarray alerts (60s)
   private _flankWarnTimer       = 0; // throttle flanking warning notification (45s cooldown)
+  private _grandBattleCooldown  = 0; // throttle "¡Gran Batalla!" notification (60s cooldown)
+  private _powerReadyFired      = false; // true once power-ready alert fired this cycle
 
   /** Show a tutorial hint at most once per match. */
   private hintOnce(key: string, msg: string) {
@@ -560,6 +562,7 @@ class GameInstance {
     if (this._advantageCooldown    > 0) this._advantageCooldown    = Math.max(0, this._advantageCooldown    - rawDt);
     if (this._enemyDisarrayCooldown > 0) this._enemyDisarrayCooldown = Math.max(0, this._enemyDisarrayCooldown - rawDt);
     if (this._flankWarnTimer       > 0) this._flankWarnTimer       = Math.max(0, this._flankWarnTimer       - rawDt);
+    if (this._grandBattleCooldown  > 0) this._grandBattleCooldown  = Math.max(0, this._grandBattleCooldown  - rawDt);
     this.game.update(dt);
 
     // Register any units produced this frame
@@ -940,6 +943,30 @@ class GameInstance {
       if (flanked) {
         this._flankWarnTimer = 45;
         this.hud.notify('⚠️ ¡Flanqueo! El enemigo rodea a tus tropas — Forma una Falange (F2) o retira', 'warning');
+      }
+    }
+
+    // Grand battle notification: when 8+ units fight simultaneously, signal the clash
+    if (this._grandBattleCooldown <= 0 && this.game.status === 'PLAYING') {
+      const fighting = this.game.allUnits.filter(u => u.isAlive() && u.state === UnitState.ATTACKING).length;
+      if (fighting >= 8) {
+        this._grandBattleCooldown = 60;
+        this.hud.notify('⚔️ ¡GRAN BATALLA! Los ejércitos chocan en plena batalla', 'warning');
+        this.camera.shake(0.3, 0.5);
+      }
+    }
+
+    // Civilization power ready alert: notify once when cooldown hits zero
+    {
+      const player = this.game.humanPlayer;
+      if (player.powerCooldown <= 0 && !player.powerActive) {
+        if (!this._powerReadyFired) {
+          this._powerReadyFired = true;
+          const def = CIV_POWER_DEFS[player.civType];
+          this.hud.notify(`${def.emoji} ¡PODER LISTO! Pulsa Q para activar: ${def.name}`, 'success');
+        }
+      } else {
+        this._powerReadyFired = false; // reset so alert fires again next cycle
       }
     }
 
