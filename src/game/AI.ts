@@ -166,8 +166,22 @@ export class AISystem {
           }
         }
         if (state.phase === 'attacking') {
-          // Keep the offensive wedge applied (catches newly trained units)
-          this.applyFormation(player, 'WEDGE');
+          // Anti-phalanx adaptation: switch to LOOSE when human deploys PHALANX
+          // — ranged units fight freely while cavalry disengages from set spears
+          const humanPhalanxCount = game.allUnits.filter(
+            u => u.isAlive() && u.playerId === game.humanPlayerId && u.formation === 'PHALANX',
+          ).length;
+          if (humanPhalanxCount >= 2) {
+            this.applyFormation(player, 'LOOSE');
+            for (const u of player.aliveUnits) {
+              if (u.type === UnitType.CAVALRY && u.attackTarget?.formation === 'PHALANX') {
+                u.attackTarget = null;
+                u.state = UnitState.HOLD; // hold back — let ranged soften the spear line first
+              }
+            }
+          } else {
+            this.applyFormation(player, 'WEDGE');
+          }
           this.waveAttack(player, game);
           // AI volley fire: every 12-20s during attack, trigger synchronized burst
           state.volleyTimer -= dt;
