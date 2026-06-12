@@ -127,6 +127,11 @@ export class AISystem {
         // Regrouping: loose formation for faster repositioning
         this.applyFormation(player, null);
         this.rallyTroops(player, game);
+        // Guerrilla raids: small mobile forces harass workers and resource nodes
+        // instead of standing idle while waiting to mass enough for a frontal wave
+        if (player.aliveUnits.length >= 2 && player.aliveUnits.length <= 5) {
+          this.guerrillaRaid(player, game);
+        }
         // Strategy personality: aggressive civs (high militaryRatio) rush with shorter
         // gather times and smaller armies; economic/defensive civs mass larger forces first
         const milRatio = STRATEGY_BY_CIV[player.civType]?.militaryRatio ?? 0.6;
@@ -712,6 +717,61 @@ export class AISystem {
             worker.task = WorkerTask.MOVING;
           }
         }
+      }
+    }
+  }
+
+  /**
+   * Guerrilla raids: send fast units to harass enemy workers and resource nodes when
+   * the AI force is too small to assault the enemy base head-on.
+   */
+  private guerrillaRaid(player: Player, game: Game) {
+    const fastTypes = new Set([
+      UnitType.CAVALRY, UnitType.EAGLE_WARRIOR, UnitType.JAGUAR_KNIGHT, UnitType.CUACHIC,
+    ]);
+    const raiders = player.aliveUnits.filter(
+      u => fastTypes.has(u.type) && !u.isHero &&
+           u.state !== UnitState.ATTACKING && u.state !== UnitState.MOVING,
+    );
+    if (raiders.length === 0) return;
+
+    // Priority 1: enemy workers within sight
+    const enemyWorkers = game.allWorkers.filter(w => w.playerId !== player.id);
+    // Priority 2: enemy resource nodes (deny the enemy their economy)
+    const enemyNodes = game.resourceNodes.filter(n => !n.isEmpty());
+    // Priority 3: isolated enemy units (no ally within 5 tiles)
+    const enemyUnits = game.allUnits.filter(u =>
+      u.playerId !== player.id && u.isAlive() && u.garrisonedIn === null,
+    );
+
+    for (const raider of raiders) {
+      // Try to find the nearest priority target
+      let bestCol = -1, bestRow = -1, bestDist = Infinity;
+
+      for (const w of enemyWorkers) {
+        const d = Math.hypot(raider.col - w.col, raider.row - w.row);
+        if (d < bestDist && d < raider.sight * 1.5) { bestDist = d; bestCol = Math.round(w.col); bestRow = Math.round(w.row); }
+      }
+      if (bestCol < 0) {
+        for (const n of enemyNodes) {
+          const d = Math.hypot(raider.col - n.col, raider.row - n.row);
+          if (d < bestDist && d < raider.sight * 2) { bestDist = d; bestCol = n.col; bestRow = n.row; }
+        }
+      }
+      if (bestCol < 0) {
+        for (const u of enemyUnits) {
+          const alliesNear = game.allUnits.filter(
+            a => a.playerId === u.playerId && a.isAlive() && Math.hypot(a.col - u.col, a.row - u.row) <= 5,
+          ).length;
+          if (alliesNear > 2) continue; // don't raid well-defended positions
+          const d = Math.hypot(raider.col - u.col, raider.row - u.row);
+          if (d < bestDist && d < raider.sight * 1.5) { bestDist = d; bestCol = Math.round(u.col); bestRow = Math.round(u.row); }
+        }
+      }
+
+      if (bestCol >= 0) {
+        const path = findPath(game.map, raider.gridPos(), { col: bestCol, row: bestRow }, 300);
+        if (path.length > 0) raider.moveTo(path);
       }
     }
   }

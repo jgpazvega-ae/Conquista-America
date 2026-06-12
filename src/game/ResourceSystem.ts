@@ -5,6 +5,7 @@ import { WorkerTask } from './Worker';
 import type { ResourceNode } from './ResourceNode';
 import { ResourceType } from './ResourceNode';
 import { findPath } from './Pathfinding';
+import { TerrainType, CivilizationType } from './types';
 
 export class ResourceSystem {
   update(game: Game) {
@@ -58,6 +59,19 @@ export class ResourceSystem {
         // Drought withers crops: food gathering is 30% slower during a drought
         if (game.weather.state === 'DROUGHT' && worker.task === WorkerTask.GATHERING_FOOD) {
           worker.taskProgress -= game.lastDt * 0.3;
+        }
+        // Terrain gather bonus: jungle-tile food is richer; highland stone seams are abundant.
+        // Native civs (Aztec/Maya) know their jungles — extra +10% on top.
+        const workerTile = game.map.getTile(Math.floor(worker.col), Math.floor(worker.row));
+        const playerCiv  = (game.players[worker.playerId] as Player | undefined)?.civType;
+        if (worker.task === WorkerTask.GATHERING_FOOD && workerTile?.terrain === TerrainType.JUNGLE) {
+          const nativeBonus = (playerCiv === CivilizationType.AZTEC || playerCiv === CivilizationType.MAYA) ? 0.10 : 0;
+          worker.taskProgress += game.lastDt * (0.30 + nativeBonus);
+        }
+        if (worker.task === WorkerTask.GATHERING_STONE &&
+            (workerTile?.terrain === TerrainType.HIGHLAND || workerTile?.terrain === TerrainType.MOUNTAIN)) {
+          const incaBonus = playerCiv === CivilizationType.INCA ? 0.15 : 0;
+          worker.taskProgress += game.lastDt * (0.25 + incaBonus);
         }
       }
 
