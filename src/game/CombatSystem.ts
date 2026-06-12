@@ -243,6 +243,22 @@ export class CombatSystem {
           let isCrit = multiplier >= 1.5 || isFlanking || isCharge || unit.berserkTimer > 0 || isVolley || unit.buffAttackTimer > 0;
           this.events.push({ attacker: unit, target, damage: actual, worldX: target.worldX, worldZ: target.worldZ, critical: isCrit, isCharge, chargeBlocked });
 
+          // Hero front-line inspiration: hero's attack boosts morale of nearby allies (+1 each strike)
+          if (unit.isHero && actual > 0) {
+            for (const ally of allUnits) {
+              if (!ally.isAlive() || ally === unit || ally.playerId !== unit.playerId) continue;
+              if (Math.hypot(ally.col - unit.col, ally.row - unit.row) <= 5)
+                ally.morale = Math.min(100, ally.morale + 1);
+            }
+          }
+
+          // Fire arrow: ARCHER/ATLATL/SLINGER have a 15% chance to ignite the target
+          if (target.isAlive() && !target.burning &&
+              (unit.type === UnitType.ARCHER || unit.type === UnitType.ATLATL || unit.type === UnitType.SLINGER) &&
+              Math.random() < 0.15) {
+            target.burning = 3;
+          }
+
           // Kill streak tracking: 3 kills in a row without taking damage → 12s berserk
           if (!target.isAlive()) {
             unit.killStreak++;
