@@ -78,14 +78,26 @@ export class Renderer {
   private static readonly RAIN_COUNT = 1200;
 
   constructor(canvas: HTMLCanvasElement) {
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+                     navigator.maxTouchPoints > 1;
+
+    this.renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: !isMobile,     // antialias expensive on mobile; disabling prevents context loss
+      powerPreference: 'default', // 'high-performance' causes black screen on iOS Safari
+    });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.enabled = !isMobile; // shadow maps crash mobile GPUs
     this.renderer.shadowMap.type    = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace  = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    // ACES filmic shaders can fail to compile on older mobile GPUs → fall back to Reinhard
+    this.renderer.toneMapping = isMobile ? THREE.ReinhardToneMapping : THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
+
+    // Handle WebGL context loss (common on iOS when memory is under pressure)
+    canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); }, false);
+    canvas.addEventListener('webglcontextrestored', () => { this.onResize(); }, false);
 
     this.scene  = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.5, 600);
