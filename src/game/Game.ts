@@ -1512,29 +1512,47 @@ export class Game {
     this._bonusTimer = 0;
 
     for (const player of this.players) {
-      // Collect temple and forge positions for proximity checks
+      // Collect temple, forge, and watchtower positions for proximity checks
       const temples = this.allBuildings.filter(
         b => b.playerId === player.id && b.type === BuildingType.TEMPLE && b.isComplete()
       );
-      const hasForge = this.allBuildings.some(
+      const forges = this.allBuildings.filter(
         b => b.playerId === player.id && b.type === BuildingType.FORGE && b.isComplete()
+      );
+      const towers = this.allBuildings.filter(
+        b => b.playerId === player.id && b.type === BuildingType.WATCHTOWER && b.isComplete() && b.isAlive()
       );
 
       for (const unit of player.aliveUnits) {
-        // Temple global HP regen + proximity morale aura (American Conquest: temples inspire troops)
+        // Temple: global HP regen + proximity morale aura + poison cure when near
         if (temples.length > 0) {
           if (unit.hp < unit.maxHp) unit.hp = Math.min(unit.maxHp, unit.hp + 2);
           const nearTemple = temples.some(
             t => Math.sqrt((unit.col - t.col) ** 2 + (unit.row - t.row) ** 2) <= 6
           );
-          if (nearTemple && unit.morale < 80 && !unit.panicked) {
-            unit.morale = Math.min(80, unit.morale + 5);
+          if (nearTemple) {
+            if (unit.morale < 80 && !unit.panicked) unit.morale = Math.min(80, unit.morale + 5);
+            // Temple priests cure poison for units who shelter near the sacred fire
+            if (unit.poisoned > 0) unit.poisoned = Math.max(0, unit.poisoned - 3);
           }
         }
-        if (hasForge) {
-          // Mark unit as forge-buffed for combat (attack up to 125% of base)
+        // Forge: sharpens weapons over time (attack up to 125% of base) + morale bonus for fighters
+        if (forges.length > 0) {
           const cap = Math.round(unit.def.stats.attack * 1.25);
           if (unit.attack < cap) unit.attack = Math.min(cap, unit.attack + 1);
+          const nearForge = forges.some(
+            f => Math.sqrt((unit.col - f.col) ** 2 + (unit.row - f.row) ** 2) <= 8
+          );
+          if (nearForge && unit.morale < 90 && !unit.isHero) {
+            unit.morale = Math.min(90, unit.morale + 3); // forge workers inspire nearby troops
+          }
+        }
+        // Watchtower banner: visible fortifications within 10 tiles steady the troops (+2 morale/tick)
+        if (towers.length > 0 && !unit.panicked) {
+          const nearTower = towers.some(
+            t => Math.sqrt((unit.col - t.col) ** 2 + (unit.row - t.row) ** 2) <= 10
+          );
+          if (nearTower && unit.morale < 85) unit.morale = Math.min(85, unit.morale + 2);
         }
       }
     }
