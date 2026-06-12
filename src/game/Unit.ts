@@ -138,6 +138,10 @@ export class Unit {
   // Recomputed periodically by Game.updateFormations.
   nearOfficer = false;
 
+  // Civ unit synergy: complementary elite unit type nearby (Eagle+Jaguar, Quechua+Antis, etc.)
+  // Grants +10% damage when active. Recomputed periodically by Game.updateFormations.
+  nearSynergy = false;
+
   // Ranged unit pinned in melee: an enemy melee unit is adjacent → -40% ranged damage.
   // Set each frame by CombatSystem when the unit fires while threatened.
   meleePinned = false;

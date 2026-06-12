@@ -418,7 +418,9 @@ export class Building {
   updateProduction(dt: number) {
     if (this._prodQueue.length === 0) return;
     const item = this._prodQueue[0];
-    item.elapsed += dt;
+    // Veteran garrison training bonus: a garrisoned level-2+ unit trains recruits 20% faster
+    const veteranPresent = this.garrison.some(u => u.level >= 2);
+    item.elapsed += veteranPresent ? dt * 1.20 : dt;
     if (item.elapsed >= item.totalTime) {
       this.finishedUnit = item.unitType;
       this._prodQueue.shift();

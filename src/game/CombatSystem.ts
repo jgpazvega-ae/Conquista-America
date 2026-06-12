@@ -197,6 +197,8 @@ export class CombatSystem {
           if (unit.berserkTimer > 0) dmg = Math.round(dmg * 1.25);
           // Leadership aura: +5% damage when player has any level-3 unit alive
           if (playersWithLeader.has(unit.playerId)) dmg = Math.round(dmg * 1.05);
+          // Civ unit synergy: +10% damage when fighting alongside a complementary unit type
+          if (unit.nearSynergy) dmg = Math.round(dmg * 1.10);
           // Hero war cry buff: +25% attack for 12s
           if (unit.buffAttackTimer > 0) dmg = Math.round(dmg * 1.25);
           // Volley: synchronized burst for 2.5× damage, longer reload
