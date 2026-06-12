@@ -328,14 +328,19 @@ export class Game {
     this.lastDt = dt;
     this.gameTime += dt;
 
-    // Precompute settlement and storehouse positions per player for proximity effects
+    // Precompute settlement, temple, and storehouse positions per player for proximity effects
     const settlementsByPlayer = new Map<number, { col: number; row: number }[]>();
+    const templesByPlayer     = new Map<number, { col: number; row: number }[]>();
     const storehousesByPlayer = new Map<number, { col: number; row: number }[]>();
     for (const b of this.allBuildings) {
       if (!b.isAlive() || !b.isComplete()) continue;
       if (b.type === BuildingType.SETTLEMENT) {
         if (!settlementsByPlayer.has(b.playerId)) settlementsByPlayer.set(b.playerId, []);
         settlementsByPlayer.get(b.playerId)!.push({ col: b.col, row: b.row });
+      }
+      if (b.type === BuildingType.TEMPLE) {
+        if (!templesByPlayer.has(b.playerId)) templesByPlayer.set(b.playerId, []);
+        templesByPlayer.get(b.playerId)!.push({ col: b.col, row: b.row });
       }
       if (b.type === BuildingType.STOREHOUSE) {
         if (!storehousesByPlayer.has(b.playerId)) storehousesByPlayer.set(b.playerId, []);
@@ -344,10 +349,13 @@ export class Game {
     }
 
     for (const unit of this.allUnits) {
-      // Check proximity to own settlement (within 4 tiles) for boosted healing & morale
+      // Near settlement (4 tiles) OR near temple (5 tiles) → boosted healing & morale regen
       const settlements = settlementsByPlayer.get(unit.playerId) ?? [];
+      const temples     = templesByPlayer.get(unit.playerId)     ?? [];
       unit._nearSettlement = settlements.some(
         s => Math.abs(unit.col - s.col) <= 4 && Math.abs(unit.row - s.row) <= 4,
+      ) || temples.some(
+        t => Math.abs(unit.col - t.col) <= 5 && Math.abs(unit.row - t.row) <= 5,
       );
       // Storehouses act as field supply depots — within 4 tiles replenishes ammo
       const storehouses = storehousesByPlayer.get(unit.playerId) ?? [];
@@ -791,16 +799,20 @@ export class Game {
       this.updatePatrol();
     }
 
-    // Ranged kiting: every 0.4s, ranged non-cannon units in IDLE state back away from
-    // adjacent enemy melee units (AC fire-and-fall-back behaviour)
+    // Ranged kiting: every 0.4s, ranged non-cannon units back away from adjacent enemy
+    // melee units. IDLE units kite proactively; ATTACKING units retreat when meleePinned.
+    // Applies to human and AI alike (AC fire-and-fall-back behaviour).
     this._kiteTimer += dt;
     if (this._kiteTimer >= 0.4) {
       this._kiteTimer = 0;
       for (const unit of this.allUnits) {
         if (!unit.isAlive() || unit.garrisonedIn !== null || unit.panicked) continue;
         if (unit.attackRange <= 1.5 || unit.type === UnitType.CANNON) continue;
-        if (unit.state !== UnitState.IDLE) continue;
         if (unit.outOfAmmo) continue;
+        const isIdleKite      = unit.state === UnitState.IDLE;
+        const isAttackingPinned = unit.meleePinned &&
+          (unit.state === UnitState.ATTACKING || unit.state === UnitState.ATTACK_MOVE);
+        if (!isIdleKite && !isAttackingPinned) continue;
         let nearestDist = Infinity;
         let nearestMelee: Unit | null = null;
         for (const other of this.allUnits) {
@@ -809,12 +821,14 @@ export class Game {
           const d = unit.distanceTo(other);
           if (d < nearestDist) { nearestDist = d; nearestMelee = other; }
         }
-        if (!nearestMelee || nearestDist > 2.5) continue;
+        const triggerDist = isAttackingPinned ? 1.8 : 2.5;
+        if (!nearestMelee || nearestDist > triggerDist) continue;
         const dc = unit.col - nearestMelee.col;
         const dr = unit.row - nearestMelee.row;
         const len = Math.sqrt(dc * dc + dr * dr) || 1;
-        const tCol = Math.round(unit.col + (dc / len) * 3);
-        const tRow = Math.round(unit.row + (dr / len) * 3);
+        const fleeSteps = isAttackingPinned ? 4 : 3; // pinned units flee a bit farther
+        const tCol = Math.round(unit.col + (dc / len) * fleeSteps);
+        const tRow = Math.round(unit.row + (dr / len) * fleeSteps);
         const near = this.map.findWalkableNear(tCol, tRow, 2);
         if (near) {
           const path = findPath(this.map, unit.gridPos(), { col: near[0], row: near[1] }, 80);
