@@ -111,6 +111,7 @@ export class Game {
   private _warExhaustionNotified = false;
   private _garrisonUpkeepTimer   = 0;    // throttle garrison food drain (every 10s)
   private _autoGarrisonSent      = new Set<number>(); // unit ids sent to auto-garrison
+  private _rubberBandTimer       = 0;    // throttle rubber-band difficulty check (every 30s)
   villageIncomeEvents: { playerId: number; food: number; gold: number }[] = [];
 
   constructor(humanCiv: CivilizationType = CivilizationType.AZTEC) {
@@ -867,6 +868,37 @@ export class Game {
         }
       } else if (ratio < 0.8) {
         this._popPressureNotified = false;
+      }
+    }
+
+    // Dynamic difficulty rubber-band: check every 30s and subtly adjust AI strength
+    // to keep the game competitive without the player noticing heavy-handed intervention.
+    this._rubberBandTimer += dt;
+    if (this._rubberBandTimer >= 30 && this.difficulty === 'normal') {
+      this._rubberBandTimer = 0;
+      const humanCount = this.humanPlayer.aliveUnits.length;
+      const aiMaxCount = this.players
+        .filter(p => !p.isHuman && !p.isDefeated())
+        .reduce((max, p) => Math.max(max, p.aliveUnits.length), 0);
+      const ratio = humanCount / Math.max(1, aiMaxCount);
+      // Player is crushing it (3:1+ advantage) → give weakest AI a morale boost
+      if (ratio >= 3) {
+        const weakestAI = this.players
+          .filter(p => !p.isHuman && !p.isDefeated())
+          .sort((a, b) => a.aliveUnits.length - b.aliveUnits.length)[0];
+        if (weakestAI) {
+          for (const u of weakestAI.aliveUnits) {
+            if (!u.isHero) u.morale = Math.min(100, u.morale + 15);
+          }
+          weakestAI.resources.food = Math.min(2000, weakestAI.resources.food + 50);
+          weakestAI.resources.gold = Math.min(2000, weakestAI.resources.gold + 30);
+        }
+      }
+      // Player is getting overwhelmed (1:3+ disadvantage) → give human a subtle morale boost
+      if (ratio <= 0.33 && humanCount > 0) {
+        for (const u of this.humanPlayer.aliveUnits) {
+          if (!u.isHero && u.morale < 70) u.morale = Math.min(70, u.morale + 10);
+        }
       }
     }
 

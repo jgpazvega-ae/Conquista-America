@@ -91,6 +91,7 @@ export class Unit {
   // Status effects (damage over time)
   burning  = 0;  // remaining burn duration (s); 2 HP every 0.5 s
   poisoned = 0;  // remaining poison duration (s); 2 HP every 1 s
+  slowed   = 0;  // remaining slow duration (s); -40% speed from slinger stones
   private _burnTick   = 0;
   private _poisonTick = 0;
 
@@ -930,6 +931,9 @@ export class Unit {
       }
     }
 
+    // Slinger slow: -40% speed for the duration (does not stack)
+    if (this.slowed > 0) this.slowed = Math.max(0, this.slowed - dt);
+
     // Hero war cry cooldown, attack buff, and rally cooldown
     if (this.warCryCooldown > 0) this.warCryCooldown = Math.max(0, this.warCryCooldown - dt);
     if (this.heroCooldown2   > 0) this.heroCooldown2  = Math.max(0, this.heroCooldown2  - dt);
@@ -1062,6 +1066,8 @@ export class Unit {
     if (this.hp < this.maxHp * 0.25) terrainMult *= 0.7;
     // Wet weather turns ground to mud — all units move slower in rain/storm
     terrainMult *= Unit.weatherSpeedMult;
+    // Slinger slow: stone projectiles stagger the target (-40% speed)
+    if (this.slowed > 0) terrainMult *= 0.6;
     const effSpeed = this.formationSpeedCap !== null ? Math.min(this.speed, this.formationSpeedCap) : this.speed;
     const step = effSpeed * TILE_SIZE * dt * terrainMult;
 

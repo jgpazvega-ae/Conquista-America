@@ -132,6 +132,11 @@ export class AISystem {
         if (player.aliveUnits.length >= 2 && player.aliveUnits.length <= 5) {
           this.guerrillaRaid(player, game);
         }
+        // Scout probe: during first GATHER_DURATION/2 of every gather phase, send
+        // the fastest idle unit toward the human settlement to gather intel.
+        if (state.phaseTimer < GATHER_DURATION / 2 && player.aliveUnits.length >= 4) {
+          this.sendScout(player, game);
+        }
         // Strategy personality: aggressive civs (high militaryRatio) rush with shorter
         // gather times and smaller armies; economic/defensive civs mass larger forces first
         const milRatio = STRATEGY_BY_CIV[player.civType]?.militaryRatio ?? 0.6;
@@ -732,6 +737,35 @@ export class AISystem {
         }
       }
     }
+  }
+
+  /**
+   * Scout probe: during the gather phase, send the fastest idle unit toward the
+   * human settlement to reveal enemy positions before committing the full army.
+   */
+  private sendScout(player: Player, game: Game) {
+    const humanSettle = game.allBuildings.find(
+      b => b.playerId === game.humanPlayerId && b.type === BuildingType.SETTLEMENT && b.isAlive(),
+    );
+    if (!humanSettle) return;
+
+    // Pick fastest idle non-hero unit as scout (prefer cavalry / fast melee)
+    const scout = player.aliveUnits
+      .filter(u => !u.isHero && u.state === UnitState.IDLE)
+      .sort((a, b) => b.speed - a.speed)[0];
+    if (!scout) return;
+
+    // Move to a point 5 tiles short of the human settlement (not suicidally close)
+    const dx = humanSettle.col - scout.col;
+    const dy = humanSettle.row - scout.row;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 8) return; // already close enough to see the enemy
+    const targetCol = Math.round(humanSettle.col - (dx / dist) * 5);
+    const targetRow = Math.round(humanSettle.row - (dy / dist) * 5);
+    const near = game.map.findWalkableNear(targetCol, targetRow, 3);
+    if (!near) return;
+    const path = findPath(game.map, scout.gridPos(), { col: near[0], row: near[1] }, 300);
+    if (path.length > 0) scout.moveTo(path);
   }
 
   /**
