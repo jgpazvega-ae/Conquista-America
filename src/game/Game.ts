@@ -109,6 +109,8 @@ export class Game {
   private _warExhaustionTimer    = 0;    // throttle war exhaustion checks (every 8s)
   private _firstCombatTime       = -1;   // gameTime when first damage event occurred
   private _warExhaustionNotified = false;
+  private _garrisonUpkeepTimer   = 0;    // throttle garrison food drain (every 10s)
+  private _autoGarrisonSent      = new Set<number>(); // unit ids sent to auto-garrison
   villageIncomeEvents: { playerId: number; food: number; gold: number }[] = [];
 
   constructor(humanCiv: CivilizationType = CivilizationType.AZTEC) {
@@ -511,6 +513,37 @@ export class Game {
         for (const u of survivors) u.takeDamage(25);
       }
     }
+
+    // Auto-garrison: critically wounded non-hero units (<15% HP) that are idle near a
+    // friendly garrisonable building seek shelter automatically.
+    for (const unit of this.allUnits) {
+      if (!unit.isAlive() || unit.isHero || unit.garrisonedIn !== null) continue;
+      if (unit.hp / unit.maxHp >= 0.15) { this._autoGarrisonSent.delete(unit.id); continue; }
+      if (this._autoGarrisonSent.has(unit.id)) continue;
+      if (unit.state === UnitState.ATTACKING || unit.state === UnitState.ATTACK_MOVE) continue;
+      const refuge = this.allBuildings
+        .filter(b => b.playerId === unit.playerId && b.isAlive() && b.isComplete() &&
+                     b.garrison.length < b.garrisonCapacity &&
+                     Math.hypot(unit.col - b.col, unit.row - b.row) <= 8)
+        .sort((a, b2) => Math.hypot(unit.col - a.col, unit.row - a.row) - Math.hypot(unit.col - b2.col, unit.row - b2.row))[0];
+      if (!refuge) continue;
+      unit.garrisonTarget = refuge;
+      const path = findPath(this.map, unit.gridPos(), { col: refuge.col, row: refuge.row }, 200);
+      if (path.length > 0) unit.moveTo(path);
+      this._autoGarrisonSent.add(unit.id);
+    }
+
+    // Garrison food upkeep: garrisoned units consume food (1 per 10s per unit) — bunkering has a cost
+    this._garrisonUpkeepTimer += dt;
+    if (this._garrisonUpkeepTimer >= 10) {
+      this._garrisonUpkeepTimer = 0;
+      for (const b of this.allBuildings) {
+        if (!b.isAlive() || b.garrison.length === 0) continue;
+        const player = this.players[b.playerId];
+        if (player) player.resources.food = Math.max(0, player.resources.food - b.garrison.length);
+      }
+    }
+
     this.newlyCapturedBuildings = [];
     this.newWarDeclarations = [];
     this.updateCaptures(dt);
@@ -984,6 +1017,16 @@ export class Game {
 
     // Capital-loss morale shock: when a settlement falls, its owner's surviving
     // troops are demoralized by the loss of their capital (American Conquest mechanic)
+    for (const b of this.newlyDestroyedBuildings) {
+      // Collapse debris: any unit within 2 tiles takes rubble damage (attacker and defender alike)
+      for (const unit of this.allUnits) {
+        if (!unit.isAlive() || unit.garrisonedIn !== null) continue;
+        if (Math.hypot(unit.col - b.col, unit.row - b.row) > 2.0) continue;
+        const debris = Math.floor(8 + Math.random() * 12); // 8–19 debris damage
+        unit.takeDamage(debris);
+        if (!unit.isHero) unit.loseMorale(8); // terrifying to be buried under rubble
+      }
+    }
     for (const b of this.newlyDestroyedBuildings) {
       if (b.type !== BuildingType.SETTLEMENT || this._capitalShockDone.has(b.id)) continue;
       this._capitalShockDone.add(b.id);
