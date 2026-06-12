@@ -1087,6 +1087,8 @@ export class Unit {
       case TerrainType.HIGHLAND: terrainMult = 0.72; break;
       case TerrainType.DESERT:   terrainMult = 0.88; break;
     }
+    // Cavalry desert sprint: horses thrive in open arid terrain (+20% speed)
+    if (this.type === UnitType.CAVALRY && tile?.terrain === TerrainType.DESERT) terrainMult *= 1.20;
     // Heavy wounds (< 25% HP) impair movement — bleeding soldiers can't keep pace
     if (this.hp < this.maxHp * 0.25) terrainMult *= 0.7;
     // Wet weather turns ground to mud — all units move slower in rain/storm

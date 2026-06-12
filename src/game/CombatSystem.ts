@@ -203,6 +203,8 @@ export class CombatSystem {
           if (unit.heroPowerBuff) dmg = Math.round(dmg * 1.15);
           // Inspired fury: +15% damage for 5s after landing a kill at ≥80 morale
           if (unit.inspiredTimer > 0) dmg = Math.round(dmg * 1.15);
+          // Waterway ambush: attacking from a beach flanks the enemy's exposed shoreline (+15%)
+          if (attackerTile?.terrain === TerrainType.BEACH) dmg = Math.round(dmg * 1.15);
           // Hero war cry buff: +25% attack for 12s
           if (unit.buffAttackTimer > 0) dmg = Math.round(dmg * 1.25);
           // Volley: synchronized burst for 2.5× damage, longer reload
