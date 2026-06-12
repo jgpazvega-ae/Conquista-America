@@ -23,7 +23,7 @@ import { ResourceType } from './game/ResourceNode';
 import { findPath } from './game/Pathfinding';
 import { WorkerTask } from './game/Worker';
 import type { Difficulty } from './ui/CivSelect';
-import { activateCivPower } from './game/CivPowers';
+import { activateCivPower, CIV_POWER_DEFS } from './game/CivPowers';
 
 // ── Kill gold rewards ──────────────────────────────────────────────────────────
 function killGoldReward(type: UnitType, isHero: boolean): number {
@@ -78,7 +78,7 @@ async function boot() {
   civSelect.setOnStart(async (civ) => {
     const diff = civSelect.getDifficulty();
     civSelect.hide();
-    narrative.play(civ, () => { void startGame(civ, diff); });
+    narrative.play(civ, () => { startGame(civ, diff).catch(showFatalError); });
   });
 }
 
@@ -86,8 +86,33 @@ function showCivSelect(screen: CivSelectScreen, preferred: CivilizationType) {
   screen.show(preferred);
 }
 
+// ── Error screen ──────────────────────────────────────────────────────────────
+function showFatalError(err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  console.error('[Conquista] Fatal init error:', err);
+  // Hide loading overlay if still visible
+  document.getElementById('loading-screen')?.classList.add('hidden');
+  // Show a user-readable overlay instead of a black screen
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:#0a0502;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#e8d5a0;font-family:system-ui;padding:32px;text-align:center';
+  overlay.innerHTML =
+    `<div style="font-size:3rem">⚠️</div>` +
+    `<div style="font-size:1.4rem;font-weight:700">Error al iniciar el juego</div>` +
+    `<div style="font-size:0.9rem;color:#aa8866;max-width:480px">${msg}</div>` +
+    `<div style="font-size:0.8rem;color:#666">Intenta recargar la página (F5). Si el problema persiste, tu navegador puede no soportar WebGL.</div>` +
+    `<button onclick="location.reload()" style="margin-top:8px;padding:10px 28px;background:#c4780a;color:#fff;border:none;border-radius:8px;font-size:1rem;cursor:pointer">🔄 Recargar</button>`;
+  document.body.appendChild(overlay);
+}
+
 // ── Game lifecycle ─────────────────────────────────────────────────────────────
 async function startGame(civ: CivilizationType, difficulty: Difficulty = 'normal') {
+  // WebGL availability check — fail fast with a clear message
+  const testCanvas = document.createElement('canvas');
+  const gl = testCanvas.getContext('webgl2') ?? testCanvas.getContext('webgl');
+  if (!gl) {
+    throw new Error('WebGL no está disponible en este navegador o dispositivo. Intenta con Chrome, Firefox o Edge actualizados.');
+  }
+
   const appEl = document.getElementById('app')!;
   appEl.classList.remove('hidden');
 
@@ -143,11 +168,28 @@ class GameInstance {
   private _totalResourcesSpent = 0; // food+gold+stone combined
   private _treasuryWarned75 = false; // notified player at 75% of economic victory
   private _buildingSmokeTimers = new Map<number, number>(); // building.id → seconds since last puff
+  private _starvWarnTimer     = 0; // throttle starvation notifications (30s cooldown)
+  private _ambushWarnTimer    = 0; // throttle jungle ambush notifications (30s cooldown)
+  private _nightAttackTimer   = 0; // throttle night-attack notifications (60s cooldown)
+  private _stoneCritWarnTimer  = 0; // throttle low-stone warnings (60s cooldown)
+  private _goldCritWarnTimer   = 0; // throttle low-gold warnings (60s cooldown)
+  private _chargeResistTimer   = 0; // throttle phalanx charge-resist notification (20s cooldown)
+  private _idleArmyTimer       = 0; // time all human military units have been idle
+  private _idleArmyCooldown    = 0; // prevents repeated reminders (120s between alerts)
+  private _lowMoraleCooldown   = 0; // throttle army-wide low-morale warnings (45s)
   private _statusParticleTimers = new Map<number, number>(); // unit.id → time since last status particle
   private _wasNight = false;
   private _wasStorm = false;
   private _berserkUnits = new Set<number>(); // unit ids currently in berserk
   private _hintsShown = new Set<string>(); // one-time contextual tutorial hints
+  private _advantageTimer   = 0;  // seconds player has held >65% military advantage
+  private _advantageCooldown = 0; // prevents repeated "press the attack" alerts (90s)
+  private _enemyDisarrayCooldown = 0; // prevents repeated enemy-disarray alerts (60s)
+  private _flankWarnTimer       = 0; // throttle flanking warning notification (45s cooldown)
+  private _grandBattleCooldown  = 0; // throttle "¡Gran Batalla!" notification (60s cooldown)
+  private _powerReadyFired      = false; // true once power-ready alert fired this cycle
+  private _spottedEnemyIds      = new Set<number>(); // unit IDs already seen once (first-sight tracking)
+  private _enemyArmySpottedAt   = -999; // gameTime when last "enemy army spotted" fired
 
   /** Show a tutorial hint at most once per match. */
   private hintOnce(key: string, msg: string) {
@@ -351,7 +393,13 @@ class GameInstance {
             fortification: 'Fortificación',
             civTech:       civTechNames[this.game.humanPlayer.civType],
           };
-          this.hud.notify(`🔬 ${names[key]} investigada — beneficio aplicado`, 'success');
+          const benefits: Record<string, string> = {
+            metallurgy:    '+6⚔️ ataque a todas las unidades',
+            logistics:     '+0.4💨 velocidad a todas las unidades',
+            fortification: '+50❤️ HP máximo a todas las unidades',
+            civTech:       'élite desbloqueada — mejora de civilización única',
+          };
+          this.hud.notify(`🔬 ${names[key]} investigada — ${benefits[key] ?? 'beneficio aplicado'}`, 'success');
           this.audio.playResearchComplete();
           this.prodPanel.refresh();
         }
@@ -364,6 +412,54 @@ class GameInstance {
         const civColor = this.game.humanPlayer.civType;
         this.renderer.showGhost(CIV_COLORS[civColor]);
         this.hud.notify(`🏗️ Coloca el ${def.name} — clic derecho para cancelar`, 'info');
+      };
+      this.prodPanel.onCancelProduction = () => {
+        const b = this._panelBuilding;
+        if (!b) return;
+        const item = b.cancelCurrentProduction();
+        if (!item) return;
+        const cost = TRAIN_COSTS[item.unitType];
+        if (cost) {
+          const refFood  = Math.floor(cost.food  * 0.75);
+          const refGold  = Math.floor(cost.gold  * 0.75);
+          const refStone = Math.floor((cost.stone ?? 0) * 0.75);
+          const p = this.game.humanPlayer;
+          p.resources.food  = Math.min(2000, p.resources.food  + refFood);
+          p.resources.gold  = Math.min(2000, p.resources.gold  + refGold);
+          p.resources.stone = Math.min(2000, p.resources.stone + refStone);
+          const parts = [refFood ? `+${refFood}🌽` : '', refGold ? `+${refGold}⚜️` : '', refStone ? `+${refStone}🪨` : ''].filter(Boolean).join(' ');
+          this.hud.notify(`✕ Producción cancelada — reembolso: ${parts}`, 'info');
+        }
+        this.prodPanel.refresh();
+      };
+      this.prodPanel.onDemolish = () => {
+        const b = this._panelBuilding;
+        if (!b || !b.isAlive()) return;
+        const def = BUILDING_DEFS[b.type as BuildingType];
+        const refFood = Math.floor((def?.cost.food ?? 0) * 0.25);
+        const refGold = Math.floor((def?.cost.gold ?? 0) * 0.25);
+        b.takeDamage(b.maxHp * 2); // guaranteed kill
+        this.game.humanPlayer.resources.food = Math.min(2000, this.game.humanPlayer.resources.food + refFood);
+        this.game.humanPlayer.resources.gold = Math.min(2000, this.game.humanPlayer.resources.gold + refGold);
+        this.prodPanel.hide();
+        this._panelBuilding = null;
+        this.hud.notify(`🔥 Edificio demolido — recuperados ${refFood}🌽 ${refGold}⚜️`, 'warning');
+        this.audio.playBuild();
+      };
+      this.prodPanel.onHireMercenary = () => {
+        const b = this._panelBuilding;
+        if (!b) return;
+        if (this.game.humanPlayer.resources.gold < 80) {
+          this.hud.notify('⚜️ Necesitas 80 de oro para contratar un mercenario', 'warning');
+          return;
+        }
+        const ok = this.game.hireMercenary(b, this.game.humanPlayerId);
+        if (ok) {
+          this.prodPanel.refresh();
+          this.audio.playBuild();
+        } else {
+          this.hud.notify('👥 Límite de población alcanzado o sin recursos', 'warning');
+        }
       };
     };
 
@@ -463,6 +559,18 @@ class GameInstance {
 
     this.updateFpsCounter(rawDt);
     if (this._tradeCooldown > 0) this._tradeCooldown = Math.max(0, this._tradeCooldown - rawDt);
+    if (this._starvWarnTimer    > 0) this._starvWarnTimer    = Math.max(0, this._starvWarnTimer    - rawDt);
+    if (this._ambushWarnTimer   > 0) this._ambushWarnTimer   = Math.max(0, this._ambushWarnTimer   - rawDt);
+    if (this._nightAttackTimer  > 0) this._nightAttackTimer  = Math.max(0, this._nightAttackTimer  - rawDt);
+    if (this._stoneCritWarnTimer  > 0) this._stoneCritWarnTimer  = Math.max(0, this._stoneCritWarnTimer  - rawDt);
+    if (this._goldCritWarnTimer   > 0) this._goldCritWarnTimer   = Math.max(0, this._goldCritWarnTimer   - rawDt);
+    if (this._chargeResistTimer   > 0) this._chargeResistTimer   = Math.max(0, this._chargeResistTimer   - rawDt);
+    if (this._idleArmyCooldown    > 0) this._idleArmyCooldown    = Math.max(0, this._idleArmyCooldown    - rawDt);
+    if (this._lowMoraleCooldown   > 0) this._lowMoraleCooldown   = Math.max(0, this._lowMoraleCooldown   - rawDt);
+    if (this._advantageCooldown    > 0) this._advantageCooldown    = Math.max(0, this._advantageCooldown    - rawDt);
+    if (this._enemyDisarrayCooldown > 0) this._enemyDisarrayCooldown = Math.max(0, this._enemyDisarrayCooldown - rawDt);
+    if (this._flankWarnTimer       > 0) this._flankWarnTimer       = Math.max(0, this._flankWarnTimer       - rawDt);
+    if (this._grandBattleCooldown  > 0) this._grandBattleCooldown  = Math.max(0, this._grandBattleCooldown  - rawDt);
     this.game.update(dt);
 
     // Register any units produced this frame
@@ -479,10 +587,17 @@ class GameInstance {
     for (const node of this.game.newlyDepletedNodes) {
       const fog = this.game.fog.getFog(this.game.humanPlayerId);
       const vis = fog ? fog.getVisibility(node.col, node.row) : 1;
-      if (vis !== 0 /* UNEXPLORED */) {
+      if (vis === 0 /* UNEXPLORED */) continue;
+      // Only alert if the player's own workers are gathering here — avoids spam for
+      // distant/enemy nodes the player doesn't care about
+      const myWorkersHere = this.game.allWorkers.some(w =>
+        w.playerId === this.game.humanPlayerId &&
+        Math.abs(w.col - node.col) <= 2 && Math.abs(w.row - node.row) <= 2,
+      );
+      if (myWorkersHere) {
         this.audio.playResourceDepleted();
         const typeLabel = node.type === ResourceType.FOOD ? 'Alimentos' : node.type === ResourceType.GOLD ? 'Oro' : 'Piedra';
-        this.hud.notify(`⚠️ Yacimiento de ${typeLabel} agotado`, 'warning');
+        this.hud.notify(`⚠️ Yacimiento de ${typeLabel} agotado — reasigna tus trabajadores (Q)`, 'warning');
       }
     }
 
@@ -499,6 +614,11 @@ class GameInstance {
     // Register AI-placed buildings with renderer
     for (const b of this.game.newlyPlacedBuildings) {
       this.renderer.addBuilding(b);
+      // Warn player when an AI starts building a wonder
+      if (b.playerId !== this.game.humanPlayerId && b.type === BuildingType.WONDER) {
+        this.hud.notify('⚠️ ¡El enemigo empieza a construir una Gran Maravilla! ¡Destrúyela antes de que termine!', 'warning');
+        this.camera.shake(0.3, 0.5);
+      }
     }
 
     // Notify when human buildings finish construction
@@ -521,6 +641,15 @@ class GameInstance {
           this.hud.notify(`🏛️ ${def.name} completado`, 'success');
           this.renderer.effects.createExplosion(wx, 0.6, wz, 0.7);
           this.renderer.effects.createDustCloud(wx, wz);
+        }
+      } else {
+        // Enemy wonder completed — dramatic warning
+        if (b.type === BuildingType.WONDER) {
+          const def = BUILDING_DEFS[b.type];
+          this.hud.notify(`⚠️ ¡El enemigo completó ${def.name}! ¡Destrúyela antes de 3 minutos o perderás!`, 'warning');
+          this.camera.shake(0.6, 1.0);
+          this.renderer.effects.createExplosion(b.col * TILE_SIZE, 0.6, b.row * TILE_SIZE, 1.5);
+          this.audio.playVictory();
         }
       }
     }
@@ -595,9 +724,16 @@ class GameInstance {
     // Notify player when day/night phase transitions
     if (isNight !== this._wasNight) {
       this._wasNight = isNight;
-      this.hud.notify(isNight ? '🌙 Anochece — visión -40% · combate +15% daño ambos bandos' : '☀️ Amanece — visión restaurada', 'info');
-      if (isNight) this.hintOnce('nightCombat', '💡 De noche: la visión cae un 40% pero el daño de combate sube 15% para ambos bandos. ¡Los ataques sorpresa nocturnos son devastadores!');
-      if (!isNight) this.hintOnce('highGround', '💡 El terreno importa en combate: las tierras altas y montañas dan bonificación de ataque. El desierto expone a tus arqueros.');
+      const humanCiv = this.game.humanPlayer.civType;
+      const isNative = humanCiv === CivilizationType.AZTEC || humanCiv === CivilizationType.MAYA || humanCiv === CivilizationType.INCA;
+      if (isNight) {
+        this.hud.notify('🌙 Anochece — visión -40% · cuerpo a cuerpo +15% · pólvora -10%', 'info');
+        if (isNative) this.hintOnce('nightMelee', '💡 ¡La noche favorece a tus guerreros! El daño cuerpo a cuerpo sube 15% y la pólvora enemiga pierde 10%. ¡Ataca de noche!');
+        else this.hintOnce('nightCombat', '💡 De noche: la visión cae un 40%. Tus armas de pólvora pierden 10% de daño — despliega cuerpo a cuerpo en la oscuridad.');
+      } else {
+        this.hud.notify('☀️ Amanece — visión restaurada · pólvora recupera potencia', 'info');
+        this.hintOnce('highGround', '💡 El terreno importa en combate: las tierras altas y montañas dan bonificación de ataque. El desierto expone a tus arqueros.');
+      }
     }
     // Storm start/end notifications
     const isStorm = this.game.stormTimer > 0;
@@ -677,6 +813,10 @@ class GameInstance {
     for (const u of this.game.getAllUnits()) {
       const hasBurn = u.burning > 0;
       const hasPoison = u.poisoned > 0;
+      // First-time poison hint: suggest retreating to temple for cure
+      if (hasPoison && u.playerId === this.game.humanPlayerId) {
+        this.hintOnce('poison', '☠️ ¡Unidad envenenada! Retírala al Templo propio — los sacerdotes curan el veneno (−3s cada 3s cerca del Templo).');
+      }
       if (!u.isAlive() || (!hasBurn && !hasPoison)) {
         this._statusParticleTimers.delete(u.id);
         continue;
@@ -740,10 +880,32 @@ class GameInstance {
               this.hud.notify(`⚔️ ¡Héroe enemigo abatido! +${kg}⚜️`, 'success');
             }
           }
-          // Hero death notification
+          // Kill feed entry for significant kills
+          if (evt.target.isHero) {
+            const side = evt.target.playerId === this.game.humanPlayerId ? '☠️' : '⚔️';
+            this.hud.addKillFeedEntry(`${side} ${evt.target.heroName ?? evt.target.def.name} ha caído`);
+          } else if (evt.target.level >= 2) {
+            const stars = evt.target.level >= 3 ? '★★' : '★';
+            this.hud.addKillFeedEntry(`⚔️ ${evt.target.def.name} ${stars} eliminado`);
+          }
+          // Combat combo kill feed entries (human attacker only)
+          if (evt.attacker && evt.attacker.playerId === this.game.humanPlayerId) {
+            if (evt.attacker.type === UnitType.CAVALRY && evt.target.panicked) {
+              this.hud.addKillFeedEntry('⚡ ¡PERSECUCIÓN! Caballería acabó con tropa en fuga');
+            } else if (evt.target.slowed > 0 &&
+                       (evt.attacker.type === UnitType.ARCHER || evt.attacker.type === UnitType.ATLATL ||
+                        evt.attacker.type === UnitType.ARQUEBUSIER)) {
+              this.hud.addKillFeedEntry('🌀 ¡COMBO! Ranged remata a tropa aturdida por la honda');
+            }
+          }
+          // Hero death notification + dramatic slow-motion
           if (evt.target.isHero && evt.target.playerId === this.game.humanPlayerId) {
             this.hud.notify(`☠️ ${evt.target.heroName} ha caído — regresará en 60s`, 'warning');
             this.camera.shake(0.4, 0.6);
+            // Brief slow-motion: 0.25× for 0.6s, then restore
+            const prevSpeed = this._gameSpeed;
+            this._gameSpeed = 0.25;
+            setTimeout(() => { this._gameSpeed = prevSpeed; }, 600);
           }
         } else {
           this.audio.playHit(evt.damage / 30);
@@ -752,6 +914,81 @@ class GameInstance {
       }
       if (humanUnderAttack && Math.random() < 0.05) {
         this.hud.notify('⚔️ ¡Tus tropas están bajo ataque!', 'warning');
+      }
+
+      // Phalanx charge-resist: human spear phalanx absorbed a cavalry charge
+      if (this._chargeResistTimer <= 0) {
+        for (const evt of this.game.damageEvents) {
+          if (!evt.chargeBlocked || !evt.attacker) continue;
+          if (evt.target.playerId === this.game.humanPlayerId) {
+            this._chargeResistTimer = 20;
+            this.hud.notify('🛡️ ¡La falange resistió la carga de caballería! +10 moral', 'success');
+            break;
+          }
+        }
+      }
+
+      // Jungle ambush notification: enemy attacks a human unit from jungle cover
+      if (this._ambushWarnTimer <= 0) {
+        const dayT2 = (this.game.gameTime % 480) / 480;
+        const isNight2 = dayT2 > 0.75 || dayT2 < 0.15;
+        for (const evt of this.game.damageEvents) {
+          if (!evt.attacker || evt.target.playerId !== this.game.humanPlayerId) continue;
+          const aTile = this.game.map.getTile(Math.round(evt.attacker.col), Math.round(evt.attacker.row));
+          if ((aTile?.terrain as string) === 'JUNGLE') {
+            this._ambushWarnTimer = 30;
+            this.hud.notify('🌿 ¡EMBOSCADA! Ataque desde la jungla', 'warning');
+            this.camera.shake(0.3, 0.5);
+            break;
+          }
+          // Night attack: enemy hits human unit at night without prior alert
+          if (isNight2 && this._nightAttackTimer <= 0) {
+            this._nightAttackTimer = 60;
+            this.hud.notify('🌙 ¡ATAQUE NOCTURNO! Visibilidad reducida — ¡en guardia!', 'warning');
+            this.camera.shake(0.25, 0.4);
+            break;
+          }
+        }
+      }
+    }
+
+    // Flanking warning: notify when 2+ enemies attack the same human unit simultaneously
+    if (this._flankWarnTimer <= 0 && this.game.status === 'PLAYING') {
+      const enemyAttackers = new Map<number, number>(); // human unit id → enemy attacker count
+      for (const u of this.game.allUnits) {
+        if (!u.isAlive() || u.playerId === this.game.humanPlayerId || !u.attackTarget?.isAlive()) continue;
+        if (u.attackTarget.playerId === this.game.humanPlayerId) {
+          enemyAttackers.set(u.attackTarget.id, (enemyAttackers.get(u.attackTarget.id) ?? 0) + 1);
+        }
+      }
+      const flanked = [...enemyAttackers.values()].some(c => c >= 2);
+      if (flanked) {
+        this._flankWarnTimer = 45;
+        this.hud.notify('⚠️ ¡Flanqueo! El enemigo rodea a tus tropas — Forma una Falange (F2) o retira', 'warning');
+      }
+    }
+
+    // Grand battle notification: when 8+ units fight simultaneously, signal the clash
+    if (this._grandBattleCooldown <= 0 && this.game.status === 'PLAYING') {
+      const fighting = this.game.allUnits.filter(u => u.isAlive() && u.state === UnitState.ATTACKING).length;
+      if (fighting >= 8) {
+        this._grandBattleCooldown = 60;
+        this.hud.notify('⚔️ ¡GRAN BATALLA! Los ejércitos chocan en plena batalla', 'warning');
+        this.camera.shake(0.3, 0.5);
+      }
+    }
+
+    // Civilization power ready alert: notify once when cooldown hits zero
+    {
+      const player = this.game.humanPlayer;
+      if (player.powerCooldown <= 0 && !player.powerActive) {
+        if (!this._powerReadyFired) {
+          this._powerReadyFired = true;
+          const def = CIV_POWER_DEFS[player.civType];
+          this.hud.notify(`${def.emoji} ¡PODER LISTO! Pulsa Q para activar: ${def.name}`, 'success');
+        }
+      } else {
+        this._powerReadyFired = false; // reset so alert fires again next cycle
       }
     }
 
@@ -770,10 +1007,20 @@ class GameInstance {
       if (u.berserkTimer > 0 && !wasBerserk) {
         this._berserkUnits.add(u.id);
         this.hud.notify(`🔥 ¡${u.def.name} entró en frenesí! +25% daño por 12s`, 'warning');
+        this.hud.addKillFeedEntry(`🔥 ${u.def.name} — ¡FRENESÍ! (3 bajas consecutivas)`);
         this.renderer.effects.createExplosion(u.worldX, 0.8, u.worldZ, 0.6);
       } else if (u.berserkTimer <= 0 && wasBerserk) {
         this._berserkUnits.delete(u.id);
       }
+    }
+
+    // Veteran level-up notifications for human units
+    for (const u of this.game.newlyLeveledUpUnits) {
+      if (u.playerId !== this.game.humanPlayerId) continue;
+      const star = u.level >= 3 ? '🟠' : '⭐';
+      this.hud.notify(`${star} ¡${u.def.name} ha ascendido a veterano rango ${u.level}!`, 'success');
+      this.audio.playLevelUp();
+      this.renderer.effects.createLevelUpBurst(u.worldX, 1.0, u.worldZ);
     }
 
     // Hero respawn notifications
@@ -789,6 +1036,7 @@ class GameInstance {
     for (const cap of this.game.newlyCapturedBuildings) {
       const name = BUILDING_DEFS[cap.building.type]?.name ?? 'Edificio';
       const isVillage = cap.building.type === BuildingType.VILLAGE;
+      this.hud.addKillFeedEntry(`🚩 ${name} capturado`);
       if (cap.toPlayerId === this.game.humanPlayerId) {
         if (isVillage) {
           this.hud.notify(`🏡 ¡Aldea capturada! +10🌽 +6⚜️ cada 30s mientras la controles`, 'success');
@@ -801,6 +1049,136 @@ class GameInstance {
       } else if (cap.fromPlayerId === this.game.humanPlayerId) {
         this.hud.notify(`⚠️ ¡El enemigo ha capturado tu ${isVillage ? 'aldea' : name}!`, 'warning');
         this.camera.shake(0.4, 0.5);
+      }
+    }
+
+    // Diplomatic war declarations (American Conquest: dramatic first-attack announcement)
+    for (const decl of this.game.newWarDeclarations) {
+      if (decl.toPlayerId === this.game.humanPlayerId) {
+        const civNames: Record<string, string> = {
+          AZTEC: 'Los Aztecas', MAYA: 'Los Mayas', INCA: 'Los Incas', CONQUISTADOR: 'Los Conquistadores',
+        };
+        const aggressor = this.game.players[decl.fromPlayerId];
+        const civName = civNames[aggressor?.civType ?? ''] ?? 'El enemigo';
+        this.hud.notify(`⚔️ ¡${civName} te han declarado la guerra!`, 'warning');
+        this.camera.shake(0.5, 0.8);
+        this.audio.playDeath(); // dramatic signal
+      }
+    }
+
+    // AI civilization taunts during attack phase
+    for (const taunt of this.game.newTaunts) {
+      if (taunt.playerId !== this.game.humanPlayerId) {
+        this.hud.notify(taunt.message, 'warning');
+      }
+    }
+
+    // Civilization elimination announcements (American Conquest: dramatic defeat message)
+    const civNames: Record<string, string> = {
+      AZTEC: 'Los Aztecas', MAYA: 'Los Mayas', INCA: 'Los Incas', CONQUISTADOR: 'Los Conquistadores',
+    };
+    for (const p of this.game.newlyEliminatedPlayers) {
+      const name = civNames[p.civType] ?? 'El enemigo';
+      this.hud.notify(`⚰️ ¡${name} han sido eliminados de la batalla!`, 'success');
+      this.camera.shake(0.6, 1.0);
+      this.audio.playVictory();
+    }
+
+    // Enemy tech research notifications
+    const upgradeNames: Record<string, string> = {
+      metallurgy:    '⚔️ Metalurgia (+6 atk a todas sus unidades)',
+      logistics:     '👟 Logística (+0.4 veloc. a todas sus unidades)',
+      fortification: '🛡️ Fortificación (+50 HP máx. a todas sus unidades)',
+      civTech:       '⭐ Tecnología élite (mejora especial de su civilización)',
+    };
+    for (const r of this.game.newlyResearchedUpgrades) {
+      if (r.playerId === this.game.humanPlayerId) continue;
+      const label = upgradeNames[r.upgrade] ?? r.upgrade;
+      this.hud.notify(`🔬 ¡El enemigo investigó ${label}! Acelera tu propia investigación en la Fragua.`, 'warning');
+    }
+
+    // Enemy hero spotted: high-priority alert
+    for (const hero of this.game.newlyVisibleEnemyHeroes) {
+      this.hud.notify(`👁️ ¡HÉROE ENEMIGO AVISTADO! — ${hero.heroName ?? hero.type}`, 'warning');
+      this.camera.shake(0.4, 0.7);
+    }
+
+    // Enemy army first-sight: when 3+ enemy units become visible for the first time together
+    {
+      const humanFog = this.game.fog.getFog(this.game.humanPlayerId);
+      if (humanFog && this.game.status === 'PLAYING' &&
+          this.game.gameTime - this._enemyArmySpottedAt >= 120) {
+        let newlySpotted = 0;
+        for (const u of this.game.allUnits) {
+          if (u.playerId === this.game.humanPlayerId || !u.isAlive() || this._spottedEnemyIds.has(u.id)) continue;
+          if (humanFog.canSeeUnit(u, this.game.humanPlayerId)) {
+            this._spottedEnemyIds.add(u.id);
+            newlySpotted++;
+          }
+        }
+        if (newlySpotted >= 3) {
+          this._enemyArmySpottedAt = this.game.gameTime;
+          this.hud.notify(`👁️ ¡EJÉRCITO ENEMIGO AVISTADO! ${newlySpotted} tropas detectadas`, 'warning');
+          this.camera.shake(0.25, 0.4);
+        } else if (newlySpotted === 0) {
+          // Also track units individually even outside army detection
+          // (covered above per unit) — no extra action needed
+        }
+      }
+    }
+
+    // Starvation warning: throttled to avoid spam
+    if (this.game.humanPlayer.resources.food < 10 && this._starvWarnTimer <= 0) {
+      this.hud.notify('🍂 ¡HAMBRE! Las tropas pierden moral — construye un Almacén o entrena menos unidades', 'warning');
+      this._starvWarnTimer = 30;
+    }
+    // Stone scarcity: construction will stall
+    if (this.game.humanPlayer.resources.stone < 20 && this._stoneCritWarnTimer <= 0) {
+      this.hud.notify('🪨 ¡PIEDRA AGOTADA! La construcción se detendrá — envía trabajadores a una cantera', 'warning');
+      this._stoneCritWarnTimer = 60;
+    }
+    // Gold scarcity: can't hire or upgrade
+    if (this.game.humanPlayer.resources.gold < 20 && this._goldCritWarnTimer <= 0) {
+      this.hud.notify('⚜️ ¡ORO CRÍTICO! Captura aldeas o espera ingresos para contratar tropas', 'warning');
+      this._goldCritWarnTimer = 60;
+    }
+
+    // Idle army reminder: nudge player if all military units have been idle for 60s
+    if (this.game.status === 'PLAYING') {
+      const military = this.game.humanPlayer.aliveUnits.filter(u => u.garrisonedIn === null);
+      const allIdle  = military.length > 0 && military.every(u => u.state === UnitState.IDLE || u.state === UnitState.HOLD);
+      if (allIdle) {
+        this._idleArmyTimer += rawDt;
+        if (this._idleArmyTimer >= 60 && this._idleArmyCooldown <= 0) {
+          this.hud.notify('💤 Tus tropas llevan mucho tiempo inactivas — ¿explorar, expandir o atacar?', 'info');
+          this._idleArmyCooldown = 120;
+          this._idleArmyTimer    = 0;
+        }
+      } else {
+        this._idleArmyTimer = 0;
+      }
+
+      // Army-wide low-morale warning: alert when a sizable force is wavering so the
+      // player can rally (hero war cry Y, regroup C, temple, retreat R) before a rout
+      if (this._lowMoraleCooldown <= 0) {
+        const combat = military.filter(u => !u.isHero);
+        if (combat.length >= 4) {
+          const shaky = combat.filter(u => u.panicked || u.morale < 35).length;
+          if (shaky >= combat.length * 0.4) {
+            this.hud.notify('📉 ¡La moral de tu ejército se desmorona! Usa el grito de guerra (Y), reagrupa con el héroe (C) o retírate (R)', 'warning');
+            this.audio.playRetreat();
+            this._lowMoraleCooldown = 45;
+          }
+        }
+      }
+    }
+
+    // Objective completion notifications
+    for (const objType of this.game.objectives.newlyCompleted) {
+      const obj = this.game.objectives.objectives.find(o => o.type === objType);
+      if (obj) {
+        this.hud.notify(`🏆 ¡Objetivo completado! ${obj.title}`, 'success');
+        this.audio.playLevelUp();
       }
     }
 
@@ -855,7 +1233,52 @@ class GameInstance {
     const idleCount = humanWorkers.filter(w => (w.task as string) === 'IDLE').length;
     if (idleCount > 0 && this.game.gameTime - this._lastIdleWarnAt >= 30) {
       this._lastIdleWarnAt = this.game.gameTime;
-      this.hud.notify(`⚠️ ${idleCount} trabajador${idleCount > 1 ? 'es' : ''} sin tarea`, 'warning');
+      const res = this.game.humanPlayer.resources;
+      const suggestion = res.food < 50 ? '— recoge 🌽 comida urgente (Q)'
+        : res.gold < 30 ? '— recoge ⚜️ oro (Q)'
+        : res.stone < 30 ? '— recoge 🪨 piedra (Q)'
+        : '(Q para asignar al recurso más escaso)';
+      this.hud.notify(`⚠️ ${idleCount} trabajador${idleCount > 1 ? 'es' : ''} sin tarea ${suggestion}`, 'warning');
+    }
+
+    // "Press the attack" prompt: when player holds a strong military advantage for 30s,
+    // nudge them to capitalize before the enemy can recover or be reinforced
+    if (this.game.status === 'PLAYING' && this.game.gameTime > 120 && this._advantageCooldown <= 0) {
+      const myPop = this.game.humanPlayer.aliveUnits.length;
+      let enemyMax = 0;
+      for (const p of this.game.players) {
+        if (p.id === this.game.humanPlayerId || p.isDefeated()) continue;
+        enemyMax = Math.max(enemyMax, p.aliveUnits.length);
+      }
+      const total = myPop + enemyMax;
+      const ratio = total > 0 ? myPop / total : 0.5;
+      if (ratio >= 0.65 && myPop >= 5) {
+        this._advantageTimer += rawDt;
+        if (this._advantageTimer >= 30) {
+          this._advantageTimer = 0;
+          this._advantageCooldown = 90;
+          this.hud.notify('⚔️ ¡VENTAJA MILITAR! Presiona el ataque ahora antes de que el enemigo refuerce', 'success');
+          this.hintOnce('pressAttack', '💡 Con más tropas que el enemigo, ataca sus edificios clave. Destruye su Asentamiento para la victoria militar.');
+        }
+      } else {
+        this._advantageTimer = 0;
+      }
+    }
+
+    // Enemy army in disarray: alert when a major enemy faction's morale collapses (<35% avg)
+    // so the player knows to seize the window before they regroup
+    if (this.game.status === 'PLAYING' && this._enemyDisarrayCooldown <= 0) {
+      for (const p of this.game.players) {
+        if (p.id === this.game.humanPlayerId || p.isDefeated()) continue;
+        const fighters = p.aliveUnits.filter(u => !u.isHero);
+        if (fighters.length < 3) continue;
+        const avgMorale = fighters.reduce((s, u) => s + u.morale, 0) / fighters.length;
+        if (avgMorale < 35) {
+          this._enemyDisarrayCooldown = 60;
+          this.hud.notify('🏳️ ¡El ejército enemigo está en desorden! Presiona el ataque', 'success');
+          break;
+        }
+      }
     }
 
     // Settlement under attack warning
@@ -870,6 +1293,27 @@ class GameInstance {
         this.audio.playHit(0.9);
       }
       this._lastSettlementHp = humanSettlement.hp;
+      // Red danger vignette when settlement is critically damaged
+      const vigEl = document.getElementById('settle-danger-vignette');
+      if (vigEl) vigEl.classList.toggle('hidden', humanSettlement.hp >= humanSettlement.maxHp * 0.25);
+    } else {
+      document.getElementById('settle-danger-vignette')?.classList.add('hidden');
+    }
+
+    // Weather forecast: warn 30s before a significant weather change
+    if (this.game.weather.forecastFired) {
+      this.game.weather.forecastFired = false; // consume
+      const next = this.game.weather.nextState;
+      const forecastIcons: Record<string, string> = { CLEAR: '☀️', RAIN: '🌧️', STORM: '⛈️', DROUGHT: '🏜️' };
+      const forecastWarns: Record<string, string> = {
+        RAIN:    '30s — Lluvia inminente: arcabuceros y cañones perderán potencia. ¡Ataca ahora!',
+        STORM:   '30s — ¡TORMENTA en camino! Toda artillería quedará inutilizada. ¡Avanza!',
+        DROUGHT: '30s — Sequía en camino: riesgo de incendio ×2. Dispersa tus tropas.',
+        CLEAR:   '30s — El tiempo va a despejar.',
+      };
+      if (next !== 'CLEAR' || this.game.weather.state !== 'CLEAR') {
+        this.hud.notify(`${forecastIcons[next]} PREVISIÓN ${forecastWarns[next]}`, next === 'STORM' ? 'warning' : 'info');
+      }
     }
 
     // Weather change notification
@@ -905,6 +1349,16 @@ class GameInstance {
       this.hintOnce('ammo', '💡 Sin munición: las unidades a distancia combaten cuerpo a cuerpo. Retíralas a tu asentamiento para reabastecer automáticamente.');
     } else if (this.game.humanPlayer.aliveUnits.some(u => u.lowAmmo)) {
       this.hintOnce('lowAmmo', '💡 Munición baja (🏹 en ámbar). Retira tus arqueros/ballesteros al asentamiento propio para reabastecer. Pulsa V para descarga sincronizada.');
+    }
+    // War cry ready hint: after 3 minutes, remind player if hero war cry is available
+    if (this.game.gameTime > 180) {
+      const hero = this.game.humanPlayer.aliveUnits.find(u => u.isHero);
+      if (hero && hero.isAlive() && hero.warCryCooldown === 0) {
+        this.hintOnce('warCryReady', '💡 Tu héroe tiene el Grito de Guerra listo — pulsa Y junto a tus tropas para dar +25% de ataque por 12s');
+      }
+      if (hero && hero.isAlive() && hero.heroCooldown2 === 0) {
+        this.hintOnce('heroHReady', '💡 Tu héroe tiene su habilidad especial lista — pulsa H para desatar su poder único');
+      }
     }
 
     this.hud.update(selectedNow);
@@ -1237,8 +1691,36 @@ class GameInstance {
           if (path.length > 0) { u.moveTo(path); n++; }
         }
         if (n > 0) {
-          this.hud.notify(`🏃 ${n} unidad${n > 1 ? 'es' : ''} en retirada`, 'info');
+          // Retreat formation: switch to LOOSE for faster escape
+          for (const u of sel) u.setFormation('LOOSE');
+          this.hud.notify(`🏃 ${n} unidad${n > 1 ? 'es' : ''} en retirada (💨 formación suelta)`, 'info');
           this.audio.playMove();
+        }
+        return;
+      }
+      // C: regroup the army on the hero (consolidate under the officer/morale aura)
+      if (e.code === 'KeyC' && !e.ctrlKey && !e.altKey) {
+        const hero = this.game.humanPlayer.aliveUnits.find(u => u.isHero);
+        if (!hero) {
+          const t = this.game.getHeroRespawnTimer(this.game.humanPlayerId);
+          this.hud.notify(t !== undefined ? `⏳ Héroe reaparecerá en ${Math.ceil(t)}s` : 'Sin héroe activo para reagrupar', 'info');
+          return;
+        }
+        const sel = this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId && u.isAlive() && !u.isHero);
+        const army = sel.length > 0 ? sel : this.game.humanPlayer.aliveUnits.filter(u => !u.isHero && u.garrisonedIn === null);
+        let n = 0;
+        army.forEach((u, i) => {
+          const off = this.input.spreadOffset(i, army.length);
+          const near = this.game.map.findWalkableNear(hero.col + off[0], hero.row + off[1], 3);
+          if (!near) return;
+          const path = findPath(this.game.map, u.gridPos(), { col: near[0], row: near[1] }, 300);
+          if (path.length > 0) { u.attackTarget = null; u.moveTo(path); n++; }
+        });
+        if (n > 0) {
+          this.camera.panTo(hero.worldX, hero.worldZ);
+          this.hud.notify(`🎖️ ${n} unidad${n > 1 ? 'es' : ''} reagrupándose con ${hero.heroName}`, 'info');
+          this.audio.playMove();
+          this.hintOnce('regroup', '💡 C: reagrupa tu ejército junto al héroe. Las unidades cercanas a un héroe o campeón Nv.3 ganan +2 defensa y recuperan moral más rápido.');
         }
         return;
       }
@@ -1340,6 +1822,61 @@ class GameInstance {
         }
         return;
       }
+      // H: hero secondary ability — civ-flavored power (60s cooldown)
+      if (e.code === 'KeyH' && !e.ctrlKey && !e.altKey) {
+        const hero = this.input.getSelectedUnits().find(u => u.isHero && u.isAlive())
+                  ?? this.game.humanPlayer.aliveUnits.find(u => u.isHero && u.isAlive());
+        if (!hero) {
+          this.hud.notify('🦅 Tu héroe debe estar vivo para usar su habilidad (H)', 'info');
+        } else if (hero.heroCooldown2 > 0) {
+          this.hud.notify(`🦅 Habilidad del héroe — recarga: ${Math.ceil(hero.heroCooldown2)}s`, 'info');
+        } else {
+          const allies = this.game.humanPlayer.aliveUnits;
+          const civ    = this.game.humanPlayer.civType;
+          hero.heroCooldown2 = 60;
+          if (civ === CivilizationType.AZTEC) {
+            // Frenesí de jaguar: Eagle Warriors and Jaguar Knights within 8 tiles enter berserk
+            const warriors = allies.filter(
+              u => u.isAlive() && !u.isHero &&
+                   (u.type === UnitType.EAGLE_WARRIOR || u.type === UnitType.JAGUAR_KNIGHT) &&
+                   hero.distanceTo(u) <= 8,
+            );
+            warriors.forEach(u => { u.berserkTimer = 12; });
+            this.hud.notify(`🦅 ¡FRENESÍ DE JAGUAR! ${warriors.length} guerrero${warriors.length !== 1 ? 's' : ''} entran en frenesí +25% daño 12s`, 'warning');
+            this.hintOnce('heroH_aztec', '💡 Habilidad de héroe (H): Tlacaelel desata el frenesí de los Guerreros Águila y Jaguar cercanos. Recarga 60s.');
+          } else if (civ === CivilizationType.MAYA) {
+            // Curación astral: Lady Xoc heals all allies within 8 tiles to at least 60% HP
+            let healed = 0;
+            allies.filter(u => u.isAlive() && hero.distanceTo(u) <= 8).forEach(u => {
+              const target = Math.round(u.maxHp * 0.60);
+              if (target > u.hp) { u.heal(target - u.hp); healed++; }
+            });
+            this.hud.notify(`✨ ¡CURACIÓN ASTRAL! ${healed} unidad${healed !== 1 ? 'es' : ''} restauradas al 60% HP`, 'success');
+            this.hintOnce('heroH_maya', '💡 Habilidad de héroe (H): Lady Xoc restaura al 60% HP a todos los aliados cercanos. Recarga 60s.');
+          } else if (civ === CivilizationType.INCA) {
+            // Camino del Inca: all allies within 10 tiles get +50% speed for 15s
+            const boosted = allies.filter(u => u.isAlive() && !u.isHero && hero.distanceTo(u) <= 10);
+            boosted.forEach(u => {
+              if (u.heroSpeedBuff <= 0 && !u.incaBuff) u._preBuffSpeed = u.speed;
+              u.speed = Math.min(u.speed * 1.5, u.def.stats.speed * 3.5);
+              u.heroSpeedBuff = 15;
+            });
+            this.hud.notify(`🏔️ ¡CAMINO DEL INCA! ${boosted.length} unidades a velocidad de montaña (+50%) 15s`, 'success');
+            this.hintOnce('heroH_inca', '💡 Habilidad de héroe (H): Pachacuti concede velocidad andina a todos los aliados cercanos. Recarga 60s.');
+          } else {
+            // ¡Santiago!: all cavalry within 6 tiles get chargeReady = true
+            const cavalry = allies.filter(
+              u => u.isAlive() && u.type === UnitType.CAVALRY && hero.distanceTo(u) <= 6,
+            );
+            cavalry.forEach(u => { u.chargeReady = true; });
+            this.hud.notify(`⚔️ ¡SANTIAGO Y CIERRA ESPAÑA! ${cavalry.length} caballero${cavalry.length !== 1 ? 's' : ''} listos para cargar`, 'warning');
+            this.hintOnce('heroH_conq', '💡 Habilidad de héroe (H): Hernán Cortés lanza la carga de caballería — todos los caballos cercanos cargan de inmediato. Recarga 60s.');
+          }
+          this.renderer.effects.createExplosion(hero.worldX, 0.8, hero.worldZ, 0.8);
+          this.audio.playLevelUp();
+        }
+        return;
+      }
       // F1-F3: formation orders; F4: clear formation
       if (e.code === 'F1' || e.code === 'F2' || e.code === 'F3' || e.code === 'F4') {
         e.preventDefault();
@@ -1378,6 +1915,28 @@ class GameInstance {
       // E: activate civilization power
       if (e.code === 'KeyE' && !e.ctrlKey && !e.altKey) {
         this.triggerCivPower();
+        return;
+      }
+      // Z: rally ALL human units to the hero (or to settlement if hero is absent)
+      if (e.code === 'KeyZ' && !e.ctrlKey && !e.altKey) {
+        const hero = this.game.humanPlayer.aliveUnits.find(u => u.isHero);
+        const rallySrc = hero ?? this.game.allBuildings.find(
+          b => b.playerId === this.game.humanPlayerId && b.isAlive() && b.type === BuildingType.SETTLEMENT,
+        );
+        if (!rallySrc) return;
+        const rc = 'col' in rallySrc ? rallySrc.col : (rallySrc as import('./game/Unit').Unit).col;
+        const rr = 'row' in rallySrc ? rallySrc.row : (rallySrc as import('./game/Unit').Unit).row;
+        const near = this.game.map.findWalkableNear(rc, rr, 5);
+        if (!near) return;
+        let rallied = 0;
+        for (const u of this.game.humanPlayer.aliveUnits) {
+          if (u.isHero || u.garrisonedIn !== null) continue;
+          const path = findPath(this.game.map, u.gridPos(), { col: near[0], row: near[1] }, 400);
+          if (path.length > 0) { u.moveTo(path); rallied++; }
+        }
+        if (rallied > 0) {
+          this.hud.notify(`📯 ${rallied} unidad${rallied > 1 ? 'es' : ''} reuniéndose${hero ? ' con el héroe' : ' en el asentamiento'}`, 'success');
+        }
         return;
       }
       // X: toggle entrench — selected units dig in (+5 def, HOLD state; cancelled by movement)

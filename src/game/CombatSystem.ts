@@ -1,4 +1,4 @@
-import { UnitState, TerrainType, UnitType } from './types';
+import { UnitState, TerrainType, UnitType, CivilizationType } from './types';
 import type { Unit } from './Unit';
 import type { GameMap } from './Map';
 import { findPath } from './Pathfinding';
@@ -36,6 +36,8 @@ export interface DamageEvent {
   worldX:        number;
   worldZ:        number;
   critical?:     boolean;
+  isCharge?:     boolean;
+  chargeBlocked?: boolean; // cavalry charge was absorbed by spear phalanx
   sourceWorldX?: number; // set for building-sourced attacks (watchtower)
   sourceWorldZ?: number;
 }
@@ -62,6 +64,18 @@ export class CombatSystem {
     for (const unit of allUnits) {
       if (!unit.isAlive()) continue;
       if (unit.garrisonedIn !== null) continue; // garrisoned troops fight via Game.updateGarrisonFire
+
+      // Melee-pin detection: ranged units fighting while an adjacent enemy melee unit is present
+      // suffer -40% damage (they can't aim/reload properly while being rushed).
+      if (!unit.outOfAmmo && unit.attackRange > 1.5 && unit.type !== UnitType.CANNON) {
+        const meleeThreat = allUnits.some(e =>
+          e.isAlive() && e.playerId !== unit.playerId && e.attackRange <= 1.5 &&
+          e.garrisonedIn === null && unit.distanceTo(e) <= 1.6,
+        );
+        unit.meleePinned = meleeThreat;
+      } else {
+        unit.meleePinned = false;
+      }
 
       // Process active combat (ATTACKING or HOLD with a target)
       const isHold = unit.state === UnitState.HOLD;
@@ -97,6 +111,12 @@ export class CombatSystem {
         const isVolley = unit.volleyReady && unit.ammo > 0;
         if (isVolley) unit.volleyReady = false;
 
+        // Cannon deployment: must be stationary ≥ 4s before firing (AC: unlimbering time)
+        if (unit.type === UnitType.CANNON && unit.stationaryTimer < 4) {
+          unit.attackTimer = Math.max(unit.attackTimer, 1.0); // retry in ≤1s
+          continue;
+        }
+
         if (isVolley || unit.attackTimer <= 0) {
           const attackerTile = map.getTile(unit.col, unit.row);
           const baseAtk = unit.outOfAmmo ? Math.max(4, Math.round(unit.def.stats.attack * 0.4)) : unit.attack;
@@ -107,6 +127,17 @@ export class CombatSystem {
           }
           const multiplier = getDamageMultiplier(unit.type, target.type);
           dmg = Math.round(dmg * multiplier);
+          // Ranged units can't aim properly with a melee enemy in their face (−40% damage)
+          if (!unit.outOfAmmo && unit.attackRange > 1.5 && unit.type !== UnitType.CANNON) {
+            const meleeThreat = allUnits.some(e =>
+              e.isAlive() && e.playerId !== unit.playerId && e.attackRange <= 1.5 &&
+              e.garrisonedIn === null && unit.distanceTo(e) <= 1.6,
+            );
+            unit.meleePinned = meleeThreat;
+            if (meleeThreat) dmg = Math.max(1, Math.round(dmg * 0.6));
+          } else {
+            unit.meleePinned = false;
+          }
           const tile = map.getTile(target.col, target.row);
           dmg = Math.max(1, dmg - terrainDefenseBonus(tile?.terrain));
           // Formation defense (LOOSE: -15% def, PHALANX: +30% def, WEDGE: +10% def)
@@ -115,19 +146,32 @@ export class CombatSystem {
           }
           // Hold position: +2 defense bonus for targets holding their ground
           if (target.state === UnitState.HOLD) dmg = Math.max(1, dmg - 2);
+          // Stationary defense: unit holding ground ≥5s gains battle readiness (+1 def)
+          if (target.stationaryTimer >= 5) dmg = Math.max(1, dmg - 1);
           // Entrenched: dug into cover (+5 defense on top of HOLD bonus)
           if (target.entrenched) dmg = Math.max(1, dmg - 5);
-          // Jungle ambush: melee units fighting from dense cover gain +20% attack.
+          // Jungle ambush: melee units gain +20% from cover; stationary 5+s = true ambush (+40%).
           // Cavalry and Cannon lose this advantage — they can't maneuver in thick forest.
           if (unit.attackRange <= 1.5 &&
               unit.type !== UnitType.CAVALRY && unit.type !== UnitType.CANNON) {
             const attackerTile = map?.getTile(Math.round(unit.col), Math.round(unit.row));
-            if (attackerTile?.terrain === TerrainType.JUNGLE) dmg = Math.round(dmg * 1.20);
+            if (attackerTile?.terrain === TerrainType.JUNGLE) {
+              const ambushMult = unit.stationaryTimer >= 5 ? 1.4 : 1.2;
+              dmg = Math.round(dmg * ambushMult);
+            }
           }
           // Close ranks: formation fighters shield each other
           if (target.inFormation) dmg = Math.max(1, dmg - 2);
-          // Routed targets are cut down more easily
-          if (target.panicked) dmg = Math.round(dmg * 1.25);
+          // Fire vulnerability: burning targets take +10% damage (heat and smoke weaken defense)
+          if (target.burning > 0) dmg = Math.round(dmg * 1.10);
+          // Supply depot: troops near a friendly Storehouse have better equipment (+2 defense)
+          if (target._nearSupplyDepot) dmg = Math.max(1, dmg - 2);
+          // Officer aura: a nearby level-3 champion / hero steadies the line (+2 def)
+          if (target.nearOfficer) dmg = Math.max(1, dmg - 2);
+          // Routed targets are cut down more easily; cavalry pursuit is especially lethal
+          if (target.panicked) {
+            dmg = Math.round(dmg * (unit.type === UnitType.CAVALRY ? 1.55 : 1.25));
+          }
           // Flanking bonus: +25% damage when 2 or more allies attack the same target
           const isFlanking = (attackerCount.get(target.id) ?? 1) >= 2;
           if (isFlanking) dmg = Math.round(dmg * 1.25);
@@ -135,32 +179,114 @@ export class CombatSystem {
           if (unit.type === UnitType.CANNON && unit.entrenched) dmg = Math.round(dmg * 1.5);
           // Cavalry charge: +60% on first strike after 3s idle + morale shock on target
           let isCharge = false;
+          let chargeBlocked = false;
           if (unit.type === UnitType.CAVALRY && unit.chargeReady) {
-            dmg = Math.round(dmg * 1.6);
             unit.chargeReady = false;
-            isCharge = true;
-            if (!target.isHero) target.loseMorale(15); // charge breaks enemy morale
+            const spearTypes = new Set([UnitType.SPEARMAN, UnitType.QUECHUA, UnitType.ANTIS_WARRIOR, UnitType.CHAKANA_GUARD]);
+            if (target.formation === 'PHALANX' && spearTypes.has(target.type)) {
+              // Phalanx brace: spear units set against charging cavalry absorb the blow.
+              // No charge bonus, no morale shock; defenders gain confidence (+10 morale).
+              chargeBlocked = true;
+              if (!target.isHero) target.morale = Math.min(100, target.morale + 10);
+              if (!target.isHero) target.counterChargeBuff = true; // next attack gets counter-charge bonus
+            } else {
+              dmg = Math.round(dmg * 1.6);
+              isCharge = true;
+              unit.chargeSpeedTimer = 2.0; // 2s speed burst from charge momentum
+              if (!target.isHero) target.loseMorale(15); // charge breaks enemy morale
+            }
+          }
+          // Desperate last stand: unit at < 10% HP fights with nothing-to-lose fury (+30%)
+          // overrides the heavy-wounds penalty bracket below
+          if (unit.hp < unit.maxHp * 0.10) dmg = Math.round(dmg * 1.30);
+          // Heavy wounds (< 25% HP): attacker fights at reduced effectiveness (-20%)
+          else if (unit.hp < unit.maxHp * 0.25) dmg = Math.round(dmg * 0.8);
+          // Slowed: stone impact disrupts weapon timing — slowed units attack less effectively (-20%)
+          if (unit.slowed > 0) dmg = Math.max(1, Math.round(dmg * 0.80));
+          // Sniper precision: ARQUEBUSIER in careful HOLD aim for ≥8s lands a +25% precision shot
+          if (unit.type === UnitType.ARQUEBUSIER && !unit.outOfAmmo && isHold && unit.stationaryTimer >= 8) {
+            dmg = Math.round(dmg * 1.25);
+            unit.stationaryTimer = 0; // shifts position after firing to avoid prediction
+          }
+          // Cornered rat: 3+ enemies within 2 tiles → desperation surge (+20% damage)
+          {
+            let nearEnemies = 0;
+            for (const e of allUnits) {
+              if (e.isAlive() && e.playerId !== unit.playerId && Math.hypot(e.col - unit.col, e.row - unit.row) <= 2.0) nearEnemies++;
+            }
+            if (nearEnemies >= 3) dmg = Math.round(dmg * 1.20);
           }
           // Berserk: +25% damage during 12-second kill-streak buff
           if (unit.berserkTimer > 0) dmg = Math.round(dmg * 1.25);
           // Leadership aura: +5% damage when player has any level-3 unit alive
           if (playersWithLeader.has(unit.playerId)) dmg = Math.round(dmg * 1.05);
+          // Civ unit synergy: +10% damage when fighting alongside a complementary unit type
+          if (unit.nearSynergy) dmg = Math.round(dmg * 1.10);
+          // Hero passive specialization: +15% when hero's signature unit type fights nearby
+          if (unit.heroPowerBuff) dmg = Math.round(dmg * 1.15);
+          // Counter-charge: spear unit that absorbed a cavalry charge strikes back +20%
+          if (unit.counterChargeBuff) { dmg = Math.round(dmg * 1.20); unit.counterChargeBuff = false; }
+          // Inspired fury: +15% damage for 5s after landing a kill at ≥80 morale
+          if (unit.inspiredTimer > 0) dmg = Math.round(dmg * 1.15);
+          // Waterway ambush: attacking from a beach flanks the enemy's exposed shoreline (+15%)
+          if (attackerTile?.terrain === TerrainType.BEACH) dmg = Math.round(dmg * 1.15);
+          // Ambush striker: JAGUAR_KNIGHT/CUACHIC first attack after ≥5s still — stalk-and-pounce +35%
+          if (unit.ambushReady) { dmg = Math.round(dmg * 1.35); unit.ambushReady = false; unit.stationaryTimer = 0; }
+          // Champion last stand: level-3 unit at <25% HP fights with desperate fury (+25% dmg)
+          if (unit.lastStandTimer > 0) dmg = Math.round(dmg * 1.25);
           // Hero war cry buff: +25% attack for 12s
           if (unit.buffAttackTimer > 0) dmg = Math.round(dmg * 1.25);
           // Volley: synchronized burst for 2.5× damage, longer reload
           if (isVolley) dmg = Math.round(dmg * 2.5);
           // Weather: rain/storm reduces gunpowder & all-ranged effectiveness
           if (weather) dmg = Math.max(1, Math.round(dmg * weather.damageMultiplier(unit.type)));
-          // Night: +15% damage on both sides — darkness breeds surprise and chaos
-          if (isNight) dmg = Math.round(dmg * 1.15);
+          // Night: melee thrives in the dark (+15%); gunpowder weapons struggle (-10%).
+          // Eagle Warriors are trained for night warfare: +40% instead of the standard +15%.
+          if (isNight) {
+            const isPowder = unit.type === UnitType.ARQUEBUSIER || unit.type === UnitType.CANNON;
+            const nightMult = isPowder ? 0.9 : (unit.type === UnitType.EAGLE_WARRIOR ? 1.40 : 1.15);
+            dmg = Math.round(dmg * nightMult);
+          }
+          // Veteran toughness: level-3 Champions absorb 15% of incoming damage
+          if (target.level >= 3) dmg = Math.max(1, Math.round(dmg * 0.85));
+          // Melee pin: ranged unit threatened by adjacent enemy melee fires at -40%
+          if (unit.meleePinned) dmg = Math.max(1, Math.round(dmg * 0.6));
+          // Officer aura: units near a hero or veteran champion take -2 damage
+          if (target.nearOfficer) dmg = Math.max(1, dmg - 2);
+          // Homeland defender: Nv.3 units fighting on HOLD near their own settlement
+          // fight with supreme determination — additional 10% damage absorption
+          if (target.level >= 3 && target.state === UnitState.HOLD && target._nearSettlement) {
+            dmg = Math.max(1, Math.round(dmg * 0.90));
+          }
 
           const actual = target.takeDamage(dmg);
-          unit.attackTimer = unit.attackCooldown * (isVolley ? 1.5 : 1.0);
+          // Entrenched ranged: prepared position grants 20% faster reload
+          const entrenchedBonus = (unit.entrenched && !unit.outOfAmmo && unit.attackRange > 1.5 &&
+            unit.type !== UnitType.CANNON) ? 0.80 : 1.0;
+          // Low morale: hesitant fighters attack 15% slower when morale < 30
+          const moralePenalty = (!unit.isHero && unit.morale < 30) ? 1.15 : 1.0;
+          unit.attackTimer = unit.attackCooldown * (isVolley ? 1.5 : 1.0) * entrenchedBonus * moralePenalty;
           // Ammo consumption (volley costs 2 rounds)
           if (unit.ammo > 0) unit.ammo = Math.max(0, unit.ammo - (isVolley ? 2 : 1));
 
           let isCrit = multiplier >= 1.5 || isFlanking || isCharge || unit.berserkTimer > 0 || isVolley || unit.buffAttackTimer > 0;
-          this.events.push({ attacker: unit, target, damage: actual, worldX: target.worldX, worldZ: target.worldZ, critical: isCrit });
+          this.events.push({ attacker: unit, target, damage: actual, worldX: target.worldX, worldZ: target.worldZ, critical: isCrit, isCharge, chargeBlocked });
+
+          // Hero front-line inspiration: hero's attack boosts morale of nearby allies (+1 each strike)
+          if (unit.isHero && actual > 0) {
+            for (const ally of allUnits) {
+              if (!ally.isAlive() || ally === unit || ally.playerId !== unit.playerId) continue;
+              if (Math.hypot(ally.col - unit.col, ally.row - unit.row) <= 5)
+                ally.morale = Math.min(100, ally.morale + 1);
+            }
+          }
+
+          // Fire arrow: ARCHER/ATLATL/SLINGER have a 15% chance to ignite the target
+          if (target.isAlive() && !target.burning &&
+              (unit.type === UnitType.ARCHER || unit.type === UnitType.ATLATL || unit.type === UnitType.SLINGER) &&
+              Math.random() < 0.15) {
+            target.burning = 3;
+          }
 
           // Kill streak tracking: 3 kills in a row without taking damage → 12s berserk
           if (!target.isAlive()) {
@@ -169,29 +295,71 @@ export class CombatSystem {
               unit.berserkTimer = 12;
               unit.killStreak   = 0;
             }
+            // Inspired fury: high-morale kill triggers a short damage surge
+            if (!unit.isHero && unit.morale >= 80) unit.inspiredTimer = 5;
           }
 
-          // Cannon: splash damage + burning status effect (30% chance on direct hit)
+          // Cannon: splash damage + burning + artillery terror (morale shock)
           if (unit.type === UnitType.CANNON) {
             const burnMult = weather ? weather.burnChanceMult : 1.0;
             if (Math.random() < 0.30 * burnMult && target.isAlive()) target.burning = Math.max(target.burning, 4);
+            // Direct hit terror: a cannonball is terrifying, even when it doesn't kill
+            if (target.isAlive() && !target.isHero) target.loseMorale(8);
             const splashDmg = Math.max(1, Math.round(dmg * SPLASH_DAMAGE_RATIO));
+            const CANNON_TERROR_RADIUS = 4.0; // morale-shock zone beyond physical splash
             for (const other of allUnits) {
               if (!other.isAlive() || other === target) continue;
               const d = Math.sqrt((other.col - target.col) ** 2 + (other.row - target.row) ** 2);
               if (d <= SPLASH_RADIUS) {
                 const splashActual = other.takeDamage(splashDmg);
                 if (Math.random() < 0.15 * burnMult) other.burning = Math.max(other.burning, 3);
+                // Shrapnel terror: nearby troops are rattled by the blast
+                if (other.isAlive() && !other.isHero) other.loseMorale(5);
+                this.events.push({ attacker: unit, target: other, damage: splashActual, worldX: other.worldX, worldZ: other.worldZ, critical: false });
+              } else if (d <= CANNON_TERROR_RADIUS && other.playerId !== unit.playerId) {
+                // Psychological terror: the thunderclap demoralises troops beyond the kill zone
+                if (!other.isHero) other.loseMorale(3);
+              }
+            }
+          }
+          // Cannon echo: the thunderous boom rallies nearby allied troops (+5 morale within 5 tiles)
+          if (unit.type === UnitType.CANNON) {
+            for (const ally of allUnits) {
+              if (!ally.isAlive() || ally.playerId !== unit.playerId || ally === unit || ally.type === UnitType.CANNON) continue;
+              if (Math.hypot(ally.col - unit.col, ally.row - unit.row) <= 5) ally.morale = Math.min(100, ally.morale + 5);
+            }
+          }
+          // Jungle melee: 20% chance to poison target (MAYA specialists: 35% chance)
+          if (unit.attackRange < 2) {
+            const attackerTile = map.getTile(unit.col, unit.row);
+            const poisonChance = unit.civType === CivilizationType.MAYA ? 0.35 : 0.20;
+            if (attackerTile?.terrain === TerrainType.JUNGLE && Math.random() < poisonChance) {
+              target.poisoned = Math.max(target.poisoned, 6);
+            }
+          }
+          // Slinger: stone impact staggers the target (-40% speed for 2s; infantry only)
+          if (unit.type === UnitType.SLINGER && target.isAlive() && target.attackRange <= 1.5) {
+            target.slowed = Math.max(target.slowed, 2);
+          }
+          // Atlatl javelin stagger: 20% chance to slow target 1s (javelin weight disrupts movement)
+          if (unit.type === UnitType.ATLATL && target.isAlive() && target.attackRange <= 1.5 && Math.random() < 0.20) {
+            target.slowed = Math.max(target.slowed, 1);
+          }
+          // Atlatl: javelin has small splash (0.8-tile radius, 40% damage) — punishes packed formations
+          if (unit.type === UnitType.ATLATL && target.isAlive()) {
+            const atatlSplash = Math.max(1, Math.round(dmg * 0.40));
+            for (const other of allUnits) {
+              if (!other.isAlive() || other === target || other.playerId === unit.playerId) continue;
+              if (Math.hypot(other.col - target.col, other.row - target.row) <= 0.8) {
+                const splashActual = other.takeDamage(atatlSplash);
                 this.events.push({ attacker: unit, target: other, damage: splashActual, worldX: other.worldX, worldZ: other.worldZ, critical: false });
               }
             }
           }
-          // Jungle melee: 20% chance to poison target
-          if (unit.attackRange < 2) {
-            const attackerTile = map.getTile(unit.col, unit.row);
-            if (attackerTile?.terrain === TerrainType.JUNGLE && Math.random() < 0.20) {
-              target.poisoned = Math.max(target.poisoned, 6);
-            }
+          // Critical hit stagger: flanking, charge, berserk, or volley crits add +0.5s to the
+          // target's attack timer (brief interrupt — the blow breaks their combat rhythm)
+          if (isCrit && target.isAlive() && !target.isHero) {
+            target.attackTimer = Math.max(target.attackTimer, target.attackCooldown * 0.5);
           }
         }
       }

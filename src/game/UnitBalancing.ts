@@ -26,24 +26,24 @@ export const UNIT_COUNTERS: Record<UnitType, CounterMatrix> = {
   // Incas
   [UnitType.QUECHUA]: {
     [UnitType.EAGLE_WARRIOR]: { multiplier: 0.9, reason: 'Balanced' },
-    [UnitType.CAVALRY]: { multiplier: 1.1, reason: 'Unidad base resiliente' },
+    [UnitType.CAVALRY]: { multiplier: 1.5, reason: 'Lanzas largas detienen la carga' },
   },
   [UnitType.SLINGER]: {
     [UnitType.ARCHER]: { multiplier: 0.9, reason: 'Similar tipo' },
-    [UnitType.CAVALRY]: { multiplier: 1.3, reason: 'Detiene carga' },
+    [UnitType.CAVALRY]: { multiplier: 1.4, reason: 'Proyectiles detienen carga' },
   },
   [UnitType.CHAKANA_GUARD]: {
     [UnitType.CANNON]: { multiplier: 0.5, reason: 'Poco puede contra artillería' },
     [UnitType.JAGUAR_KNIGHT]: { multiplier: 1.2, reason: 'Defensa mejor' },
   },
   [UnitType.ANTIS_WARRIOR]: {
-    [UnitType.CAVALRY]: { multiplier: 1.4, reason: 'Rápido en terreno' },
+    [UnitType.CAVALRY]: { multiplier: 1.7, reason: 'Lanzas de selva — destroza caballería' },
     [UnitType.ARQUEBUSIER]: { multiplier: 0.7, reason: 'Vulnerable a fuego' },
   },
 
   // Mayas
   [UnitType.SPEARMAN]: {
-    [UnitType.CAVALRY]: { multiplier: 1.3, reason: 'Lanza vs carga' },
+    [UnitType.CAVALRY]: { multiplier: 1.9, reason: 'Formación de lanzas — la respuesta a la caballería' },
     [UnitType.CANNON]: { multiplier: 0.4, reason: 'Indefenso contra artillería' },
   },
   [UnitType.ARCHER]: {

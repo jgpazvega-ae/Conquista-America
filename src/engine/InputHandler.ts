@@ -219,10 +219,21 @@ export class InputHandler {
       for (const u of myUnits) { cx += u.col; cz += u.row; }
       cx /= myUnits.length; cz /= myUnits.length;
 
+      // When units are tightly clustered (e.g. just spawned), use grid spread so they don't all pile on one tile
+      const maxSpread = myUnits.length > 1
+        ? Math.max(...myUnits.map(u => Math.abs(u.col - cx) + Math.abs(u.row - cz)))
+        : 0;
+      const useGridSpread = maxSpread < 1.5 && myUnits.length > 1;
+
       let sumX = 0, sumZ = 0, moved = 0;
-      myUnits.forEach((unit) => {
-        const offsetC = myUnits.length > 1 ? Math.round(unit.col - cx) : 0;
-        const offsetR = myUnits.length > 1 ? Math.round(unit.row - cz) : 0;
+      myUnits.forEach((unit, i) => {
+        let offsetC: number, offsetR: number;
+        if (useGridSpread) {
+          [offsetC, offsetR] = this.spreadOffset(i, myUnits.length);
+        } else {
+          offsetC = myUnits.length > 1 ? Math.round(unit.col - cx) : 0;
+          offsetR = myUnits.length > 1 ? Math.round(unit.row - cz) : 0;
+        }
         const tc = hit.col + offsetC;
         const tr = hit.row + offsetR;
         const near = map.findWalkableNear(tc, tr, 3);
@@ -252,7 +263,7 @@ export class InputHandler {
     }
   }
 
-  private spreadOffset(idx: number, total: number): [number, number] {
+  spreadOffset(idx: number, total: number): [number, number] {
     if (total === 1) return [0, 0];
     const cols = Math.ceil(Math.sqrt(total));
     const c    = idx % cols - Math.floor(cols / 2);

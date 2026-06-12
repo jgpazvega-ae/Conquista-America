@@ -209,6 +209,7 @@
     <!-- ══════════════════════════════════════════════════ GAME CANVAS ══ -->
     <div id="app" class="hidden">
       <canvas id="game-canvas"></canvas>
+      <div id="settle-danger-vignette" class="hidden"></div>
 
       <!-- HUD Top Bar -->
       <div id="hud-top">
@@ -225,6 +226,8 @@
           <span id="weather-badge" title="Clima actual" style="cursor:default">☀️ Despejado</span>
           <span id="speed-indicator" class="hidden" title="Velocidad del juego">⚡ ×1.0</span>
           <span id="fps-counter" class="hidden">0 FPS</span>
+          <span id="hero-respawn-chip" class="hidden" title="Héroe en respawn — pulsa H para ver el panel">⚔️ Héroe: <b id="hero-respawn-secs">—</b>s</span>
+          <span id="idle-worker-chip" class="hidden" title="Trabajadores inactivos — pulsa Q para asignarlos a recolectar">🧑‍🌾 <b id="idle-worker-count">0</b> ocioso<span id="idle-worker-plural"></span></span>
         </div>
         <div id="hud-actions">
           <button id="power-btn" class="power-btn" title="Poder especial (E)">
@@ -277,6 +280,12 @@
       <!-- Player scoreboard -->
       <div id="scoreboard"></div>
 
+      <!-- Military momentum indicator -->
+      <div id="momentum-bar" title="Tu fuerza militar comparada con el enemigo más fuerte">
+        <div id="momentum-label">⚔️ Equilibrio</div>
+        <div id="momentum-track"><div id="momentum-fill"></div><div id="momentum-marker"></div></div>
+      </div>
+
       <!-- Wonder countdown panel -->
       <div id="wonder-panel" class="hidden">
         <div id="wonder-name"></div>
@@ -314,10 +323,13 @@
       <!-- Toast notification container -->
       <div id="toast-container"></div>
 
+      <!-- Kill feed: recent combat events -->
+      <div id="kill-feed"></div>
+
       <!-- Controls hint -->
       <div id="controls-hint">
         📱 <b>Móvil:</b> Toca · Doble toque para mover/atacar · Pellizca zoom &nbsp;|&nbsp;
-        🖥️ <b>PC:</b> Clic izq. seleccionar · Doble-clic = mismo tipo · Arrastra selección · Clic der. mover/atacar · WASD cámara · <b>Q</b> trabajadores · <b>R</b> retirada · <b>E</b> poder civ · <b>H</b> posición defensa · <b>I</b> unidad inactiva · <b>Tab</b> héroe · <b>G</b> fuego concentrado · <b>U</b> desalojar guarnición · <b>Ctrl+clic der.</b> capturar edificio · <b>+/-</b> velocidad · <b>P</b> pausar · <b>F</b> centrar · <b>Ctrl+A</b> todo · <b>A</b> attack-move · <b>B</b> construir · <b>?</b> ayuda
+        🖥️ <b>PC:</b> Clic izq. seleccionar · Doble-clic = mismo tipo · Arrastra selección · Clic der. mover/atacar · WASD cámara · <b>Q</b> trabajadores · <b>R</b> retirada · <b>E</b> poder civ · <b>H</b> posición defensa · <b>I</b> unidad inactiva · <b>Tab</b> héroe · <b>G</b> fuego concentrado · <b>C</b> reagrupar en héroe · <b>U</b> desalojar guarnición · <b>Ctrl+clic der.</b> capturar edificio · <b>+/-</b> velocidad · <b>P</b> pausar · <b>F</b> centrar · <b>Ctrl+A</b> todo · <b>A</b> attack-move · <b>B</b> construir · <b>?</b> ayuda
       </div>
 
       <!-- Selection box overlay -->
@@ -415,6 +427,17 @@
               <div class="controls-row"><kbd>G</kbd><span>Fuego concentrado</span></div>
               <div class="controls-row"><kbd>Y</kbd><span>📯 Grito de guerra del héroe (+30 moral, +25% atk 12s)</span></div>
               <div class="controls-row"><kbd>Tab</kbd><span>Localizar héroe</span></div>
+              <div class="controls-row"><kbd>C</kbd><span>🎖️ Reagrupar selección/ejército junto al héroe (+def y moral)</span></div>
+              <div class="controls-row"><kbd>Z</kbd><span>📯 Reunir todas las tropas con el héroe (o asentamiento)</span></div>
+            </div>
+            <div class="controls-section">
+              <div class="controls-heading">⚔️ Tácticas de armas combinadas</div>
+              <div class="controls-row"><kbd>🗡️ Lanceros</kbd><span>La respuesta a la caballería — ×1.9 daño contra jinetes</span></div>
+              <div class="controls-row"><kbd>🐎 Caballería</kbd><span>Carga fugaz contra arqueros y flancos; evita lanceros</span></div>
+              <div class="controls-row"><kbd>🏹 A distancia</kbd><span>Letales a distancia, pero −40% si un enemigo los acorrala (⚠️ACORRALADO)</span></div>
+              <div class="controls-row"><kbd>💣 Cañones</kbd><span>×2 contra infantería; despliegue lento, frágil en melé</span></div>
+              <div class="controls-row"><kbd>🎖️ Oficiales</kbd><span>Héroes y campeones Nv.3 dan +2 def a aliados en 5 casillas</span></div>
+              <div class="controls-row"><kbd>🛡️ Pantalla</kbd><span>Protege tus arqueros con infantería al frente</span></div>
             </div>
             <div class="controls-section">
               <div class="controls-heading">Grupos y Otros</div>

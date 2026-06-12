@@ -611,12 +611,34 @@ input.toggle { width: 22px; height: 22px; accent-color: #d4880a; }
   border-radius: 6px; padding: 4px 8px; font-size: 11px;
   backdrop-filter: blur(4px);
 }
-.sb-emoji  { font-size: 13px; }
-.sb-name   { color: #c8a060; min-width: 48px; }
-.sb-pop    { color: #a0c0e0; min-width: 30px; font-size: 10px; }
-.sb-kills  { color: #ff9966; min-width: 28px; font-size: 10px; }
-.sb-hp-wrap { width: 44px; height: 5px; background: rgba(255,255,255,0.12); border-radius: 3px; overflow: hidden; }
-.sb-hp-fill { height: 100%; border-radius: 3px; transition: width 0.4s; }
+.sb-emoji    { font-size: 13px; }
+.sb-name     { color: #c8a060; min-width: 48px; }
+.sb-pop      { color: #a0c0e0; min-width: 30px; font-size: 10px; }
+.sb-kills    { color: #ff9966; min-width: 28px; font-size: 10px; }
+.sb-bldgs    { color: #c8a060; min-width: 26px; font-size: 10px; opacity: 0.75; }
+.sb-elim     { color: #666; font-size: 10px; font-style: italic; }
+.sb-hp-wrap  { width: 44px; height: 5px; background: rgba(255,255,255,0.12); border-radius: 3px; overflow: hidden; }
+.sb-hp-fill  { height: 100%; border-radius: 3px; transition: width 0.4s; }
+.sb-defeated { opacity: 0.6; filter: grayscale(60%); }
+
+/* Military momentum indicator */
+#momentum-bar {
+  position: absolute; top: 200px; right: 8px; z-index: 110;
+  width: 132px; pointer-events: none;
+  background: rgba(8,4,1,0.85); border: 1px solid rgba(200,160,80,0.18);
+  border-radius: 6px; padding: 5px 8px; backdrop-filter: blur(4px);
+}
+#momentum-bar.hidden { display: none; }
+#momentum-label { font-size: 10px; font-weight: 700; margin-bottom: 4px; transition: color 0.4s; }
+#momentum-track {
+  position: relative; width: 100%; height: 6px;
+  background: rgba(255,255,255,0.10); border-radius: 3px; overflow: hidden;
+}
+#momentum-fill { height: 100%; border-radius: 3px; transition: width 0.5s, background 0.5s; }
+#momentum-marker {
+  position: absolute; top: -1px; width: 1px; height: 8px;
+  background: rgba(255,255,255,0.6); transform: translateX(-50%);
+}
 
 /* ═══════════════════════════════════════ CIVILIZATION POWER BUTTON ══ */
 .power-btn {
@@ -814,6 +836,22 @@ input.toggle { width: 22px; height: 22px; accent-color: #d4880a; }
   50%       { border-color: rgba(255,80,80,0.95); box-shadow: 0 0 10px rgba(255,80,80,0.55); }
 }
 .res.res-low { animation: resPulse 1.2s ease-in-out infinite; }
+@keyframes resCritical {
+  0%, 100% { border-color: rgba(255,40,40,0.9); box-shadow: 0 0 8px rgba(255,40,40,0.6); background: rgba(255,40,40,0.15); }
+  50%       { border-color: rgba(255,200,0,0.9); box-shadow: 0 0 16px rgba(255,200,0,0.55); background: rgba(255,200,0,0.1); }
+}
+.res.res-critical { animation: resCritical 0.6s ease-in-out infinite; }
+
+/* Settlement danger vignette */
+#settle-danger-vignette {
+  position: fixed; inset: 0; pointer-events: none; z-index: 50;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(200,20,20,0.0) 70%, rgba(220,30,30,0.55) 100%);
+  animation: dangerPulse 1.0s ease-in-out infinite;
+}
+@keyframes dangerPulse {
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 0.9; }
+}
 
 /* Touch ripple */
 .tap-ripple {
@@ -1106,6 +1144,31 @@ input.toggle { width: 22px; height: 22px; accent-color: #d4880a; }
   border-radius: 6px; font-variant-numeric: tabular-nums;
 }
 
+/* Hero respawn countdown chip */
+#hero-respawn-chip {
+  font-size: 11px; font-weight: 700; color: #ffaa44;
+  padding: 3px 9px;
+  background: rgba(60,20,0,0.7);
+  border: 1px solid rgba(255,140,40,0.4);
+  border-radius: 6px; animation: hero-respawn-pulse 1.2s ease-in-out infinite;
+}
+#hero-respawn-chip b { color: #ffdd88; }
+@keyframes hero-respawn-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+
+/* Idle worker chip */
+#idle-worker-chip {
+  font-size: 11px; font-weight: 600; color: #cce0a0;
+  padding: 3px 9px;
+  background: rgba(40,50,20,0.6);
+  border: 1px solid rgba(150,200,80,0.35);
+  border-radius: 6px;
+}
+#idle-worker-chip.hidden { display: none; }
+#idle-worker-chip b { color: #eaffb0; }
+
 /* Auto-save flash indicator */
 #autosave-indicator {
   position: absolute; top: 44px; right: 12px; z-index: 130;
@@ -1161,6 +1224,22 @@ input.toggle { width: 22px; height: 22px; accent-color: #d4880a; }
 .hud-toast-info    { border: 1px solid rgba(100,200,255,0.35); color: #a8d8ff; }
 .hud-toast-warning { border: 1px solid rgba(255,180,50,0.4);  color: #f0c060; }
 .hud-toast-success { border: 1px solid rgba(60,220,100,0.4);  color: #44ee88; }
+
+/* ═══════════════════════════════════════ KILL FEED ══════ */
+#kill-feed {
+  position: fixed; right: 12px; bottom: 44px; z-index: 400;
+  display: flex; flex-direction: column-reverse; gap: 3px;
+  pointer-events: none; width: 240px;
+}
+.kf-entry {
+  background: rgba(8,6,2,0.80);
+  border-left: 2px solid rgba(255,180,50,0.45);
+  border-radius: 0 5px 5px 0;
+  padding: 3px 8px; font-size: 11px; color: #ccc;
+  opacity: 1; transition: opacity 1.5s ease;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.kf-entry.fade { opacity: 0; }
 
 /* ═══════════════════════════════════════ PAUSE OVERLAY ══ */
 #pause-overlay {

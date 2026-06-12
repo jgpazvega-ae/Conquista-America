@@ -17,6 +17,9 @@ const SKIN_TONES: Record<CivilizationType, number> = {
 };
 
 export class Unit {
+  /** Global weather movement multiplier, set once per frame by Game (1.0 = clear, <1 = rain/storm mud). */
+  static weatherSpeedMult = 1.0;
+
   readonly id: number;
   readonly type: UnitType;
   readonly civType: CivilizationType;
@@ -51,12 +54,16 @@ export class Unit {
   patrolFlip = false;
 
   // XP / leveling
-  xp:    number = 0;
-  level: number = 1;
+  xp:           number  = 0;
+  level:        number  = 1;
+  justLeveledUp = false; // cleared by Game.ts each frame; true on the frame levelUp fires
+  justRallied   = false; // set on the frame panicked→false; cleared by Game to broadcast contagion
 
   // Civilization power buffs
   incaBuff  = false;
   conquBuff = false;
+  _preBuffAttack = 0; // attack value before civ power buff (0 = not buffed)
+  _preBuffSpeed  = 0;
 
   moveX: number = 0;
   moveZ: number = 0;
@@ -79,17 +86,20 @@ export class Unit {
   _idleHealTimer   = 0;     // accumulates while healing
   _nearSettlement  = false; // set each frame by Game.ts; boosts idle heal rate
   _nearSupplyDepot = false; // true when within 4 tiles of a friendly complete Storehouse
+  _isolated        = false; // set each frame by Game.ts; no friendly unit within 6 tiles
   wantsRetreat     = false; // set by takeDamage when HP < 20%; cleared by Game
 
   // Status effects (damage over time)
   burning  = 0;  // remaining burn duration (s); 2 HP every 0.5 s
   poisoned = 0;  // remaining poison duration (s); 2 HP every 1 s
+  slowed   = 0;  // remaining slow duration (s); -40% speed from slinger stones
   private _burnTick   = 0;
   private _poisonTick = 0;
 
   // Cavalry charge: ready after 3s idle; consumed on first attack
-  chargeReady     = false;
+  chargeReady      = false;
   private _chargeIdleTime = 0;
+  chargeSpeedTimer = 0; // seconds of post-charge speed boost remaining
 
   // Kill streak / berserk
   killStreak  = 0;          // consecutive kills without taking damage
@@ -102,6 +112,14 @@ export class Unit {
 
   // Entrench (X key): dig in for +5 defense; cleared on any movement order
   entrenched = false;
+
+  // Battle fatigue: prolonged combat lowers effectiveness
+  combatTimer      = 0;   // seconds spent continuously in ATTACKING state
+  fatigued         = false;
+  private _preFatigueAttack = 0;
+
+  // Stationary defense: seconds spent holding position (IDLE/HOLD) without moving
+  stationaryTimer = 0;
 
   // Garrison: inside building id, or moving toward one to enter
   garrisonedIn: number | null = null;
@@ -116,6 +134,35 @@ export class Unit {
   // Close ranks: 3+ allies within 3 tiles → +2 defense, faster morale recovery.
   // Recomputed periodically by Game.updateFormations.
   inFormation = false;
+
+  // Officer aura: a level-3 champion ally or hero within 5 tiles grants +2 defense.
+  // Recomputed periodically by Game.updateFormations.
+  nearOfficer = false;
+
+  // Civ unit synergy: complementary elite unit type nearby (Eagle+Jaguar, Quechua+Antis, etc.)
+  // Grants +10% damage when active. Recomputed periodically by Game.updateFormations.
+  nearSynergy = false;
+
+  // Hero passive specialization: hero within 6 tiles and this is its signature unit type.
+  // Grants +15% damage. Recomputed periodically by Game.updateFormations.
+  heroPowerBuff = false;
+
+  // Champion last stand: level-3 unit drops below 25% HP → +25% damage for 10s.
+  lastStandTimer = 0;
+
+  // Inspired fury: landing a killing blow at ≥80 morale grants +15% damage for 5s.
+  inspiredTimer = 0;
+
+  // Veteran teaching: level-3 same-type unit within 3 tiles — this unit gains XP 30% faster.
+  _nearVeteranTeacher = false;
+  // Counter-charge: spear unit that absorbs a cavalry charge deals +20% on their next attack.
+  counterChargeBuff = false;
+  // Ambush ready: JAGUAR_KNIGHT/CUACHIC held still for ≥5s — first strike deals +35% damage.
+  ambushReady = false;
+
+  // Ranged unit pinned in melee: an enemy melee unit is adjacent → -40% ranged damage.
+  // Set each frame by CombatSystem when the unit fires while threatened.
+  meleePinned = false;
 
   // Ammo (ranged units only; -1 = melee, never depletes)
   ammo    = -1;
@@ -135,8 +182,13 @@ export class Unit {
   heroName = '';
 
   // Hero war cry: Y-key buff that boosts nearby allies
-  warCryCooldown = 0;  // seconds remaining before war cry can be used again
-  buffAttackTimer = 0; // seconds of +25% attack buff remaining (from allied hero war cry)
+  warCryCooldown  = 0;  // seconds remaining before war cry can be used again
+  buffAttackTimer = 0;  // seconds of +25% attack buff remaining (from allied hero war cry)
+  // Hero secondary ability: H-key civ-flavored power (60s cooldown)
+  heroCooldown2    = 0;  // seconds remaining before secondary ability can be used again
+  heroSpeedBuff    = 0;  // seconds of Inca hero speed boost remaining
+  // Hero auto-rally: triggers when hero morale drops below 40
+  rallyCooldown = 0;
 
   constructor(
     type: UnitType, civ: CivilizationType, playerId: number,
@@ -766,9 +818,19 @@ export class Unit {
     if (this.hp > 0 && this.hp < this.maxHp * 0.20 && !this.wantsRetreat) {
       this.wantsRetreat = true;
     }
+    // Champion last stand: veteran (level 3) unit drops below 25% HP → surge of desperate fury
+    if (this.hp > 0 && this.level >= 3 && !this.isHero && this.hp < this.maxHp * 0.25 && this.lastStandTimer <= 0) {
+      this.lastStandTimer = 10;
+    }
     this.updateHealthBar();
     if (this.hp <= 0) this.die();
     return dmg;
+  }
+
+  /** Restore HP (up to maxHp) and refresh the health bar. */
+  heal(amount: number) {
+    this.hp = Math.min(this.maxHp, this.hp + amount);
+    this.updateHealthBar();
   }
 
   private die() {
@@ -810,15 +872,62 @@ export class Unit {
     if (this.berserkTimer > 0) this.berserkTimer = Math.max(0, this.berserkTimer - dt);
     this.animT += dt;
 
+    // Stationary defense: track time spent holding ground without moving
+    if (this.state === UnitState.IDLE || this.state === UnitState.HOLD) {
+      this.stationaryTimer = Math.min(10, this.stationaryTimer + dt);
+    } else {
+      this.stationaryTimer = 0;
+    }
+    // Ambush: melee stalkers prime a devastating first strike after holding still ≥5s
+    if ((this.type === UnitType.JAGUAR_KNIGHT || this.type === UnitType.CUACHIC) && this.stationaryTimer >= 5) {
+      this.ambushReady = true;
+    }
+
+    // Battle fatigue: ≥60s continuous combat reduces attack by 10%; rest clears it
+    if (this.state === UnitState.ATTACKING) {
+      this.combatTimer += dt;
+      if (this.combatTimer >= 60 && !this.fatigued && !this.isHero) {
+        this.fatigued          = true;
+        this._preFatigueAttack = this.attack;
+        this.attack            = Math.max(1, Math.round(this.attack * 0.9));
+      }
+    } else if (this.fatigued) {
+      // HOLD command doubles recovery speed — troops resting in position shake off fatigue faster
+      const recoveryRate = this.state === UnitState.HOLD ? 4 : 2;
+      this.combatTimer = Math.max(0, this.combatTimer - dt * recoveryRate);
+      if (this.combatTimer <= 0) {
+        this.fatigued = false;
+        this.attack   = this._preFatigueAttack; // restore pre-fatigue attack
+      }
+    } else {
+      this.combatTimer = Math.max(0, this.combatTimer - dt);
+    }
+
     // Morale regeneration: faster near own settlement; rally at 50 ends panic
     if (this._moraleCooldown > 0) {
       this._moraleCooldown -= dt;
     } else if (this.morale < 100) {
       let regen = this._nearSettlement ? 9 : 4;
+      if (this._isolated) regen *= 0.5; // lone units struggle to recover morale
       if (this.inFormation) regen *= 1.5; // close ranks steady the nerves
+      // Home terrain bonus: natives recover morale faster on their ancestral lands
+      const tile = map.getTile(this.col, this.row);
+      if (tile) {
+        const t = tile.terrain;
+        const onHome =
+          ((this.civType === CivilizationType.AZTEC || this.civType === CivilizationType.MAYA) &&
+           t === TerrainType.JUNGLE) ||
+          (this.civType === CivilizationType.INCA &&
+           (t === TerrainType.HIGHLAND || t === TerrainType.MOUNTAIN));
+        if (onHome) regen *= 1.6;
+        // CONQUISTADOR supply line: disciplined logistics — morale recovers 40% faster near settlement
+        if (this.civType === CivilizationType.CONQUISTADOR && this._nearSettlement) regen *= 1.4;
+      }
       this.morale = Math.min(100, this.morale + regen * dt);
     }
-    if (this.panicked && this.morale >= 50) this.panicked = false;
+    // Poison disrupts morale recovery — toxins sap the will to fight
+    if (this.poisoned > 0) this.morale = Math.max(0, this.morale - 0.5 * dt);
+    if (this.panicked && this.morale >= 50) { this.panicked = false; this.justRallied = true; }
 
     // Passive idle healing: 2 HP every 0.5 s after 5 s without damage
     // (nearSettlement flag set externally by Game.ts each frame for +3 extra HP/tick)
@@ -826,7 +935,22 @@ export class Unit {
       this._damageCooldown -= dt;
     } else if (this.state === UnitState.IDLE && this.hp < this.maxHp) {
       this._idleHealTimer += dt;
-      const healPerTick = this._nearSettlement ? 5 : 2;
+      // Civ terrain affinity: native terrain multiplies idle regen (AC: homeland endurance)
+      const tile2 = map.getTile(this.col, this.row);
+      let terrainHealMult = 1.0;
+      if (tile2) {
+        const t2 = tile2.terrain;
+        if ((this.civType === CivilizationType.AZTEC || this.civType === CivilizationType.MAYA) && t2 === TerrainType.JUNGLE) {
+          terrainHealMult = 1.5;
+        } else if (this.civType === CivilizationType.INCA && (t2 === TerrainType.HIGHLAND || t2 === TerrainType.MOUNTAIN)) {
+          terrainHealMult = 2.0;
+        } else if (this.civType === CivilizationType.CONQUISTADOR && (t2 === TerrainType.BEACH || t2 === TerrainType.DESERT)) {
+          terrainHealMult = 1.25;
+        }
+        // Beach healing spring: all units recover faster near water (fresh coastal springs)
+        if (t2 === TerrainType.BEACH) terrainHealMult = Math.max(terrainHealMult, 1.5);
+      }
+      const healPerTick = Math.round((this._nearSettlement ? 5 : 2) * terrainHealMult);
       while (this._idleHealTimer >= 0.5) {
         this._idleHealTimer -= 0.5;
         this.hp = Math.min(this.maxHp, this.hp + healPerTick);
@@ -856,9 +980,29 @@ export class Unit {
       }
     }
 
-    // Hero war cry cooldown and attack buff
+    // Slinger slow: -40% speed for the duration (does not stack)
+    if (this.slowed > 0) this.slowed = Math.max(0, this.slowed - dt);
+
+    // Hero war cry cooldown, attack buff, and rally cooldown
     if (this.warCryCooldown > 0) this.warCryCooldown = Math.max(0, this.warCryCooldown - dt);
-    if (this.buffAttackTimer > 0) this.buffAttackTimer = Math.max(0, this.buffAttackTimer - dt);
+    if (this.heroCooldown2   > 0) this.heroCooldown2  = Math.max(0, this.heroCooldown2  - dt);
+    if (this.heroSpeedBuff   > 0) {
+      this.heroSpeedBuff = Math.max(0, this.heroSpeedBuff - dt);
+      if (this.heroSpeedBuff === 0 && this._preBuffSpeed > 0 && !this.incaBuff) {
+        this.speed = this._preBuffSpeed; // restore only if incaBuff isn't also active
+        this._preBuffSpeed = 0;
+      }
+    }
+    if (this.buffAttackTimer  > 0) this.buffAttackTimer  = Math.max(0, this.buffAttackTimer  - dt);
+    if (this.rallyCooldown    > 0) this.rallyCooldown    = Math.max(0, this.rallyCooldown    - dt);
+    if (this.inspiredTimer    > 0) this.inspiredTimer    = Math.max(0, this.inspiredTimer    - dt);
+    if (this.lastStandTimer   > 0) this.lastStandTimer   = Math.max(0, this.lastStandTimer   - dt);
+
+    // Auto-entrench: units holding position for ≥8s dig in automatically
+    if (this.state === UnitState.HOLD && !this.entrenched && !this.isHero &&
+        this.type !== UnitType.CAVALRY && this.stationaryTimer >= 8) {
+      this.entrenched = true;
+    }
 
     // Cavalry charge tracking
     if (this.type === UnitType.CAVALRY) {
@@ -872,6 +1016,15 @@ export class Unit {
       // While ATTACKING: chargeReady persists until consumed in CombatSystem
     }
 
+    // Charge speed burst: apply +0.6 speed for 2s after a successful cavalry charge
+    if (this.chargeSpeedTimer > 0) {
+      this.chargeSpeedTimer = Math.max(0, this.chargeSpeedTimer - dt);
+      this.speed = Math.max(this.speed, this._defSpeed + 0.6);
+      if (this.chargeSpeedTimer === 0) {
+        this.speed = Math.max(0.1, this.speed - 0.6); // remove burst when timer expires
+      }
+    }
+
     // Ammo resupply: 1 round per 1.5 s when near own settlement OR a Storehouse supply depot
     if (this.ammo >= 0 && this.ammo < this.maxAmmo && (this._nearSettlement || this._nearSupplyDepot)) {
       this._ammoRechargeTimer += dt;
@@ -881,6 +1034,12 @@ export class Unit {
       }
     } else {
       this._ammoRechargeTimer = 0;
+    }
+
+    // Supply regen: Storehouse proximity slowly heals wounded troops (up to 50% max HP)
+    if (this._nearSupplyDepot && this.hp < this.maxHp * 0.5 && this.hp > 0) {
+      this.hp = Math.min(Math.round(this.maxHp * 0.5), this.hp + dt);
+      this.updateHealthBar();
     }
 
     if (this.state === UnitState.MOVING || this.state === UnitState.ATTACK_MOVE) {
@@ -954,6 +1113,18 @@ export class Unit {
       case TerrainType.HIGHLAND: terrainMult = 0.72; break;
       case TerrainType.DESERT:   terrainMult = 0.88; break;
     }
+    // Cavalry desert sprint: horses thrive in open arid terrain (+20% speed)
+    if (this.type === UnitType.CAVALRY && tile?.terrain === TerrainType.DESERT) terrainMult *= 1.20;
+    // INCA highland runner: INCA units move faster on their native high-altitude terrain
+    if (this.civType === CivilizationType.INCA && !this.isHero && tile?.terrain === TerrainType.HIGHLAND) {
+      terrainMult *= 1.20;
+    }
+    // Heavy wounds (< 25% HP) impair movement — bleeding soldiers can't keep pace
+    if (this.hp < this.maxHp * 0.25) terrainMult *= 0.7;
+    // Wet weather turns ground to mud — all units move slower in rain/storm
+    terrainMult *= Unit.weatherSpeedMult;
+    // Slinger slow: stone projectiles stagger the target (-40% speed)
+    if (this.slowed > 0) terrainMult *= 0.6;
     const effSpeed = this.formationSpeedCap !== null ? Math.min(this.speed, this.formationSpeedCap) : this.speed;
     const step = effSpeed * TILE_SIZE * dt * terrainMult;
 
@@ -1001,6 +1172,8 @@ export class Unit {
       this.attackBuildingTarget = null;
       this.garrisonTarget = null;
       this.captureTarget = null;
+      // Trench confidence: digging in gives troops a sense of security (+10 morale)
+      this.morale = Math.min(100, this.morale + 10);
     }
   }
 
@@ -1036,17 +1209,20 @@ export class Unit {
   /** Award XP and level up if threshold reached. */
   gainXP(amount: number) {
     if (this.level >= 3) return;
-    this.xp += amount;
+    this.xp += this._nearVeteranTeacher ? Math.round(amount * 1.30) : amount;
     const needed = this.level === 1 ? 50 : 150;
     if (this.xp >= needed) this.levelUp();
   }
 
   private levelUp() {
     this.level++;
-    this.attack  = Math.round(this.attack  * 1.15);
-    this.defense = Math.round(this.defense * 1.15);
-    this.maxHp   = Math.round(this.maxHp   * 1.10);
-    this.hp      = this.maxHp;
+    this.attack       = Math.round(this.attack       * 1.15);
+    this.defense      = Math.round(this.defense      * 1.15);
+    this.maxHp        = Math.round(this.maxHp        * 1.10);
+    this.hp           = this.maxHp;
+    // Veterans attack faster: 8% cooldown reduction per level (cap at 0.3s)
+    this.attackCooldown = Math.max(0.3, this.attackCooldown * 0.92);
+    this.justLeveledUp  = true;
     this.refreshLevelRing();
   }
 

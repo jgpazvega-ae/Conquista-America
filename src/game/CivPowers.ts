@@ -69,7 +69,9 @@ export function activateCivPower(game: Game, selectedUnitId?: number): string | 
     case CivilizationType.INCA: {
       if (player.aliveUnits.length === 0) return null;
       for (const u of player.aliveUnits) {
-        u.incaBuff = true;
+        u.incaBuff        = true;
+        u._preBuffAttack  = u.attack;
+        u._preBuffSpeed   = u.speed;
         u.attack = Math.round(u.attack * 1.3);
         u.speed  = Math.min(u.speed * 1.3, u.def.stats.speed * 3);
       }
@@ -89,7 +91,8 @@ export function activateCivPower(game: Game, selectedUnitId?: number): string | 
     case CivilizationType.CONQUISTADOR: {
       if (player.aliveUnits.length === 0) return null;
       for (const u of player.aliveUnits) {
-        u.conquBuff = true;
+        u.conquBuff       = true;
+        u._preBuffAttack  = u.attack;
         u.attack = Math.round(u.attack * 1.8);
       }
       player.powerActive      = true;
@@ -108,7 +111,11 @@ export function updateCivPowers(game: Game, dt: number) {
   const def    = CIV_POWER_DEFS[player.civType];
 
   if (player.powerCooldown > 0) {
-    player.powerCooldown = Math.max(0, player.powerCooldown - dt);
+    // Temple blessing: owning a completed Temple reduces civ power cooldown 30% faster
+    const hasTemple = game.allBuildings.some(
+      b => b.playerId === player.id && (b.type as string) === 'TEMPLE' && b.isComplete() && b.isAlive(),
+    );
+    player.powerCooldown = Math.max(0, player.powerCooldown - dt * (hasTemple ? 1.3 : 1.0));
   }
 
   if (player.powerActive && player.powerActiveTimer > 0) {
@@ -126,17 +133,21 @@ function removePowerBuffs(game: Game, _def: PowerDef) {
     case CivilizationType.INCA:
       for (const u of player.aliveUnits) {
         if (u.incaBuff) {
-          u.attack = u.def.stats.attack + (player.upgrades.metallurgy ? 6 : 0);
-          u.speed  = u.def.stats.speed  + (player.upgrades.logistics  ? 0.4 : 0);
+          // Restore exact pre-buff values (preserves forge, upgrades, civ traits, fatigue state)
+          if (u._preBuffAttack > 0) u.attack = u.fatigued ? Math.round(u._preBuffAttack * 0.9) : u._preBuffAttack;
+          if (u._preBuffSpeed  > 0) u.speed  = u._preBuffSpeed;
           u.incaBuff = false;
+          u._preBuffAttack = 0;
+          u._preBuffSpeed  = 0;
         }
       }
       break;
     case CivilizationType.CONQUISTADOR:
       for (const u of player.aliveUnits) {
         if (u.conquBuff) {
-          u.attack = u.def.stats.attack + (player.upgrades.metallurgy ? 6 : 0);
+          if (u._preBuffAttack > 0) u.attack = u.fatigued ? Math.round(u._preBuffAttack * 0.9) : u._preBuffAttack;
           u.conquBuff = false;
+          u._preBuffAttack = 0;
         }
       }
       break;

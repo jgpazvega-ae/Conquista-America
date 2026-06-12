@@ -53,6 +53,11 @@ export class HUD {
   private minimapBuilt = false;
   private minimapBase: ImageData | null = null;
   private elTimer      = document.getElementById('game-timer');
+  private elHeroRespawnChip = document.getElementById('hero-respawn-chip');
+  private elHeroRespawnSecs = document.getElementById('hero-respawn-secs');
+  private elIdleWorkerChip  = document.getElementById('idle-worker-chip');
+  private elIdleWorkerCount = document.getElementById('idle-worker-count');
+  private elIdleWorkerPlural = document.getElementById('idle-worker-plural');
   private elPop             = document.getElementById('pop-count');
   private elPopBarFill      = document.getElementById('pop-bar-fill') as HTMLDivElement | null;
   private elTreasuryWrap    = document.getElementById('treasury-wrap') as HTMLElement | null;
@@ -67,6 +72,8 @@ export class HUD {
   onGroupRetreat: (() => void) | null = null;
   private _combatPings:    { col: number; row: number; ts: number }[] = [];
   private _lastSeenUnits:  Map<number, { col: number; row: number }> = new Map();
+  private _killFeedEl      = document.getElementById('kill-feed');
+  private _killFeedEntries: { el: HTMLElement; ts: number }[] = [];
 
   private camera: import('../engine/Camera').RTSCamera | null = null;
   setCamera(cam: import('../engine/Camera').RTSCamera) { this.camera = cam; }
@@ -146,15 +153,27 @@ export class HUD {
     }
 
     // Low resource warnings — pulse the resource chip red
-    this.elFood.closest('.res')?.classList.toggle('res-low', player.resources.food < 50);
+    const foodEl = this.elFood.closest('.res');
+    foodEl?.classList.toggle('res-low', player.resources.food < 50 && player.resources.food >= 10);
+    foodEl?.classList.toggle('res-critical', player.resources.food < 10);
     this.elGold.closest('.res')?.classList.toggle('res-low', player.resources.gold < 30);
     this.elStone.closest('.res')?.classList.toggle('res-low', player.resources.stone < 30);
 
-    // Weather badge
+    // Weather badge + dawn/dusk countdown
     if (this.elWeather) {
       const w = this.game.weather;
-      this.elWeather.textContent = `${WEATHER_ICONS[w.state]} ${WEATHER_NAMES[w.state]}`;
-      this.elWeather.title = WEATHER_TIPS[w.state] || WEATHER_NAMES[w.state];
+      const dayT = this.game.dayT;
+      const isNight = this.game.isNight;
+      // Seconds until next day↔night transition
+      const secsToTransition = isNight
+        ? Math.ceil(dayT >= 0.75
+          ? (1.15 - dayT) * 480   // night continuing past midnight
+          : (0.15 - dayT) * 480)  // night before dawn
+        : Math.ceil((0.75 - dayT) * 480); // day before dusk
+      const transitionLabel = isNight ? `☀️${secsToTransition}s` : `🌙${secsToTransition}s`;
+      this.elWeather.textContent = `${WEATHER_ICONS[w.state]} ${WEATHER_NAMES[w.state]}  ${transitionLabel}`;
+      this.elWeather.title = (WEATHER_TIPS[w.state] || WEATHER_NAMES[w.state]) +
+        (isNight ? ' · Anochecer activo' : ` · Anochecer en ${secsToTransition}s`);
     }
 
     // Treasury (economic victory) progress bar: visible once gold > 150
@@ -174,6 +193,33 @@ export class HUD {
     const m = Math.floor(secs / 60);
     const s = secs % 60;
     if (this.elTimer) this.elTimer.textContent = `${m}:${String(s).padStart(2, '0')}`;
+
+    // Hero respawn countdown chip (always visible while hero is respawning)
+    if (this.elHeroRespawnChip) {
+      const heroTimer = this.game.getHeroRespawnTimer(this.game.humanPlayerId);
+      const heroAlive = this.game.humanPlayer.aliveUnits.some(u => u.isHero);
+      if (!heroAlive && heroTimer !== undefined && heroTimer > 0) {
+        this.elHeroRespawnChip.classList.remove('hidden');
+        if (this.elHeroRespawnSecs) this.elHeroRespawnSecs.textContent = String(Math.ceil(heroTimer));
+      } else {
+        this.elHeroRespawnChip.classList.add('hidden');
+      }
+    }
+
+    // Idle worker chip — nudges the player to put idle villagers to work (Q)
+    if (this.elIdleWorkerChip) {
+      let idle = 0;
+      for (const w of this.game.allWorkers) {
+        if (w.playerId === this.game.humanPlayerId && w.task === 'IDLE' && !w.carrying) idle++;
+      }
+      if (idle > 0) {
+        this.elIdleWorkerChip.classList.remove('hidden');
+        if (this.elIdleWorkerCount)  this.elIdleWorkerCount.textContent = String(idle);
+        if (this.elIdleWorkerPlural) this.elIdleWorkerPlural.textContent = idle > 1 ? 's' : '';
+      } else {
+        this.elIdleWorkerChip.classList.add('hidden');
+      }
+    }
 
     // Population (human alive units)
     if (this.elPop) {
@@ -220,15 +266,21 @@ export class HUD {
         byType.get(u.def.name)!.count++;
       }
       const parts = [...byType.entries()].map(([, v]) => `${v.emoji}×${v.count}`).join(' ');
-      this.elSelCount.textContent = `${selectedUnits.length} unidades  ${parts}`;
+      const avgMorale = Math.round(selectedUnits.reduce((s, u) => s + u.morale, 0) / selectedUnits.length);
+      const moraleColor = avgMorale < 40 ? '#dd4422' : avgMorale < 65 ? '#ddaa00' : '#22dd44';
+      this.elSelCount.innerHTML = `${selectedUnits.length} unidades  ${parts}  <span style="color:${moraleColor}">❤ ${avgMorale}%</span>`;
     } else {
       this.unitPanel.classList.add('hidden');
       this.elSelCount.classList.add('hidden');
     }
 
+    // Kill feed: remove entries older than 8s
+    this.pruneKillFeed();
+
     // Minimap units
     this.updateMinimap();
     this.updateScoreboard();
+    this.updateMomentum();
     this.updateObjectives();
     this.updatePowerButton();
     this.updateBuildingHpBars();
@@ -313,25 +365,105 @@ export class HUD {
     }).join('');
   }
 
+  /** Add a line to the kill feed (max 5 visible entries). */
+  addKillFeedEntry(text: string) {
+    if (!this._killFeedEl) return;
+    const el = document.createElement('div');
+    el.className = 'kf-entry';
+    el.textContent = text;
+    this._killFeedEl.prepend(el);
+    const entry = { el, ts: Date.now() };
+    this._killFeedEntries.unshift(entry);
+    // Trim to 5
+    while (this._killFeedEntries.length > 5) {
+      const old = this._killFeedEntries.pop()!;
+      old.el.remove();
+    }
+    // Start fade after 6s
+    setTimeout(() => el.classList.add('fade'), 6000);
+  }
+
+  private pruneKillFeed() {
+    const now = Date.now();
+    this._killFeedEntries = this._killFeedEntries.filter(e => {
+      if (now - e.ts > 8000) { e.el.remove(); return false; }
+      return true;
+    });
+  }
+
   private updateScoreboard() {
     const html = this.game.players.map(p => {
       const settle = this.game.allBuildings.find(
         b => b.playerId === p.id && b.type === BuildingType.SETTLEMENT,
       );
-      const hpPct = settle?.isAlive() ? (settle.hp / settle.maxHp) * 100 : 0;
+      const defeated = p.isDefeated();
+      const hpPct  = settle?.isAlive() ? (settle.hp / settle.maxHp) * 100 : 0;
       const hpColor = hpPct > 50 ? '#22dd55' : hpPct > 25 ? '#ddaa00' : '#dd2222';
       const pop    = p.aliveUnits.length;
       const kills  = this.game.killsByPlayer.get(p.id) ?? 0;
+      const bldgs  = this.game.allBuildings.filter(b => b.playerId === p.id && b.isAlive() && b.isComplete()).length;
       const label  = p.isHuman ? '(Tú)' : CIV_NAMES[p.civType].slice(0, 6);
+      if (defeated) {
+        return `<div class="sb-row sb-defeated">
+          <span class="sb-emoji" style="opacity:0.5">${CIV_EMOJIS[p.civType]}</span>
+          <span class="sb-name" style="color:#666">${label}</span>
+          <span style="color:#666;font-size:10px">☠️ ELIMINADO</span>
+          <span class="sb-kills" title="Bajas totales" style="color:#555">⚔️${kills}</span>
+        </div>`;
+      }
       return `<div class="sb-row">
         <span class="sb-emoji">${CIV_EMOJIS[p.civType]}</span>
         <span class="sb-name" style="color:${hex(CIV_COLORS[p.civType])}">${label}</span>
-        <span class="sb-pop">👥${pop}</span>
-        <span class="sb-kills" title="Bajas">⚔️${kills}</span>
+        <span class="sb-pop" title="Unidades vivas">👥${pop}</span>
+        <span class="sb-kills" title="Bajas enemigas">⚔️${kills}</span>
+        <span class="sb-bldgs" title="Edificios construidos">🏛️${bldgs}</span>
         <div class="sb-hp-wrap"><div class="sb-hp-fill" style="width:${hpPct}%;background:${hpColor}"></div></div>
       </div>`;
     }).join('');
     this.elScoreboard.innerHTML = html;
+  }
+
+  /** Estimate a player's military strength: sum of (attack + defense + hp/10) over alive units. */
+  private militaryStrength(playerId: number): number {
+    let total = 0;
+    for (const u of this.game.players[playerId]?.aliveUnits ?? []) {
+      total += u.attack + u.defense + u.hp / 10 + (u.isHero ? 40 : 0) + u.level * 5;
+    }
+    return total;
+  }
+
+  private updateMomentum() {
+    const bar = document.getElementById('momentum-bar');
+    const fill = document.getElementById('momentum-fill');
+    const marker = document.getElementById('momentum-marker');
+    const label = document.getElementById('momentum-label');
+    if (!bar || !fill || !marker || !label) return;
+    if (this.game.status !== 'PLAYING') { bar.classList.add('hidden'); return; }
+
+    const mine = this.militaryStrength(this.game.humanPlayerId);
+    // Strongest living enemy
+    let enemyMax = 0;
+    for (const p of this.game.players) {
+      if (p.id === this.game.humanPlayerId || p.isDefeated()) continue;
+      enemyMax = Math.max(enemyMax, this.militaryStrength(p.id));
+    }
+    if (mine === 0 && enemyMax === 0) { bar.classList.add('hidden'); return; }
+    bar.classList.remove('hidden');
+
+    // Ratio 0..1 where 0.5 = parity; clamp display
+    const ratio = mine / (mine + enemyMax || 1);
+    const pct = Math.round(ratio * 100);
+    fill.style.width = `${pct}%`;
+    // Color: green when ahead, amber near parity, red when behind
+    const color = ratio > 0.62 ? '#33cc55' : ratio > 0.42 ? '#ddaa22' : '#dd3333';
+    fill.style.background = color;
+    marker.style.left = '50%'; // parity reference line
+
+    const advantage = Math.round((ratio - 0.5) * 200); // -100..+100
+    if (advantage > 12)      label.textContent = `⚔️ Ventaja +${advantage}%`;
+    else if (advantage < -12) label.textContent = `🛡️ Desventaja ${advantage}%`;
+    else                      label.textContent = '⚖️ Equilibrio militar';
+    label.style.color = color;
   }
 
   private updateHeroPanel() {
@@ -425,7 +557,8 @@ export class HUD {
     this.elPortrait.style.background = `rgba(${(civColor >> 16) & 0xff}, ${(civColor >> 8) & 0xff}, ${civColor & 0xff}, 0.25)`;
     this.elPortrait.style.borderColor = hex(civColor);
 
-    this.elUnitName.textContent = unit.isHero ? `${unit.heroName} ★` : unit.def.name;
+    const champSuffix = !unit.isHero && unit.level >= 3 ? ' ★★' : '';
+    this.elUnitName.textContent = unit.isHero ? `${unit.heroName} ★` : `${unit.def.name}${champSuffix}`;
     this.elUnitCiv.textContent  = unit.isHero ? `Héroe — ${CIV_NAMES[unit.civType]}` : CIV_NAMES[unit.civType];
 
     const pct = unit.hp / unit.maxHp;
@@ -434,10 +567,19 @@ export class HUD {
     this.elHpText.textContent     = `${unit.hp}/${unit.maxHp}`;
 
     const holdBadge    = unit.state === UnitState.HOLD ? `<span title="Posición de defensa (+2 def)" style="color:#88ccff">🛡️DEF</span>` : '';
+    const fatigueBadge = unit.fatigued ? `<span title="Fatigado — -10% ataque por combate prolongado. Descansa para recuperar" style="color:#cc8844">😴FATIGADO</span>` : '';
+    const woundBadge   = unit.hp < unit.maxHp * 0.25 ? `<span title="Herida grave — -20% ataque, -30% movimiento" style="color:#ff4444">🩸HERIDO</span>` : '';
     const burnBadge    = unit.burning     > 0 ? `<span title="En llamas" style="color:#ff8822">🔥${Math.ceil(unit.burning)}s</span>`       : '';
-    const poisonBadge  = unit.poisoned    > 0 ? `<span title="Envenenado" style="color:#44dd44">☠️${Math.ceil(unit.poisoned)}s</span>`       : '';
+    const poisonBadge  = unit.poisoned    > 0 ? `<span title="Envenenado — 2 HP/s · retira al Templo propio para curar (−3s cada 3s cerca del Templo)" style="color:#44dd44">☠️${Math.ceil(unit.poisoned)}s</span>` : '';
+    const slowedBadge  = unit.slowed      > 0 ? `<span title="Aturdido por pedrada — -40% veloc." style="color:#aaaaff">🌀${Math.ceil(unit.slowed)}s</span>` : '';
     const berserkBadge = unit.berserkTimer > 0 ? `<span title="¡Frenesí! +25% daño" style="color:#ff6600">🔥FRENESÍ ${Math.ceil(unit.berserkTimer)}s</span>` : '';
     const chargeBadge  = unit.chargeReady  ? `<span title="Carga de caballería lista — +60% daño en primer golpe" style="color:#ffe066">⚡CARGA</span>` : '';
+    const deployBadge  = unit.type === 'CANNON' && unit.stationaryTimer < 4
+      ? `<span title="Desplegando cañón — espera ${(4 - unit.stationaryTimer).toFixed(1)}s antes de disparar" style="color:#ffcc44">⚙️DESPLEGANDO</span>`
+      : '';
+    const nightBadge   = this.game.isNight ? `<span title="Noche: +15% daño de combate para ambos bandos" style="color:#88aaff">🌙+15%</span>` : '';
+    const reloadPct    = unit.attackTimer > 0 && unit.attackCooldown > 0 ? Math.round((unit.attackTimer / unit.attackCooldown) * 100) : 0;
+    const reloadBadge  = reloadPct > 0 ? `<span title="Recargando ${unit.attackTimer.toFixed(1)}s" style="color:#ccaa44">🔄${reloadPct}%</span>` : '';
     const formBadge    = unit.inFormation ? `<span title="Filas cerradas — +2 defensa · la moral se recupera un 50% más rápido" style="color:#88ddaa">⚔️FILA</span>` : '';
     const moraleColor = unit.panicked || unit.morale < 25 ? '#dd2222' : unit.morale < 50 ? '#ddaa00' : '#22dd44';
     const moraleIcon  = unit.panicked ? '😱' : unit.morale < 50 ? '😰' : '❤';
@@ -459,6 +601,11 @@ export class HUD {
       : unit.buffAttackTimer > 0
         ? `<span title="Buff de grito de guerra: +25% atk" style="color:#ffd700">📯${Math.ceil(unit.buffAttackTimer)}s</span>`
         : '';
+    const heroPowerBadge = unit.isHero
+      ? unit.heroCooldown2 > 0
+        ? `<span title="Habilidad del héroe en recarga (H)" style="color:#888">🦅${Math.ceil(unit.heroCooldown2)}s</span>`
+        : `<span title="Habilidad especial del héroe lista — pulsa H para activar" style="color:#ff9944">🦅LISTA</span>`
+      : '';
     const FORM_LABELS: Record<string, string> = { LOOSE: '💨SUELTA', PHALANX: '🛡️FALANGE', WEDGE: '⚔️CUÑA' };
     const FORM_TIPS:   Record<string, string> = {
       LOOSE:   'Formación suelta — +20% veloc., -10% atk, -15% def · F4 para cancelar',
@@ -468,12 +615,26 @@ export class HUD {
     const orderBadge = unit.formation
       ? `<span title="${FORM_TIPS[unit.formation] ?? ''}" style="color:#bbffee">${FORM_LABELS[unit.formation] ?? unit.formation}</span>`
       : '';
+    const officerBadge = unit.nearOfficer && !unit.isHero
+      ? `<span title="Bajo el mando de un oficial veterano cercano (campeón Nv.3 o héroe) — +2 defensa" style="color:#ffcc66">🎖️OFICIAL</span>`
+      : '';
+    const pinnedBadge = unit.meleePinned
+      ? `<span title="Acorralado en cuerpo a cuerpo — -40% daño a distancia. ¡Retíralo o protégelo con infantería!" style="color:#ff6644">⚠️ACORRALADO</span>`
+      : '';
+    const supplyBadge = unit._nearSupplyDepot
+      ? `<span title="Cerca de un Almacén — munición y HP se recargan el doble de rápido (hasta 50% HP)" style="color:#88ffcc">📦SUMIN.</span>`
+      : '';
+    const isHealing = unit.hp < unit.maxHp && unit.hp > 0 &&
+                      unit._damageCooldown <= 0 && unit.state === UnitState.IDLE;
+    const healingBadge = isHealing
+      ? `<span title="Recuperando HP — permanece inactivo para acelerar la cura" style="color:#88ff88">💊CURANDO</span>`
+      : '';
     this.elUnitStats.innerHTML =
       `<span>⚔️ ${unit.attack}</span>` +
       `<span>🛡️ ${unit.defense}</span>` +
       `<span>💨 ${unit.speed.toFixed(1)}</span>` +
       `<span>🎯 ${unit.attackRange.toFixed(1)}</span>` +
-      holdBadge + entrenchedBadge + burnBadge + poisonBadge + berserkBadge + chargeBadge + formBadge + moraleBadge + ammoBadge + orderBadge + warCryBadge;
+      woundBadge + holdBadge + entrenchedBadge + fatigueBadge + burnBadge + poisonBadge + slowedBadge + berserkBadge + chargeBadge + deployBadge + formBadge + moraleBadge + ammoBadge + orderBadge + officerBadge + pinnedBadge + supplyBadge + healingBadge + warCryBadge + heroPowerBadge + nightBadge + reloadBadge;
 
     // XP bar (only if unit can still level up)
     const xpEl = document.getElementById('unit-xp-row');
@@ -488,7 +649,7 @@ export class HUD {
           `<span class="xp-num">${unit.xp}/${needed}</span>`;
         xpEl.classList.remove('hidden');
       } else {
-        xpEl.innerHTML = `<span class="xp-label">★★ Máx.</span>`;
+        xpEl.innerHTML = `<span class="xp-label" style="color:#ff9933">★★ Campeón</span>`;
         xpEl.classList.remove('hidden');
       }
     }
@@ -830,7 +991,8 @@ export class HUD {
       const ownerLabel = owner?.isHuman ? '(Tú)' : CIV_NAMES[owner?.civType ?? 0];
       let status: string;
       if (!building.isComplete()) {
-        status = `🔨 ${Math.round(building.buildProgress * 100)}% construido`;
+        const etaSecs = Math.ceil(building.buildTime * (1 - building.buildProgress));
+        status = `🔨 ${Math.round(building.buildProgress * 100)}% construido — listo en ${etaSecs}s`;
       } else if (building.productionQueue?.length > 0) {
         const item = building.productionQueue[0];
         const rem  = Math.ceil(item.totalTime - item.elapsed);
