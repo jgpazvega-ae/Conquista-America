@@ -744,6 +744,11 @@ export class Game {
             if (d <= 6) ally.morale = Math.min(100, ally.morale + 8);
           }
         }
+        // AZTEC flower war: each kill earns +5 food for AZTEC players (tribute/captives mechanic)
+        const aztecKiller = this.players[evt.attacker.playerId];
+        if (!evt.attacker.isHero && aztecKiller?.civType === CivilizationType.AZTEC) {
+          aztecKiller.resources.food = Math.min(2000, aztecKiller.resources.food + 5);
+        }
         // Army rout tracking: count friendly deaths in the 30s window
         if (evt.target.playerId === this.humanPlayerId) this._recentHumanDeaths++;
       }
