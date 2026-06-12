@@ -194,8 +194,11 @@ export class CombatSystem {
               if (!target.isHero) target.loseMorale(15); // charge breaks enemy morale
             }
           }
-          // Heavy wounds (< 25% HP): attacker fights at reduced effectiveness
-          if (unit.hp < unit.maxHp * 0.25) dmg = Math.round(dmg * 0.8);
+          // Desperate last stand: unit at < 10% HP fights with nothing-to-lose fury (+30%)
+          // overrides the heavy-wounds penalty bracket below
+          if (unit.hp < unit.maxHp * 0.10) dmg = Math.round(dmg * 1.30);
+          // Heavy wounds (< 25% HP): attacker fights at reduced effectiveness (-20%)
+          else if (unit.hp < unit.maxHp * 0.25) dmg = Math.round(dmg * 0.8);
           // Slowed: stone impact disrupts weapon timing — slowed units attack less effectively (-20%)
           if (unit.slowed > 0) dmg = Math.max(1, Math.round(dmg * 0.80));
           // Sniper precision: ARQUEBUSIER in careful HOLD aim for ≥8s lands a +25% precision shot
@@ -313,6 +316,13 @@ export class CombatSystem {
                 // Psychological terror: the thunderclap demoralises troops beyond the kill zone
                 if (!other.isHero) other.loseMorale(3);
               }
+            }
+          }
+          // Cannon echo: the thunderous boom rallies nearby allied troops (+5 morale within 5 tiles)
+          if (unit.type === UnitType.CANNON) {
+            for (const ally of allUnits) {
+              if (!ally.isAlive() || ally.playerId !== unit.playerId || ally === unit || ally.type === UnitType.CANNON) continue;
+              if (Math.hypot(ally.col - unit.col, ally.row - unit.row) <= 5) ally.morale = Math.min(100, ally.morale + 5);
             }
           }
           // Jungle melee: 20% chance to poison target (MAYA specialists: 35% chance)

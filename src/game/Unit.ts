@@ -153,6 +153,8 @@ export class Unit {
   // Inspired fury: landing a killing blow at ≥80 morale grants +15% damage for 5s.
   inspiredTimer = 0;
 
+  // Veteran teaching: level-3 same-type unit within 3 tiles — this unit gains XP 30% faster.
+  _nearVeteranTeacher = false;
   // Counter-charge: spear unit that absorbs a cavalry charge deals +20% on their next attack.
   counterChargeBuff = false;
   // Ambush ready: JAGUAR_KNIGHT/CUACHIC held still for ≥5s — first strike deals +35% damage.
@@ -1203,7 +1205,7 @@ export class Unit {
   /** Award XP and level up if threshold reached. */
   gainXP(amount: number) {
     if (this.level >= 3) return;
-    this.xp += amount;
+    this.xp += this._nearVeteranTeacher ? Math.round(amount * 1.30) : amount;
     const needed = this.level === 1 ? 50 : 150;
     if (this.xp >= needed) this.levelUp();
   }
