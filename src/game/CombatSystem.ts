@@ -193,6 +193,14 @@ export class CombatSystem {
           }
           // Heavy wounds (< 25% HP): attacker fights at reduced effectiveness
           if (unit.hp < unit.maxHp * 0.25) dmg = Math.round(dmg * 0.8);
+          // Cornered rat: 3+ enemies within 2 tiles → desperation surge (+20% damage)
+          {
+            let nearEnemies = 0;
+            for (const e of allUnits) {
+              if (e.isAlive() && e.playerId !== unit.playerId && Math.hypot(e.col - unit.col, e.row - unit.row) <= 2.0) nearEnemies++;
+            }
+            if (nearEnemies >= 3) dmg = Math.round(dmg * 1.20);
+          }
           // Berserk: +25% damage during 12-second kill-streak buff
           if (unit.berserkTimer > 0) dmg = Math.round(dmg * 1.25);
           // Leadership aura: +5% damage when player has any level-3 unit alive
