@@ -1132,11 +1132,13 @@ export class Unit {
 
   private levelUp() {
     this.level++;
-    this.attack  = Math.round(this.attack  * 1.15);
-    this.defense = Math.round(this.defense * 1.15);
-    this.maxHp   = Math.round(this.maxHp   * 1.10);
-    this.hp      = this.maxHp;
-    this.justLeveledUp = true;
+    this.attack       = Math.round(this.attack       * 1.15);
+    this.defense      = Math.round(this.defense      * 1.15);
+    this.maxHp        = Math.round(this.maxHp        * 1.10);
+    this.hp           = this.maxHp;
+    // Veterans attack faster: 8% cooldown reduction per level (cap at 0.3s)
+    this.attackCooldown = Math.max(0.3, this.attackCooldown * 0.92);
+    this.justLeveledUp  = true;
     this.refreshLevelRing();
   }
 

@@ -103,6 +103,8 @@ export class Game {
   private _workerFleeTimer   = 0; // throttle worker flee checks
   private _popPressureNotified = false;
   private _lowFoodNotified     = false; // early hunger warning at ≤30 food
+  private _ammoRetreatSent     = new Set<number>(); // unit ids already auto-retreated for ammo
+  private _cannonSiegeReady    = new Set<number>(); // cannon ids already notified as siege-ready
   villageIncomeEvents: { playerId: number; food: number; gold: number }[] = [];
 
   constructor(humanCiv: CivilizationType = CivilizationType.AZTEC) {
@@ -717,6 +719,48 @@ export class Game {
           if (d < minDist) minDist = d;
         }
         if (minDist > 15) unit.loseMorale(2); // ~0.4 morale/s when isolated far from base
+      }
+
+      // Out-of-ammo auto-retreat: human ranged units with no ammo left retreat to resupply
+      const humanResupplyBldgs = this.allBuildings.filter(
+        b => b.playerId === this.humanPlayerId && b.isAlive() &&
+          (b.type === BuildingType.SETTLEMENT || b.type === BuildingType.STOREHOUSE),
+      );
+      for (const unit of this.humanPlayer.aliveUnits) {
+        if (!unit.outOfAmmo || unit.type === UnitType.CANNON) continue;
+        if (unit.garrisonedIn !== null || unit.panicked) continue;
+        if (unit.state === UnitState.MOVING) { this._ammoRetreatSent.delete(unit.id); continue; }
+        if (this._ammoRetreatSent.has(unit.id)) continue;
+        let closest: typeof humanResupplyBldgs[0] | null = null;
+        let closestDist = Infinity;
+        for (const b of humanResupplyBldgs) {
+          const d = Math.sqrt((unit.col - b.col) ** 2 + (unit.row - b.row) ** 2);
+          if (d < closestDist) { closestDist = d; closest = b; }
+        }
+        if (!closest) continue;
+        const near = this.map.findWalkableNear(closest.col, closest.row, 3);
+        if (!near) continue;
+        const path = findPath(this.map, unit.gridPos(), { col: near[0], row: near[1] }, 300);
+        if (path.length > 0) {
+          unit.moveTo(path);
+          this._ammoRetreatSent.add(unit.id);
+        }
+      }
+      // Clean up the retreat-sent set for units that have resupplied
+      for (const id of this._ammoRetreatSent) {
+        const u = this.allUnits.find(u => u.id === id);
+        if (!u || !u.isAlive() || !u.outOfAmmo) this._ammoRetreatSent.delete(id);
+      }
+
+      // Cannon siege-ready: notify once per cannon when it reaches 4s stationary (unlimbered)
+      for (const unit of this.humanPlayer.aliveUnits) {
+        if (unit.type !== UnitType.CANNON || !unit.isAlive()) continue;
+        const isReady = unit.stationaryTimer >= 4;
+        if (isReady && !this._cannonSiegeReady.has(unit.id)) {
+          this._cannonSiegeReady.add(unit.id);
+          this.pendingEventMessages.push('💣 ¡Cañón en posición de asedio! Listo para disparar con daño máximo');
+        }
+        if (!isReady) this._cannonSiegeReady.delete(unit.id);
       }
     }
 
