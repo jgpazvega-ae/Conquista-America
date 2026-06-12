@@ -901,6 +901,8 @@ export class Unit {
           (this.civType === CivilizationType.INCA &&
            (t === TerrainType.HIGHLAND || t === TerrainType.MOUNTAIN));
         if (onHome) regen *= 1.6;
+        // CONQUISTADOR supply line: disciplined logistics — morale recovers 40% faster near settlement
+        if (this.civType === CivilizationType.CONQUISTADOR && this._nearSettlement) regen *= 1.4;
       }
       this.morale = Math.min(100, this.morale + regen * dt);
     }
@@ -1140,6 +1142,8 @@ export class Unit {
       this.attackBuildingTarget = null;
       this.garrisonTarget = null;
       this.captureTarget = null;
+      // Trench confidence: digging in gives troops a sense of security (+10 morale)
+      this.morale = Math.min(100, this.morale + 10);
     }
   }
 
