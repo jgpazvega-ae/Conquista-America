@@ -611,7 +611,23 @@ export class AISystem {
     const settlement = game.allBuildings.find(b => b.playerId === player.id && b.type === BuildingType.SETTLEMENT);
     if (!settlement) return;
 
-    const pos = game.map.findWalkableNear(settlement.col + 3, settlement.row + 3, 5);
+    // Watchtowers go on the frontier toward the human player — maximise coverage
+    let buildCol = settlement.col + 3;
+    let buildRow = settlement.row + 3;
+    if (buildType === BuildingType.WATCHTOWER) {
+      const humanSettle = game.allBuildings.find(
+        b => b.playerId === game.humanPlayerId && b.type === BuildingType.SETTLEMENT && b.isAlive(),
+      );
+      if (humanSettle) {
+        const dx = humanSettle.col - settlement.col;
+        const dy = humanSettle.row - settlement.row;
+        const d  = Math.hypot(dx, dy) || 1;
+        // Place 8 tiles toward the enemy — inside our perimeter but facing the threat
+        buildCol = Math.round(settlement.col + (dx / d) * 8);
+        buildRow = Math.round(settlement.row + (dy / d) * 8);
+      }
+    }
+    const pos = game.map.findWalkableNear(buildCol, buildRow, 5);
     if (!pos) return;
 
     const building = new Building(buildType, def, player.id, pos[0], pos[1], CIV_COLORS[player.civType], player.civType);
