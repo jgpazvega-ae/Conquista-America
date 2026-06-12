@@ -39,18 +39,38 @@ export const WEATHER_TIPS: Record<WeatherState, string> = {
 
 export class WeatherSystem {
   state: WeatherState = 'CLEAR';
+  /** Next weather state — pre-picked so forecasts can be shown in advance. */
+  nextState: WeatherState = 'CLEAR';
+  /** Set to true once per transition when ≤30s remain — consumed by main.ts. */
+  forecastFired = false;
   private _timer = 0;
   private _nextChange = BASE_DURATION.CLEAR + Math.random() * 60;
+
+  constructor() {
+    this.nextState = this._pickNext('CLEAR');
+  }
+
+  private _pickNext(current: WeatherState): WeatherState {
+    const choices = TRANSITIONS[current];
+    return choices[Math.floor(Math.random() * choices.length)];
+  }
 
   /** Tick weather; returns new state name if weather just changed, else null. */
   update(dt: number): WeatherState | null {
     this._timer += dt;
+
+    // Forecast: fire once when 30s remain before transition (and next state differs)
+    if (!this.forecastFired && this._nextChange - this._timer <= 30 && this.nextState !== this.state) {
+      this.forecastFired = true;
+    }
+
     if (this._timer < this._nextChange) return null;
 
     this._timer = 0;
-    const choices = TRANSITIONS[this.state];
-    this.state = choices[Math.floor(Math.random() * choices.length)];
+    this.state = this.nextState;
     this._nextChange = BASE_DURATION[this.state] + Math.random() * 60;
+    this.nextState = this._pickNext(this.state);
+    this.forecastFired = false;
     return this.state;
   }
 

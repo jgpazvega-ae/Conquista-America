@@ -1204,6 +1204,22 @@ class GameInstance {
       document.getElementById('settle-danger-vignette')?.classList.add('hidden');
     }
 
+    // Weather forecast: warn 30s before a significant weather change
+    if (this.game.weather.forecastFired) {
+      this.game.weather.forecastFired = false; // consume
+      const next = this.game.weather.nextState;
+      const forecastIcons: Record<string, string> = { CLEAR: '☀️', RAIN: '🌧️', STORM: '⛈️', DROUGHT: '🏜️' };
+      const forecastWarns: Record<string, string> = {
+        RAIN:    '30s — Lluvia inminente: arcabuceros y cañones perderán potencia. ¡Ataca ahora!',
+        STORM:   '30s — ¡TORMENTA en camino! Toda artillería quedará inutilizada. ¡Avanza!',
+        DROUGHT: '30s — Sequía en camino: riesgo de incendio ×2. Dispersa tus tropas.',
+        CLEAR:   '30s — El tiempo va a despejar.',
+      };
+      if (next !== 'CLEAR' || this.game.weather.state !== 'CLEAR') {
+        this.hud.notify(`${forecastIcons[next]} PREVISIÓN ${forecastWarns[next]}`, next === 'STORM' ? 'warning' : 'info');
+      }
+    }
+
     // Weather change notification
     if (this.game.weatherChangeEvent) {
       const icons: Record<string, string> = { CLEAR: '☀️', RAIN: '🌧️', STORM: '⛈️', DROUGHT: '🏜️' };

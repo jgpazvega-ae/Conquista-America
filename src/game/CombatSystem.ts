@@ -214,6 +214,11 @@ export class CombatSystem {
           if (unit.meleePinned) dmg = Math.max(1, Math.round(dmg * 0.6));
           // Officer aura: units near a hero or veteran champion take -2 damage
           if (target.nearOfficer) dmg = Math.max(1, dmg - 2);
+          // Homeland defender: Nv.3 units fighting on HOLD near their own settlement
+          // fight with supreme determination — additional 10% damage absorption
+          if (target.level >= 3 && target.state === UnitState.HOLD && target._nearSettlement) {
+            dmg = Math.max(1, Math.round(dmg * 0.90));
+          }
 
           const actual = target.takeDamage(dmg);
           unit.attackTimer = unit.attackCooldown * (isVolley ? 1.5 : 1.0);
