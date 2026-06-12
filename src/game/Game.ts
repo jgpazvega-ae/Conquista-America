@@ -116,6 +116,7 @@ export class Game {
   private _killsThisCycle        = new Map<number, number>(); // kills per player in current momentum window
   private _lightningTimer        = 0;    // throttle storm lightning strikes (every 5s)
   private _lowNodeWarned         = new Set<number>(); // resource node ids already warned as low
+  private _sortiedBuildings           = new Set<number>(); // building ids that already triggered a garrison sortie
   private _emergencyConscriptionFired = false; // one-time free militia spawn when human drops to < 3 units
   villageIncomeEvents: { playerId: number; food: number; gold: number }[] = [];
 
@@ -1082,8 +1083,10 @@ export class Game {
     }
 
     // Panic check: morale ≤ 25 breaks the unit unless its hero stands nearby
+    // Veteran morale floor: level-3 units have seen enough battle — they hold until morale hits 10
     for (const u of this.allUnits) {
-      if (!u.isAlive() || u.isHero || u.panicked || u.morale > 25 || u.garrisonedIn !== null) continue;
+      if (!u.isAlive() || u.isHero || u.panicked || u.garrisonedIn !== null) continue;
+      if (u.level >= 3 ? u.morale > 10 : u.morale > 25) continue;
       const hero = heroesByPlayer.get(u.playerId);
       if (hero && u.distanceTo(hero) <= 8) {
         u.morale = 35; // the hero steadies the line
@@ -1629,6 +1632,27 @@ export class Game {
       const garrisonDefMult = bldg.garrison.length > 0 ? 0.85 : 1.0;
       const rawDmg = Math.max(1, Math.round((unit.attack - 5) * assaultMult * siegeMult * garrisonDefMult)); // buildings have some armor
       bldg.takeDamage(rawDmg);
+      // Garrison sortie: when human building reaches ≤30% HP with ≥2 garrison, half exit to counterattack
+      if (bldg.isAlive() && bldg.playerId === this.humanPlayerId &&
+          !this._sortiedBuildings.has(bldg.id) &&
+          bldg.hp <= bldg.maxHp * 0.30 && bldg.garrison.length >= 2) {
+        this._sortiedBuildings.add(bldg.id);
+        const sortieCount = Math.ceil(bldg.garrison.length / 2);
+        const sortieUnits = bldg.garrison.splice(0, sortieCount);
+        let exited = 0;
+        for (const su of sortieUnits) {
+          if (!su.isAlive()) continue;
+          const near = this.map.findWalkableNear(bldg.col + Math.floor(Math.random() * 3) - 1, bldg.row + 3, 4);
+          if (near) { su.col = near[0]; su.row = near[1]; su.worldX = near[0] * TILE_SIZE; su.worldZ = near[1] * TILE_SIZE; }
+          su.garrisonedIn = null;
+          su.mesh.visible = true;
+          su.attackTarget = unit;
+          su.state = UnitState.ATTACKING;
+          exited++;
+        }
+        if (exited > 0)
+          this.pendingEventMessages.push(`🏰 ¡Salida de guarnición! ${exited} defensor${exited > 1 ? 'es' : ''} salen a contraatacar`);
+      }
       if (!bldg.isAlive()) {
         this.newlyDestroyedBuildings.push(bldg);
         // Award XP to the unit that delivers the killing blow to a building
