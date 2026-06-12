@@ -262,6 +262,22 @@ export class CombatSystem {
           if (unit.type === UnitType.SLINGER && target.isAlive() && target.attackRange <= 1.5) {
             target.slowed = Math.max(target.slowed, 2);
           }
+          // Atlatl: javelin has small splash (0.8-tile radius, 40% damage) — punishes packed formations
+          if (unit.type === UnitType.ATLATL && target.isAlive()) {
+            const atatlSplash = Math.max(1, Math.round(dmg * 0.40));
+            for (const other of allUnits) {
+              if (!other.isAlive() || other === target || other.playerId === unit.playerId) continue;
+              if (Math.hypot(other.col - target.col, other.row - target.row) <= 0.8) {
+                const splashActual = other.takeDamage(atatlSplash);
+                this.events.push({ attacker: unit, target: other, damage: splashActual, worldX: other.worldX, worldZ: other.worldZ, critical: false });
+              }
+            }
+          }
+          // Critical hit stagger: flanking, charge, berserk, or volley crits add +0.5s to the
+          // target's attack timer (brief interrupt — the blow breaks their combat rhythm)
+          if (isCrit && target.isAlive() && !target.isHero) {
+            target.attackTimer = Math.max(target.attackTimer, target.attackCooldown * 0.5);
+          }
         }
       }
 
