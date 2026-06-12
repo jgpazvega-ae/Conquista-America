@@ -142,6 +142,10 @@ export class Unit {
   // Grants +10% damage when active. Recomputed periodically by Game.updateFormations.
   nearSynergy = false;
 
+  // Hero passive specialization: hero within 6 tiles and this is its signature unit type.
+  // Grants +15% damage. Recomputed periodically by Game.updateFormations.
+  heroPowerBuff = false;
+
   // Inspired fury: landing a killing blow at ≥80 morale grants +15% damage for 5s.
   inspiredTimer = 0;
 
@@ -908,7 +912,20 @@ export class Unit {
       this._damageCooldown -= dt;
     } else if (this.state === UnitState.IDLE && this.hp < this.maxHp) {
       this._idleHealTimer += dt;
-      const healPerTick = this._nearSettlement ? 5 : 2;
+      // Civ terrain affinity: native terrain multiplies idle regen (AC: homeland endurance)
+      const tile2 = map.getTile(this.col, this.row);
+      let terrainHealMult = 1.0;
+      if (tile2) {
+        const t2 = tile2.terrain;
+        if ((this.civType === CivilizationType.AZTEC || this.civType === CivilizationType.MAYA) && t2 === TerrainType.JUNGLE) {
+          terrainHealMult = 1.5;
+        } else if (this.civType === CivilizationType.INCA && (t2 === TerrainType.HIGHLAND || t2 === TerrainType.MOUNTAIN)) {
+          terrainHealMult = 2.0;
+        } else if (this.civType === CivilizationType.CONQUISTADOR && (t2 === TerrainType.BEACH || t2 === TerrainType.DESERT)) {
+          terrainHealMult = 1.25;
+        }
+      }
+      const healPerTick = Math.round((this._nearSettlement ? 5 : 2) * terrainHealMult);
       while (this._idleHealTimer >= 0.5) {
         this._idleHealTimer -= 0.5;
         this.hp = Math.min(this.maxHp, this.hp + healPerTick);

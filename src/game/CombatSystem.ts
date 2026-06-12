@@ -199,6 +199,8 @@ export class CombatSystem {
           if (playersWithLeader.has(unit.playerId)) dmg = Math.round(dmg * 1.05);
           // Civ unit synergy: +10% damage when fighting alongside a complementary unit type
           if (unit.nearSynergy) dmg = Math.round(dmg * 1.10);
+          // Hero passive specialization: +15% when hero's signature unit type fights nearby
+          if (unit.heroPowerBuff) dmg = Math.round(dmg * 1.15);
           // Inspired fury: +15% damage for 5s after landing a kill at ≥80 morale
           if (unit.inspiredTimer > 0) dmg = Math.round(dmg * 1.15);
           // Hero war cry buff: +25% attack for 12s
