@@ -1335,6 +1335,14 @@ export class Game {
     [UnitType.CUACHIC,        UnitType.ATLATL],          // Aztec elite + javelin support
   ];
 
+  // Hero passive specialization: hero's signature unit types get +15% damage within 6 tiles.
+  private static readonly HERO_POWER_MAP: Partial<Record<UnitType, Set<UnitType>>> = {
+    [UnitType.EAGLE_WARRIOR]: new Set([UnitType.JAGUAR_KNIGHT, UnitType.CUACHIC, UnitType.ATLATL]),
+    [UnitType.AHAU_WARRIOR]:  new Set([UnitType.ARCHER, UnitType.SLINGER]),
+    [UnitType.CHAKANA_GUARD]: new Set([UnitType.QUECHUA, UnitType.ANTIS_WARRIOR]),
+    [UnitType.CAVALRY]:       new Set([UnitType.ARQUEBUSIER]),
+  };
+
   private updateFormations(dt: number) {
     this._formationTimer += dt;
     if (this._formationTimer < 0.8) return;
@@ -1345,6 +1353,7 @@ export class Game {
       let allies = 0;
       let hasOfficer = false;
       let hasSynergy = false;
+      let hasHeroPower = false;
       for (const o of active) {
         if (o === u || o.playerId !== u.playerId) continue;
         const dc = u.col - o.col, dr = u.row - o.row;
@@ -1357,10 +1366,15 @@ export class Game {
             ([a, b]) => (u.type === a && o.type === b) || (u.type === b && o.type === a),
           );
         }
+        // Hero passive: hero within 6 tiles buffs its signature unit types
+        if (!hasHeroPower && o.isHero && d2 <= 36) {
+          hasHeroPower = (Game.HERO_POWER_MAP[o.type]?.has(u.type)) ?? false;
+        }
       }
-      u.inFormation = allies >= 3;
-      u.nearOfficer = hasOfficer;
-      u.nearSynergy = hasSynergy;
+      u.inFormation   = allies >= 3;
+      u.nearOfficer   = hasOfficer;
+      u.nearSynergy   = hasSynergy;
+      u.heroPowerBuff = hasHeroPower;
     }
   }
 
@@ -1552,7 +1566,9 @@ export class Game {
       const assaultMult = assaulters >= 3 ? 1.5 : 1.0;
       // Cannon siege specialist: 3× damage vs buildings (AC: cannons were wall-breakers)
       const siegeMult = unit.type === UnitType.CANNON ? 3.0 : 1.0;
-      const rawDmg = Math.max(1, Math.round((unit.attack - 5) * assaultMult * siegeMult)); // buildings have some armor
+      // Garrison wall defense: defenders inside reinforce the structure (−15% siege damage)
+      const garrisonDefMult = bldg.garrison.length > 0 ? 0.85 : 1.0;
+      const rawDmg = Math.max(1, Math.round((unit.attack - 5) * assaultMult * siegeMult * garrisonDefMult)); // buildings have some armor
       bldg.takeDamage(rawDmg);
       if (!bldg.isAlive()) {
         this.newlyDestroyedBuildings.push(bldg);
