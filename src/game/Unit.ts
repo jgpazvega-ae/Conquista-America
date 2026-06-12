@@ -1113,6 +1113,8 @@ export class Unit {
       case TerrainType.HIGHLAND: terrainMult = 0.72; break;
       case TerrainType.DESERT:   terrainMult = 0.88; break;
     }
+    // Cavalry desert sprint: horses thrive in open arid terrain (+20% speed)
+    if (this.type === UnitType.CAVALRY && tile?.terrain === TerrainType.DESERT) terrainMult *= 1.20;
     // INCA highland runner: INCA units move faster on their native high-altitude terrain
     if (this.civType === CivilizationType.INCA && !this.isHero && tile?.terrain === TerrainType.HIGHLAND) {
       terrainMult *= 1.20;

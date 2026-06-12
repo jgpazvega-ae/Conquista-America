@@ -953,6 +953,20 @@ export class Game {
       }
     }
 
+    // Temple burning cure: priests at nearby temples douse flames on friendly units (30% chance/s per temple).
+    if (this._fireSpreadTimer === 0) { // piggyback on the 1s tick already used above
+      const activatedTemples = this.allBuildings.filter(
+        b => b.isAlive() && b.isComplete() && b.type === BuildingType.TEMPLE,
+      );
+      for (const u of this.allUnits) {
+        if (!u.isAlive() || u.burning <= 0) continue;
+        const hasNearbyTemple = activatedTemples.some(
+          t => t.playerId === u.playerId && Math.hypot(t.col - u.col, t.row - u.row) <= 3.0,
+        );
+        if (hasNearbyTemple && Math.random() < 0.30) u.burning = 0;
+      }
+    }
+
     // War drum pulse: every 90s the settlement beats war drums (+10 morale for nearby troops)
     this._warDrumTimer -= dt;
     if (this._warDrumTimer <= 0) {

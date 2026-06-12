@@ -228,6 +228,8 @@ export class CombatSystem {
           if (unit.counterChargeBuff) { dmg = Math.round(dmg * 1.20); unit.counterChargeBuff = false; }
           // Inspired fury: +15% damage for 5s after landing a kill at ≥80 morale
           if (unit.inspiredTimer > 0) dmg = Math.round(dmg * 1.15);
+          // Waterway ambush: attacking from a beach flanks the enemy's exposed shoreline (+15%)
+          if (attackerTile?.terrain === TerrainType.BEACH) dmg = Math.round(dmg * 1.15);
           // Ambush striker: JAGUAR_KNIGHT/CUACHIC first attack after ≥5s still — stalk-and-pounce +35%
           if (unit.ambushReady) { dmg = Math.round(dmg * 1.35); unit.ambushReady = false; unit.stationaryTimer = 0; }
           // Champion last stand: level-3 unit at <25% HP fights with desperate fury (+25% dmg)
