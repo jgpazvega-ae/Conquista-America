@@ -193,6 +193,13 @@ export class CombatSystem {
           }
           // Heavy wounds (< 25% HP): attacker fights at reduced effectiveness
           if (unit.hp < unit.maxHp * 0.25) dmg = Math.round(dmg * 0.8);
+          // Slowed: stone impact disrupts weapon timing — slowed units attack less effectively (-20%)
+          if (unit.slowed > 0) dmg = Math.max(1, Math.round(dmg * 0.80));
+          // Sniper precision: ARQUEBUSIER in careful HOLD aim for ≥8s lands a +25% precision shot
+          if (unit.type === UnitType.ARQUEBUSIER && !unit.outOfAmmo && isHold && unit.stationaryTimer >= 8) {
+            dmg = Math.round(dmg * 1.25);
+            unit.stationaryTimer = 0; // shifts position after firing to avoid prediction
+          }
           // Berserk: +25% damage during 12-second kill-streak buff
           if (unit.berserkTimer > 0) dmg = Math.round(dmg * 1.25);
           // Leadership aura: +5% damage when player has any level-3 unit alive

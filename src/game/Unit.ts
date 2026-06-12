@@ -1087,6 +1087,10 @@ export class Unit {
       case TerrainType.HIGHLAND: terrainMult = 0.72; break;
       case TerrainType.DESERT:   terrainMult = 0.88; break;
     }
+    // INCA highland runner: INCA units move faster on their native high-altitude terrain
+    if (this.civType === CivilizationType.INCA && !this.isHero && tile?.terrain === TerrainType.HIGHLAND) {
+      terrainMult *= 1.20;
+    }
     // Heavy wounds (< 25% HP) impair movement — bleeding soldiers can't keep pace
     if (this.hp < this.maxHp * 0.25) terrainMult *= 0.7;
     // Wet weather turns ground to mud — all units move slower in rain/storm
