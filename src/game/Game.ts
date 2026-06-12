@@ -102,6 +102,7 @@ export class Game {
   private _routFired         = false;
   private _workerFleeTimer   = 0; // throttle worker flee checks
   private _popPressureNotified = false;
+  private _lowFoodNotified     = false; // early hunger warning at ≤30 food
   villageIncomeEvents: { playerId: number; food: number; gold: number }[] = [];
 
   constructor(humanCiv: CivilizationType = CivilizationType.AZTEC) {
@@ -542,31 +543,57 @@ export class Game {
     }
 
     // Worker flee: workers within 5 tiles of any enemy drop their task and run to nearest friendly settlement
+    // Also handles auto-repair: idle workers near a damaged own building move to fix it.
     this._workerFleeTimer -= dt;
     if (this._workerFleeTimer <= 0) {
       this._workerFleeTimer = 2;
       for (const worker of this.allWorkers) {
-        if (worker.task === WorkerTask.MOVING && worker.path.length > 0) continue; // already fleeing
+        if (worker.task === WorkerTask.MOVING && worker.path.length > 0) continue; // already moving
+
+        // Flee takes priority over auto-repair
         const threatened = this.allUnits.some(u =>
           u.isAlive() && u.playerId !== worker.playerId &&
           Math.sqrt((u.col - worker.col) ** 2 + (u.row - worker.row) ** 2) <= 5,
         );
-        if (!threatened) continue;
-        const refuge = this.allBuildings
-          .filter(b => b.playerId === worker.playerId && b.isAlive() &&
-            (b.type === BuildingType.SETTLEMENT || b.type === BuildingType.BARRACKS))
-          .sort((a, b) =>
-            ((worker.col - a.col) ** 2 + (worker.row - a.row) ** 2) -
-            ((worker.col - b.col) ** 2 + (worker.row - b.row) ** 2),
-          )[0];
-        if (!refuge) continue;
-        const near = this.map.findWalkableNear(refuge.col, refuge.row, 3);
+        if (threatened) {
+          const refuge = this.allBuildings
+            .filter(b => b.playerId === worker.playerId && b.isAlive() &&
+              (b.type === BuildingType.SETTLEMENT || b.type === BuildingType.BARRACKS))
+            .sort((a, b) =>
+              ((worker.col - a.col) ** 2 + (worker.row - a.row) ** 2) -
+              ((worker.col - b.col) ** 2 + (worker.row - b.row) ** 2),
+            )[0];
+          if (!refuge) continue;
+          const near = this.map.findWalkableNear(refuge.col, refuge.row, 3);
+          if (!near) continue;
+          const path = findPath(this.map, { col: Math.round(worker.col), row: Math.round(worker.row) }, { col: near[0], row: near[1] }, 300);
+          if (path.length > 0) {
+            worker.path = path;
+            worker.pathIndex = 0;
+            worker.setTask(WorkerTask.MOVING, near[0], near[1]);
+          }
+          continue;
+        }
+
+        // Auto-repair: idle workers within 6 tiles of a damaged friendly building walk over and fix it
+        if (worker.task !== WorkerTask.IDLE) continue;
+        let nearestDmgBldg: import('./Building').Building | null = null;
+        let nearestDist = Infinity;
+        for (const b of this.allBuildings) {
+          if (b.playerId !== worker.playerId || !b.isAlive() || !b.isComplete()) continue;
+          if (b.hp >= b.maxHp) continue;
+          const d = Math.sqrt((worker.col - b.col) ** 2 + (worker.row - b.row) ** 2);
+          if (d <= 6 && d < nearestDist) { nearestDist = d; nearestDmgBldg = b; }
+        }
+        if (!nearestDmgBldg) continue;
+        const near = this.map.findWalkableNear(nearestDmgBldg.col, nearestDmgBldg.row, 2);
         if (!near) continue;
-        const path = findPath(this.map, { col: Math.round(worker.col), row: Math.round(worker.row) }, { col: near[0], row: near[1] }, 300);
+        const path = findPath(this.map, { col: Math.round(worker.col), row: Math.round(worker.row) }, { col: near[0], row: near[1] }, 200);
         if (path.length > 0) {
-          worker.path = path;
-          worker.pathIndex = 0;
-          worker.setTask(WorkerTask.MOVING, near[0], near[1]);
+          worker.repairTarget = nearestDmgBldg;
+          worker.path         = path;
+          worker.pathIndex    = 0;
+          worker.task         = WorkerTask.MOVING;
         }
       }
     }
@@ -647,6 +674,17 @@ export class Game {
         if (rallied > 0) {
           this.pendingEventMessages.push(`🛡️ ¡${hero.heroName ?? 'Tu héroe'} arenga a las tropas! ${rallied} unidad${rallied > 1 ? 'es' : ''} recuperan moral`);
         }
+      }
+    }
+
+    // Pre-starvation hunger warning: alert the human player when food reserves are low
+    {
+      const hFood = this.humanPlayer.resources.food;
+      if (hFood <= 30 && !this._lowFoodNotified && this.humanPlayer.aliveUnits.length > 0) {
+        this._lowFoodNotified = true;
+        this.pendingEventMessages.push(`🌽 ¡Reservas de comida bajas! (${Math.floor(hFood)}) — Asegura recursos antes de que la moral caiga`);
+      } else if (hFood > 60) {
+        this._lowFoodNotified = false; // reset once food recovers
       }
     }
 
@@ -1130,8 +1168,17 @@ export class Game {
         if (nearest) {
           const actual = nearest.takeDamage(Math.round(u.attack * 0.85));
           u.attackTimer = u.attackCooldown * 1.2;
+          // Credit the garrisoned unit as attacker so it gains XP, morale, and kill streaks
+          if (!nearest.isAlive()) {
+            u.killStreak++;
+            if (u.killStreak >= 3) { u.berserkTimer = 12; u.killStreak = 0; }
+            u.xp += 10;
+            if (!u.isHero && u.morale < 70) u.morale = Math.min(70, u.morale + 5);
+            const kills = (this.killsByPlayer.get(u.playerId) ?? 0) + 1;
+            this.killsByPlayer.set(u.playerId, kills);
+          }
           this.damageEvents.push({
-            attacker: null,
+            attacker: u,
             target: nearest,
             damage: actual,
             worldX: nearest.worldX,
