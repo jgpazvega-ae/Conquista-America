@@ -105,6 +105,10 @@ export class Game {
   private _lowFoodNotified     = false; // early hunger warning at ≤30 food
   private _ammoRetreatSent     = new Set<number>(); // unit ids already auto-retreated for ammo
   private _cannonSiegeReady    = new Set<number>(); // cannon ids already notified as siege-ready
+  private _fireSpreadTimer       = 0;    // throttle fire spread checks (every 1s)
+  private _warExhaustionTimer    = 0;    // throttle war exhaustion checks (every 8s)
+  private _firstCombatTime       = -1;   // gameTime when first damage event occurred
+  private _warExhaustionNotified = false;
   villageIncomeEvents: { playerId: number; food: number; gold: number }[] = [];
 
   constructor(humanCiv: CivilizationType = CivilizationType.AZTEC) {
@@ -777,6 +781,41 @@ export class Game {
           this.pendingEventMessages.push('💣 ¡Cañón en posición de asedio! Listo para disparar con daño máximo');
         }
         if (!isReady) this._cannonSiegeReady.delete(unit.id);
+      }
+    }
+
+    // Fire spread: burning units have a 25% chance per second to ignite adjacent units
+    this._fireSpreadTimer += dt;
+    if (this._fireSpreadTimer >= 1) {
+      this._fireSpreadTimer = 0;
+      const burningUnits = this.allUnits.filter(u => u.isAlive() && u.burning > 0);
+      for (const burner of burningUnits) {
+        if (Math.random() > 0.25) continue; // 25% chance to spread per burning unit per second
+        for (const other of this.allUnits) {
+          if (!other.isAlive() || other === burner || other.burning > 0) continue;
+          if (Math.hypot(other.col - burner.col, other.row - burner.row) > 1.5) continue;
+          other.burning = Math.max(other.burning, 3); // 3s burn; doesn't extend existing longer burns
+        }
+      }
+    }
+
+    // War exhaustion: prolonged combat (>4 min since first damage) slowly drains morale.
+    // Heroes are immune. Incentivises decisive victory rather than endless attrition.
+    if (this._firstCombatTime < 0 && this.damageEvents.length > 0) {
+      this._firstCombatTime = this.gameTime;
+    }
+    if (this._firstCombatTime >= 0 && this.gameTime - this._firstCombatTime > 240) {
+      if (!this._warExhaustionNotified) {
+        this._warExhaustionNotified = true;
+        this.pendingEventMessages.push('⚔️ ¡Agotamiento de guerra! 4+ min de combate — todas las tropas pierden moral lentamente. ¡Decide la batalla ya!');
+      }
+      this._warExhaustionTimer += dt;
+      if (this._warExhaustionTimer >= 8) {
+        this._warExhaustionTimer = 0;
+        for (const unit of this.allUnits) {
+          if (!unit.isAlive() || unit.isHero || unit.garrisonedIn !== null) continue;
+          unit.loseMorale(1); // ~0.125 morale/s — gradual but relentless pressure
+        }
       }
     }
 

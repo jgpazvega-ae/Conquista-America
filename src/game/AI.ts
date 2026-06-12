@@ -1,4 +1,4 @@
-import { UnitState, UnitType, CivilizationType } from './types';
+import { UnitState, UnitType, CivilizationType, TerrainType } from './types';
 import type { Unit } from './Unit';
 import type { Player } from './Player';
 import type { Game } from './Game';
@@ -696,7 +696,20 @@ export class AISystem {
 
       for (const node of game.resourceNodes) {
         if (node.isEmpty()) continue;
-        const d = Math.sqrt((worker.col - node.col) ** 2 + (worker.row - node.row) ** 2);
+        const rawDist = Math.sqrt((worker.col - node.col) ** 2 + (worker.row - node.row) ** 2);
+        // Terrain-aware routing: apply a virtual distance discount for bonus-terrain nodes
+        // so that AI workers prefer them even if they are slightly farther away.
+        const tile = game.map.getTile(node.col, node.row);
+        let terrainMult = 1.0;
+        if (node.type === ResourceType.FOOD && tile?.terrain === TerrainType.JUNGLE) {
+          const isNative = player.civType === CivilizationType.AZTEC || player.civType === CivilizationType.MAYA;
+          terrainMult = isNative ? 0.60 : 0.72; // native civs value jungle food much more
+        }
+        if (node.type === ResourceType.STONE &&
+            (tile?.terrain === TerrainType.HIGHLAND || tile?.terrain === TerrainType.MOUNTAIN)) {
+          terrainMult = player.civType === CivilizationType.INCA ? 0.55 : 0.75;
+        }
+        const d = rawDist * terrainMult;
         if (d < nearestDist) {
           nearestDist = d;
           nearestNode = node;
