@@ -57,6 +57,7 @@ export class Unit {
   xp:           number  = 0;
   level:        number  = 1;
   justLeveledUp = false; // cleared by Game.ts each frame; true on the frame levelUp fires
+  justRallied   = false; // set on the frame panicked→false; cleared by Game to broadcast contagion
 
   // Civilization power buffs
   incaBuff  = false;
@@ -146,8 +147,14 @@ export class Unit {
   // Grants +15% damage. Recomputed periodically by Game.updateFormations.
   heroPowerBuff = false;
 
+  // Champion last stand: level-3 unit drops below 25% HP → +25% damage for 10s.
+  lastStandTimer = 0;
+
   // Inspired fury: landing a killing blow at ≥80 morale grants +15% damage for 5s.
   inspiredTimer = 0;
+
+  // Ambush ready: JAGUAR_KNIGHT/CUACHIC held still for ≥5s — first strike deals +35% damage.
+  ambushReady = false;
 
   // Ranged unit pinned in melee: an enemy melee unit is adjacent → -40% ranged damage.
   // Set each frame by CombatSystem when the unit fires while threatened.
@@ -807,6 +814,10 @@ export class Unit {
     if (this.hp > 0 && this.hp < this.maxHp * 0.20 && !this.wantsRetreat) {
       this.wantsRetreat = true;
     }
+    // Champion last stand: veteran (level 3) unit drops below 25% HP → surge of desperate fury
+    if (this.hp > 0 && this.level >= 3 && !this.isHero && this.hp < this.maxHp * 0.25 && this.lastStandTimer <= 0) {
+      this.lastStandTimer = 10;
+    }
     this.updateHealthBar();
     if (this.hp <= 0) this.die();
     return dmg;
@@ -863,6 +874,10 @@ export class Unit {
     } else {
       this.stationaryTimer = 0;
     }
+    // Ambush: melee stalkers prime a devastating first strike after holding still ≥5s
+    if ((this.type === UnitType.JAGUAR_KNIGHT || this.type === UnitType.CUACHIC) && this.stationaryTimer >= 5) {
+      this.ambushReady = true;
+    }
 
     // Battle fatigue: ≥60s continuous combat reduces attack by 10%; rest clears it
     if (this.state === UnitState.ATTACKING) {
@@ -904,7 +919,7 @@ export class Unit {
       }
       this.morale = Math.min(100, this.morale + regen * dt);
     }
-    if (this.panicked && this.morale >= 50) this.panicked = false;
+    if (this.panicked && this.morale >= 50) { this.panicked = false; this.justRallied = true; }
 
     // Passive idle healing: 2 HP every 0.5 s after 5 s without damage
     // (nearSettlement flag set externally by Game.ts each frame for +3 extra HP/tick)
@@ -971,6 +986,7 @@ export class Unit {
     if (this.buffAttackTimer  > 0) this.buffAttackTimer  = Math.max(0, this.buffAttackTimer  - dt);
     if (this.rallyCooldown    > 0) this.rallyCooldown    = Math.max(0, this.rallyCooldown    - dt);
     if (this.inspiredTimer    > 0) this.inspiredTimer    = Math.max(0, this.inspiredTimer    - dt);
+    if (this.lastStandTimer   > 0) this.lastStandTimer   = Math.max(0, this.lastStandTimer   - dt);
 
     // Auto-entrench: units holding position for ≥8s dig in automatically
     if (this.state === UnitState.HOLD && !this.entrenched && !this.isHero &&
@@ -1086,6 +1102,10 @@ export class Unit {
       case TerrainType.MOUNTAIN: terrainMult = 0.48; break;
       case TerrainType.HIGHLAND: terrainMult = 0.72; break;
       case TerrainType.DESERT:   terrainMult = 0.88; break;
+    }
+    // INCA highland runner: INCA units move faster on their native high-altitude terrain
+    if (this.civType === CivilizationType.INCA && !this.isHero && tile?.terrain === TerrainType.HIGHLAND) {
+      terrainMult *= 1.20;
     }
     // Heavy wounds (< 25% HP) impair movement — bleeding soldiers can't keep pace
     if (this.hp < this.maxHp * 0.25) terrainMult *= 0.7;
