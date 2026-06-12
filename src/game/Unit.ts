@@ -947,6 +947,8 @@ export class Unit {
         } else if (this.civType === CivilizationType.CONQUISTADOR && (t2 === TerrainType.BEACH || t2 === TerrainType.DESERT)) {
           terrainHealMult = 1.25;
         }
+        // Beach healing spring: all units recover faster near water (fresh coastal springs)
+        if (t2 === TerrainType.BEACH) terrainHealMult = Math.max(terrainHealMult, 1.5);
       }
       const healPerTick = Math.round((this._nearSettlement ? 5 : 2) * terrainHealMult);
       while (this._idleHealTimer >= 0.5) {

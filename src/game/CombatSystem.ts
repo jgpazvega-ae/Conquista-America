@@ -162,6 +162,8 @@ export class CombatSystem {
           }
           // Close ranks: formation fighters shield each other
           if (target.inFormation) dmg = Math.max(1, dmg - 2);
+          // Fire vulnerability: burning targets take +10% damage (heat and smoke weaken defense)
+          if (target.burning > 0) dmg = Math.round(dmg * 1.10);
           // Supply depot: troops near a friendly Storehouse have better equipment (+2 defense)
           if (target._nearSupplyDepot) dmg = Math.max(1, dmg - 2);
           // Officer aura: a nearby level-3 champion / hero steadies the line (+2 def)
