@@ -1076,6 +1076,19 @@ export class Game {
       }
     }
 
+    // Panic shelter: routing units that reach a friendly building regain 20 morale and stop fleeing
+    for (const u of this.allUnits) {
+      if (!u.isAlive() || !u.panicked || u.garrisonedIn !== null) continue;
+      const shelter = this.allBuildings.find(
+        b => b.playerId === u.playerId && b.isAlive() && Math.hypot(u.col - b.col, u.row - b.row) <= 2.5,
+      );
+      if (shelter) {
+        u.panicked = false;
+        u.morale   = Math.min(100, u.morale + 20);
+        u.state    = UnitState.IDLE;
+      }
+    }
+
     this.updateTowerAttacks(dt);
     this.updateGarrisonFire(dt);
     this.updateUnitBuildingAttacks(dt);
