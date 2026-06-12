@@ -199,6 +199,8 @@ export class CombatSystem {
           if (playersWithLeader.has(unit.playerId)) dmg = Math.round(dmg * 1.05);
           // Civ unit synergy: +10% damage when fighting alongside a complementary unit type
           if (unit.nearSynergy) dmg = Math.round(dmg * 1.10);
+          // Inspired fury: +15% damage for 5s after landing a kill at ≥80 morale
+          if (unit.inspiredTimer > 0) dmg = Math.round(dmg * 1.15);
           // Hero war cry buff: +25% attack for 12s
           if (unit.buffAttackTimer > 0) dmg = Math.round(dmg * 1.25);
           // Volley: synchronized burst for 2.5× damage, longer reload
@@ -237,6 +239,8 @@ export class CombatSystem {
               unit.berserkTimer = 12;
               unit.killStreak   = 0;
             }
+            // Inspired fury: high-morale kill triggers a short damage surge
+            if (!unit.isHero && unit.morale >= 80) unit.inspiredTimer = 5;
           }
 
           // Cannon: splash damage + burning + artillery terror (morale shock)
