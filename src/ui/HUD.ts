@@ -570,7 +570,7 @@ export class HUD {
     const fatigueBadge = unit.fatigued ? `<span title="Fatigado — -10% ataque por combate prolongado. Descansa para recuperar" style="color:#cc8844">😴FATIGADO</span>` : '';
     const woundBadge   = unit.hp < unit.maxHp * 0.25 ? `<span title="Herida grave — -20% ataque, -30% movimiento" style="color:#ff4444">🩸HERIDO</span>` : '';
     const burnBadge    = unit.burning     > 0 ? `<span title="En llamas" style="color:#ff8822">🔥${Math.ceil(unit.burning)}s</span>`       : '';
-    const poisonBadge  = unit.poisoned    > 0 ? `<span title="Envenenado" style="color:#44dd44">☠️${Math.ceil(unit.poisoned)}s</span>`       : '';
+    const poisonBadge  = unit.poisoned    > 0 ? `<span title="Envenenado — 2 HP/s · retira al Templo propio para curar (−3s cada 3s cerca del Templo)" style="color:#44dd44">☠️${Math.ceil(unit.poisoned)}s</span>` : '';
     const slowedBadge  = unit.slowed      > 0 ? `<span title="Aturdido por pedrada — -40% veloc." style="color:#aaaaff">🌀${Math.ceil(unit.slowed)}s</span>` : '';
     const berserkBadge = unit.berserkTimer > 0 ? `<span title="¡Frenesí! +25% daño" style="color:#ff6600">🔥FRENESÍ ${Math.ceil(unit.berserkTimer)}s</span>` : '';
     const chargeBadge  = unit.chargeReady  ? `<span title="Carga de caballería lista — +60% daño en primer golpe" style="color:#ffe066">⚡CARGA</span>` : '';

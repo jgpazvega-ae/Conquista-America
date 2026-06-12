@@ -813,6 +813,10 @@ class GameInstance {
     for (const u of this.game.getAllUnits()) {
       const hasBurn = u.burning > 0;
       const hasPoison = u.poisoned > 0;
+      // First-time poison hint: suggest retreating to temple for cure
+      if (hasPoison && u.playerId === this.game.humanPlayerId) {
+        this.hintOnce('poison', '☠️ ¡Unidad envenenada! Retírala al Templo propio — los sacerdotes curan el veneno (−3s cada 3s cerca del Templo).');
+      }
       if (!u.isAlive() || (!hasBurn && !hasPoison)) {
         this._statusParticleTimers.delete(u.id);
         continue;
