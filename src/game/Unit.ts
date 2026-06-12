@@ -159,8 +159,11 @@ export class Unit {
   heroName = '';
 
   // Hero war cry: Y-key buff that boosts nearby allies
-  warCryCooldown = 0;  // seconds remaining before war cry can be used again
-  buffAttackTimer = 0; // seconds of +25% attack buff remaining (from allied hero war cry)
+  warCryCooldown  = 0;  // seconds remaining before war cry can be used again
+  buffAttackTimer = 0;  // seconds of +25% attack buff remaining (from allied hero war cry)
+  // Hero secondary ability: H-key civ-flavored power (60s cooldown)
+  heroCooldown2    = 0;  // seconds remaining before secondary ability can be used again
+  heroSpeedBuff    = 0;  // seconds of Inca hero speed boost remaining
   // Hero auto-rally: triggers when hero morale drops below 40
   rallyCooldown = 0;
 
@@ -797,6 +800,12 @@ export class Unit {
     return dmg;
   }
 
+  /** Restore HP (up to maxHp) and refresh the health bar. */
+  heal(amount: number) {
+    this.hp = Math.min(this.maxHp, this.hp + amount);
+    this.updateHealthBar();
+  }
+
   private die() {
     this.state         = UnitState.DEAD;
     this.selected      = false;
@@ -923,6 +932,14 @@ export class Unit {
 
     // Hero war cry cooldown, attack buff, and rally cooldown
     if (this.warCryCooldown > 0) this.warCryCooldown = Math.max(0, this.warCryCooldown - dt);
+    if (this.heroCooldown2   > 0) this.heroCooldown2  = Math.max(0, this.heroCooldown2  - dt);
+    if (this.heroSpeedBuff   > 0) {
+      this.heroSpeedBuff = Math.max(0, this.heroSpeedBuff - dt);
+      if (this.heroSpeedBuff === 0 && this._preBuffSpeed > 0 && !this.incaBuff) {
+        this.speed = this._preBuffSpeed; // restore only if incaBuff isn't also active
+        this._preBuffSpeed = 0;
+      }
+    }
     if (this.buffAttackTimer  > 0) this.buffAttackTimer  = Math.max(0, this.buffAttackTimer  - dt);
     if (this.rallyCooldown    > 0) this.rallyCooldown    = Math.max(0, this.rallyCooldown    - dt);
 
