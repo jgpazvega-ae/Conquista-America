@@ -258,6 +258,10 @@ export class CombatSystem {
               target.poisoned = Math.max(target.poisoned, 6);
             }
           }
+          // Slinger: stone impact staggers the target (-40% speed for 2s; infantry only)
+          if (unit.type === UnitType.SLINGER && target.isAlive() && target.attackRange <= 1.5) {
+            target.slowed = Math.max(target.slowed, 2);
+          }
         }
       }
 
