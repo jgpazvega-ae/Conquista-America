@@ -677,6 +677,14 @@ export class Game {
         if (!evt.attacker.isHero && evt.attacker.morale < nightKillCap) {
           evt.attacker.morale = Math.min(nightKillCap, evt.attacker.morale + nightKillBoost);
         }
+        // Hero kill ripple: when a hero lands a killing blow, nearby allies gain morale (American Conquest: champion's presence inspires the line)
+        if (evt.attacker.isHero) {
+          for (const ally of this.allUnits) {
+            if (!ally.isAlive() || ally.playerId !== evt.attacker.playerId || ally === evt.attacker) continue;
+            const d = Math.sqrt((ally.col - evt.attacker.col) ** 2 + (ally.row - evt.attacker.row) ** 2);
+            if (d <= 6) ally.morale = Math.min(100, ally.morale + 8);
+          }
+        }
         // Army rout tracking: count friendly deaths in the 30s window
         if (evt.target.playerId === this.humanPlayerId) this._recentHumanDeaths++;
       }
