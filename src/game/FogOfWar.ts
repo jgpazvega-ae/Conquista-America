@@ -45,12 +45,15 @@ export class FogOfWar {
       this.revealAroundPoint(Math.round(unit.col), Math.round(unit.row), Math.ceil(unit.sight * unitMult), game.map);
     }
 
-    // Buildings reveal terrain (watchtowers get boosted sight to match their attack range)
+    // Buildings reveal terrain (watchtowers get boosted sight; night reduces watchtower vision like units)
     const myBuildings = game.allBuildings.filter(b => b.playerId === playerId && b.isAlive());
     for (const building of myBuildings) {
-      const sightRange = building.type === BuildingType.WATCHTOWER && building.isComplete()
-        ? 7
-        : building.isComplete() ? 4 : 2;
+      let sightRange: number;
+      if (building.type === BuildingType.WATCHTOWER && building.isComplete()) {
+        sightRange = Math.ceil(7 * sightMultiplier); // night reduces tower sight like unit sight
+      } else {
+        sightRange = building.isComplete() ? 4 : 2;
+      }
       this.revealAroundPoint(building.col, building.row, sightRange, game.map);
     }
 
