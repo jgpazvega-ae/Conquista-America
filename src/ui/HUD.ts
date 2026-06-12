@@ -159,11 +159,21 @@ export class HUD {
     this.elGold.closest('.res')?.classList.toggle('res-low', player.resources.gold < 30);
     this.elStone.closest('.res')?.classList.toggle('res-low', player.resources.stone < 30);
 
-    // Weather badge
+    // Weather badge + dawn/dusk countdown
     if (this.elWeather) {
       const w = this.game.weather;
-      this.elWeather.textContent = `${WEATHER_ICONS[w.state]} ${WEATHER_NAMES[w.state]}`;
-      this.elWeather.title = WEATHER_TIPS[w.state] || WEATHER_NAMES[w.state];
+      const dayT = this.game.dayT;
+      const isNight = this.game.isNight;
+      // Seconds until next day↔night transition
+      const secsToTransition = isNight
+        ? Math.ceil(dayT >= 0.75
+          ? (1.15 - dayT) * 480   // night continuing past midnight
+          : (0.15 - dayT) * 480)  // night before dawn
+        : Math.ceil((0.75 - dayT) * 480); // day before dusk
+      const transitionLabel = isNight ? `☀️${secsToTransition}s` : `🌙${secsToTransition}s`;
+      this.elWeather.textContent = `${WEATHER_ICONS[w.state]} ${WEATHER_NAMES[w.state]}  ${transitionLabel}`;
+      this.elWeather.title = (WEATHER_TIPS[w.state] || WEATHER_NAMES[w.state]) +
+        (isNight ? ' · Anochecer activo' : ` · Anochecer en ${secsToTransition}s`);
     }
 
     // Treasury (economic victory) progress bar: visible once gold > 150

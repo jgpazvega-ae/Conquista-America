@@ -185,6 +185,7 @@ class GameInstance {
   private _advantageTimer   = 0;  // seconds player has held >65% military advantage
   private _advantageCooldown = 0; // prevents repeated "press the attack" alerts (90s)
   private _enemyDisarrayCooldown = 0; // prevents repeated enemy-disarray alerts (60s)
+  private _flankWarnTimer       = 0; // throttle flanking warning notification (45s cooldown)
 
   /** Show a tutorial hint at most once per match. */
   private hintOnce(key: string, msg: string) {
@@ -558,6 +559,7 @@ class GameInstance {
     if (this._lowMoraleCooldown   > 0) this._lowMoraleCooldown   = Math.max(0, this._lowMoraleCooldown   - rawDt);
     if (this._advantageCooldown    > 0) this._advantageCooldown    = Math.max(0, this._advantageCooldown    - rawDt);
     if (this._enemyDisarrayCooldown > 0) this._enemyDisarrayCooldown = Math.max(0, this._enemyDisarrayCooldown - rawDt);
+    if (this._flankWarnTimer       > 0) this._flankWarnTimer       = Math.max(0, this._flankWarnTimer       - rawDt);
     this.game.update(dt);
 
     // Register any units produced this frame
@@ -922,6 +924,22 @@ class GameInstance {
             break;
           }
         }
+      }
+    }
+
+    // Flanking warning: notify when 2+ enemies attack the same human unit simultaneously
+    if (this._flankWarnTimer <= 0 && this.game.status === 'PLAYING') {
+      const enemyAttackers = new Map<number, number>(); // human unit id → enemy attacker count
+      for (const u of this.game.allUnits) {
+        if (!u.isAlive() || u.playerId === this.game.humanPlayerId || !u.attackTarget?.isAlive()) continue;
+        if (u.attackTarget.playerId === this.game.humanPlayerId) {
+          enemyAttackers.set(u.attackTarget.id, (enemyAttackers.get(u.attackTarget.id) ?? 0) + 1);
+        }
+      }
+      const flanked = [...enemyAttackers.values()].some(c => c >= 2);
+      if (flanked) {
+        this._flankWarnTimer = 45;
+        this.hud.notify('⚠️ ¡Flanqueo! El enemigo rodea a tus tropas — Forma una Falange (F2) o retira', 'warning');
       }
     }
 
