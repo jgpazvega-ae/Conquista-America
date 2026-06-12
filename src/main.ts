@@ -933,6 +933,7 @@ class GameInstance {
       if (u.berserkTimer > 0 && !wasBerserk) {
         this._berserkUnits.add(u.id);
         this.hud.notify(`🔥 ¡${u.def.name} entró en frenesí! +25% daño por 12s`, 'warning');
+        this.hud.addKillFeedEntry(`🔥 ${u.def.name} — ¡FRENESÍ! (3 bajas consecutivas)`);
         this.renderer.effects.createExplosion(u.worldX, 0.8, u.worldZ, 0.6);
       } else if (u.berserkTimer <= 0 && wasBerserk) {
         this._berserkUnits.delete(u.id);

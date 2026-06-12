@@ -453,8 +453,31 @@ export class AISystem {
     }
     const flankSplit = Math.floor(toSend / 2); // first half = direct, second half = flank
 
+    // Precompute nearest enemy building for cannon siege targeting
+    const enemyBuildings = game.allBuildings.filter(
+      b => b.playerId !== player.id && b.isAlive() && b.isComplete(),
+    );
+    const settlementTarget = enemyBuildings.find(b => b.type === BuildingType.SETTLEMENT)
+      ?? enemyBuildings.find(b => b.type === BuildingType.BARRACKS)
+      ?? enemyBuildings[0] ?? null;
+
     for (let i = 0; i < Math.min(toSend, available.length); i++) {
       const unit = available[i];
+
+      // Cannon siege priority: cannons target the nearest enemy building rather than units
+      if (unit.type === UnitType.CANNON && settlementTarget) {
+        const d = Math.sqrt((unit.col - settlementTarget.col) ** 2 + (unit.row - settlementTarget.row) ** 2);
+        if (d <= unit.attackRange + 1.0) {
+          unit.attackBuilding(settlementTarget);
+        } else {
+          const near = game.map.findWalkableNear(settlementTarget.col, settlementTarget.row, 3);
+          if (near) {
+            const path = findPath(game.map, unit.gridPos(), { col: near[0], row: near[1] }, 400);
+            if (path.length > 0) unit.moveTo(path);
+          }
+        }
+        continue;
+      }
 
       // Wonder is active — all attacking units converge on it
       if (humanWonder && game.wonderCountdown !== null) {
