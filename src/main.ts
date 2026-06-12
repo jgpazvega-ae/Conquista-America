@@ -393,7 +393,13 @@ class GameInstance {
             fortification: 'Fortificación',
             civTech:       civTechNames[this.game.humanPlayer.civType],
           };
-          this.hud.notify(`🔬 ${names[key]} investigada — beneficio aplicado`, 'success');
+          const benefits: Record<string, string> = {
+            metallurgy:    '+6⚔️ ataque a todas las unidades',
+            logistics:     '+0.4💨 velocidad a todas las unidades',
+            fortification: '+50❤️ HP máximo a todas las unidades',
+            civTech:       'élite desbloqueada — mejora de civilización única',
+          };
+          this.hud.notify(`🔬 ${names[key]} investigada — ${benefits[key] ?? 'beneficio aplicado'}`, 'success');
           this.audio.playResearchComplete();
           this.prodPanel.refresh();
         }
