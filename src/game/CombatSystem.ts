@@ -196,6 +196,21 @@ export class CombatSystem {
           }
           // Heavy wounds (< 25% HP): attacker fights at reduced effectiveness
           if (unit.hp < unit.maxHp * 0.25) dmg = Math.round(dmg * 0.8);
+          // Slowed: stone impact disrupts weapon timing — slowed units attack less effectively (-20%)
+          if (unit.slowed > 0) dmg = Math.max(1, Math.round(dmg * 0.80));
+          // Sniper precision: ARQUEBUSIER in careful HOLD aim for ≥8s lands a +25% precision shot
+          if (unit.type === UnitType.ARQUEBUSIER && !unit.outOfAmmo && isHold && unit.stationaryTimer >= 8) {
+            dmg = Math.round(dmg * 1.25);
+            unit.stationaryTimer = 0; // shifts position after firing to avoid prediction
+          }
+          // Cornered rat: 3+ enemies within 2 tiles → desperation surge (+20% damage)
+          {
+            let nearEnemies = 0;
+            for (const e of allUnits) {
+              if (e.isAlive() && e.playerId !== unit.playerId && Math.hypot(e.col - unit.col, e.row - unit.row) <= 2.0) nearEnemies++;
+            }
+            if (nearEnemies >= 3) dmg = Math.round(dmg * 1.20);
+          }
           // Berserk: +25% damage during 12-second kill-streak buff
           if (unit.berserkTimer > 0) dmg = Math.round(dmg * 1.25);
           // Leadership aura: +5% damage when player has any level-3 unit alive
@@ -208,16 +223,22 @@ export class CombatSystem {
           if (unit.counterChargeBuff) { dmg = Math.round(dmg * 1.20); unit.counterChargeBuff = false; }
           // Inspired fury: +15% damage for 5s after landing a kill at ≥80 morale
           if (unit.inspiredTimer > 0) dmg = Math.round(dmg * 1.15);
+          // Ambush striker: JAGUAR_KNIGHT/CUACHIC first attack after ≥5s still — stalk-and-pounce +35%
+          if (unit.ambushReady) { dmg = Math.round(dmg * 1.35); unit.ambushReady = false; unit.stationaryTimer = 0; }
+          // Champion last stand: level-3 unit at <25% HP fights with desperate fury (+25% dmg)
+          if (unit.lastStandTimer > 0) dmg = Math.round(dmg * 1.25);
           // Hero war cry buff: +25% attack for 12s
           if (unit.buffAttackTimer > 0) dmg = Math.round(dmg * 1.25);
           // Volley: synchronized burst for 2.5× damage, longer reload
           if (isVolley) dmg = Math.round(dmg * 2.5);
           // Weather: rain/storm reduces gunpowder & all-ranged effectiveness
           if (weather) dmg = Math.max(1, Math.round(dmg * weather.damageMultiplier(unit.type)));
-          // Night: melee thrives in the dark (+15%); gunpowder weapons struggle with poor visibility (-10%)
+          // Night: melee thrives in the dark (+15%); gunpowder weapons struggle (-10%).
+          // Eagle Warriors are trained for night warfare: +40% instead of the standard +15%.
           if (isNight) {
             const isPowder = unit.type === UnitType.ARQUEBUSIER || unit.type === UnitType.CANNON;
-            dmg = Math.round(dmg * (isPowder ? 0.9 : 1.15));
+            const nightMult = isPowder ? 0.9 : (unit.type === UnitType.EAGLE_WARRIOR ? 1.40 : 1.15);
+            dmg = Math.round(dmg * nightMult);
           }
           // Veteran toughness: level-3 Champions absorb 15% of incoming damage
           if (target.level >= 3) dmg = Math.max(1, Math.round(dmg * 0.85));
@@ -235,12 +256,30 @@ export class CombatSystem {
           // Entrenched ranged: prepared position grants 20% faster reload
           const entrenchedBonus = (unit.entrenched && !unit.outOfAmmo && unit.attackRange > 1.5 &&
             unit.type !== UnitType.CANNON) ? 0.80 : 1.0;
-          unit.attackTimer = unit.attackCooldown * (isVolley ? 1.5 : 1.0) * entrenchedBonus;
+          // Low morale: hesitant fighters attack 15% slower when morale < 30
+          const moralePenalty = (!unit.isHero && unit.morale < 30) ? 1.15 : 1.0;
+          unit.attackTimer = unit.attackCooldown * (isVolley ? 1.5 : 1.0) * entrenchedBonus * moralePenalty;
           // Ammo consumption (volley costs 2 rounds)
           if (unit.ammo > 0) unit.ammo = Math.max(0, unit.ammo - (isVolley ? 2 : 1));
 
           let isCrit = multiplier >= 1.5 || isFlanking || isCharge || unit.berserkTimer > 0 || isVolley || unit.buffAttackTimer > 0;
           this.events.push({ attacker: unit, target, damage: actual, worldX: target.worldX, worldZ: target.worldZ, critical: isCrit, isCharge, chargeBlocked });
+
+          // Hero front-line inspiration: hero's attack boosts morale of nearby allies (+1 each strike)
+          if (unit.isHero && actual > 0) {
+            for (const ally of allUnits) {
+              if (!ally.isAlive() || ally === unit || ally.playerId !== unit.playerId) continue;
+              if (Math.hypot(ally.col - unit.col, ally.row - unit.row) <= 5)
+                ally.morale = Math.min(100, ally.morale + 1);
+            }
+          }
+
+          // Fire arrow: ARCHER/ATLATL/SLINGER have a 15% chance to ignite the target
+          if (target.isAlive() && !target.burning &&
+              (unit.type === UnitType.ARCHER || unit.type === UnitType.ATLATL || unit.type === UnitType.SLINGER) &&
+              Math.random() < 0.15) {
+            target.burning = 3;
+          }
 
           // Kill streak tracking: 3 kills in a row without taking damage → 12s berserk
           if (!target.isAlive()) {
@@ -260,6 +299,7 @@ export class CombatSystem {
             // Direct hit terror: a cannonball is terrifying, even when it doesn't kill
             if (target.isAlive() && !target.isHero) target.loseMorale(8);
             const splashDmg = Math.max(1, Math.round(dmg * SPLASH_DAMAGE_RATIO));
+            const CANNON_TERROR_RADIUS = 4.0; // morale-shock zone beyond physical splash
             for (const other of allUnits) {
               if (!other.isAlive() || other === target) continue;
               const d = Math.sqrt((other.col - target.col) ** 2 + (other.row - target.row) ** 2);
@@ -269,6 +309,9 @@ export class CombatSystem {
                 // Shrapnel terror: nearby troops are rattled by the blast
                 if (other.isAlive() && !other.isHero) other.loseMorale(5);
                 this.events.push({ attacker: unit, target: other, damage: splashActual, worldX: other.worldX, worldZ: other.worldZ, critical: false });
+              } else if (d <= CANNON_TERROR_RADIUS && other.playerId !== unit.playerId) {
+                // Psychological terror: the thunderclap demoralises troops beyond the kill zone
+                if (!other.isHero) other.loseMorale(3);
               }
             }
           }
@@ -283,6 +326,10 @@ export class CombatSystem {
           // Slinger: stone impact staggers the target (-40% speed for 2s; infantry only)
           if (unit.type === UnitType.SLINGER && target.isAlive() && target.attackRange <= 1.5) {
             target.slowed = Math.max(target.slowed, 2);
+          }
+          // Atlatl javelin stagger: 20% chance to slow target 1s (javelin weight disrupts movement)
+          if (unit.type === UnitType.ATLATL && target.isAlive() && target.attackRange <= 1.5 && Math.random() < 0.20) {
+            target.slowed = Math.max(target.slowed, 1);
           }
           // Atlatl: javelin has small splash (0.8-tile radius, 40% damage) — punishes packed formations
           if (unit.type === UnitType.ATLATL && target.isAlive()) {
