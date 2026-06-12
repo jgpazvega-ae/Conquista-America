@@ -142,6 +142,9 @@ export class Unit {
   // Grants +10% damage when active. Recomputed periodically by Game.updateFormations.
   nearSynergy = false;
 
+  // Inspired fury: landing a killing blow at ≥80 morale grants +15% damage for 5s.
+  inspiredTimer = 0;
+
   // Ranged unit pinned in melee: an enemy melee unit is adjacent → -40% ranged damage.
   // Set each frame by CombatSystem when the unit fires while threatened.
   meleePinned = false;
@@ -950,6 +953,7 @@ export class Unit {
     }
     if (this.buffAttackTimer  > 0) this.buffAttackTimer  = Math.max(0, this.buffAttackTimer  - dt);
     if (this.rallyCooldown    > 0) this.rallyCooldown    = Math.max(0, this.rallyCooldown    - dt);
+    if (this.inspiredTimer    > 0) this.inspiredTimer    = Math.max(0, this.inspiredTimer    - dt);
 
     // Auto-entrench: units holding position for ≥8s dig in automatically
     if (this.state === UnitState.HOLD && !this.entrenched && !this.isHero &&

@@ -112,6 +112,8 @@ export class Game {
   private _garrisonUpkeepTimer   = 0;    // throttle garrison food drain (every 10s)
   private _autoGarrisonSent      = new Set<number>(); // unit ids sent to auto-garrison
   private _rubberBandTimer       = 0;    // throttle rubber-band difficulty check (every 30s)
+  private _momentumTimer         = 0;    // throttle battle-momentum check (every 45s)
+  private _killsThisCycle        = new Map<number, number>(); // kills per player in current momentum window
   villageIncomeEvents: { playerId: number; food: number; gold: number }[] = [];
 
   constructor(humanCiv: CivilizationType = CivilizationType.AZTEC) {
@@ -612,6 +614,27 @@ export class Game {
           Math.sqrt((u.col - worker.col) ** 2 + (u.row - worker.row) ** 2) <= 5,
         );
         if (threatened) {
+          // Cavalry worker harassment: cavalry within 3 tiles loots food directly from the worker's owner
+          const nearCav = this.allUnits.find(u =>
+            u.isAlive() && u.playerId !== worker.playerId && u.type === UnitType.CAVALRY &&
+            Math.sqrt((u.col - worker.col) ** 2 + (u.row - worker.row) ** 2) <= 3,
+          );
+          if (nearCav) {
+            const victim = this.players[worker.playerId];
+            const raider = this.players[nearCav.playerId];
+            if (victim && raider) {
+              const stolen = Math.min(victim.resources.food, 5 + Math.floor(Math.random() * 6));
+              if (stolen > 0) {
+                victim.resources.food -= stolen;
+                raider.resources.food += stolen;
+                if (nearCav.playerId === this.humanPlayerId) {
+                  this.pendingEventMessages.push(`🐎 ¡Pillaje! Caballería saquea trabajadores enemigos +${stolen}🌽`);
+                } else if (worker.playerId === this.humanPlayerId) {
+                  this.pendingEventMessages.push(`⚠️ ¡Caballería enemiga hostiga a tus trabajadores! −${stolen}🌽`);
+                }
+              }
+            }
+          }
           const refuge = this.allBuildings
             .filter(b => b.playerId === worker.playerId && b.isAlive() &&
               (b.type === BuildingType.SETTLEMENT || b.type === BuildingType.BARRACKS))
@@ -671,6 +694,7 @@ export class Game {
     for (const evt of this.damageEvents) {
       if (!evt.target.isAlive() && evt.attacker) {
         this.killsByPlayer.set(evt.attacker.playerId, (this.killsByPlayer.get(evt.attacker.playerId) ?? 0) + 1);
+        this._killsThisCycle.set(evt.attacker.playerId, (this._killsThisCycle.get(evt.attacker.playerId) ?? 0) + 1);
         // Kill morale boost: victory euphoria (+5 morale, cap 70; night raids cap 80)
         const nightKillBoost = this.isNight ? 10 : 5;
         const nightKillCap   = this.isNight ? 80 : 70;
@@ -913,6 +937,25 @@ export class Game {
           if (!u.isHero && u.morale < 70) u.morale = Math.min(70, u.morale + 10);
         }
       }
+    }
+
+    // Battle momentum: every 45s, reward players who won the firefight with a morale boost.
+    // 3+ kills → "impulso de batalla" (+8 morale to all alive units).
+    this._momentumTimer += dt;
+    if (this._momentumTimer >= 45) {
+      this._momentumTimer = 0;
+      for (const p of this.players) {
+        const kills = this._killsThisCycle.get(p.id) ?? 0;
+        if (kills >= 3) {
+          for (const u of p.aliveUnits) {
+            if (!u.isHero) u.morale = Math.min(100, u.morale + 8);
+          }
+          if (p.id === this.humanPlayerId) {
+            this.pendingEventMessages.push(`⚔️ ¡Impulso de batalla! ${kills} bajas enemigas — tus tropas ganan moral (+8)`);
+          }
+        }
+      }
+      this._killsThisCycle.clear();
     }
 
     // Army rout: 5+ human units lost within 30s → mass panic on low-morale survivors
