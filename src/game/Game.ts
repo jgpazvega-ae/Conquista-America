@@ -116,6 +116,9 @@ export class Game {
   private _killsThisCycle        = new Map<number, number>(); // kills per player in current momentum window
   private _lightningTimer        = 0;    // throttle storm lightning strikes (every 5s)
   private _lowNodeWarned         = new Set<number>(); // resource node ids already warned as low
+  private _warDrumTimer               = 90.0; // countdown to next settlement war drum pulse
+  private _sortiedBuildings           = new Set<number>(); // building ids that already triggered a garrison sortie
+  private _emergencyConscriptionFired = false; // one-time free militia spawn when human drops to < 3 units
   villageIncomeEvents: { playerId: number; food: number; gold: number }[] = [];
 
   constructor(humanCiv: CivilizationType = CivilizationType.AZTEC) {
@@ -444,6 +447,18 @@ export class Game {
       if (u.justLeveledUp) { this.newlyLeveledUpUnits.push(u); u.justLeveledUp = false; }
     }
 
+    // Rally contagion: a unit that just recovered from panic spreads hope to nearby allies (+5 morale)
+    for (const u of this.allUnits) {
+      if (!u.justRallied) continue;
+      u.justRallied = false;
+      for (const ally of this.allUnits) {
+        if (!ally.isAlive() || ally === u || ally.playerId !== u.playerId || ally.isHero || ally.panicked) continue;
+        if (Math.hypot(ally.col - u.col, ally.row - u.row) <= 4) {
+          ally.morale = Math.min(100, ally.morale + 5);
+        }
+      }
+    }
+
     // Track civilization eliminations: fire event first time a player loses their last settlement
     for (const p of this.players) {
       if (p.id === this.humanPlayerId) continue;
@@ -729,6 +744,11 @@ export class Game {
             if (d <= 6) ally.morale = Math.min(100, ally.morale + 8);
           }
         }
+        // AZTEC flower war: each kill earns +5 food for AZTEC players (tribute/captives mechanic)
+        const aztecKiller = this.players[evt.attacker.playerId];
+        if (!evt.attacker.isHero && aztecKiller?.civType === CivilizationType.AZTEC) {
+          aztecKiller.resources.food = Math.min(2000, aztecKiller.resources.food + 5);
+        }
         // Army rout tracking: count friendly deaths in the 30s window
         if (evt.target.playerId === this.humanPlayerId) this._recentHumanDeaths++;
       }
@@ -915,6 +935,34 @@ export class Game {
       }
     }
 
+    // Rain/storm suppresses fire: wet conditions extinguish burning units 2× faster
+    if (this.weather.state === 'RAIN' || this.weather.state === 'STORM') {
+      for (const u of this.allUnits) {
+        if (u.isAlive() && u.burning > 0) u.burning = Math.max(0, u.burning - dt);
+      }
+    }
+
+    // War drum pulse: every 90s the settlement beats war drums (+10 morale for nearby troops)
+    this._warDrumTimer -= dt;
+    if (this._warDrumTimer <= 0) {
+      this._warDrumTimer = 90.0;
+      const settle = this.allBuildings.find(
+        b => b.playerId === this.humanPlayerId && b.type === BuildingType.SETTLEMENT && b.isAlive(),
+      );
+      if (settle) {
+        let rallied = 0;
+        for (const u of this.humanPlayer.aliveUnits) {
+          if (u.isHero || u.panicked) continue;
+          if (Math.hypot(u.col - settle.col, u.row - settle.row) <= 8) {
+            u.morale = Math.min(100, u.morale + 10);
+            rallied++;
+          }
+        }
+        if (rallied > 0)
+          this.pendingEventMessages.push(`🥁 ¡Tambores de guerra! ${rallied} guerrer${rallied > 1 ? 'os' : 'o'} cerca del asentamiento se enardecen (+10 moral)`);
+      }
+    }
+
     // War exhaustion: prolonged combat (>4 min since first damage) slowly drains morale.
     // Heroes are immune. Incentivises decisive victory rather than endless attrition.
     if (this._firstCombatTime < 0 && this.damageEvents.length > 0) {
@@ -1024,6 +1072,36 @@ export class Game {
       }
     }
 
+    // Emergency conscription: human player nearly wiped out (< 3 non-hero units) → free militia at settlement
+    {
+      const nonHeroes = this.humanPlayer.aliveUnits.filter(u => !u.isHero);
+      if (nonHeroes.length < 3 && !this._emergencyConscriptionFired) {
+        const settle = this.allBuildings.find(
+          b => b.playerId === this.humanPlayerId && b.type === BuildingType.SETTLEMENT && b.isAlive(),
+        );
+        if (settle) {
+          this._emergencyConscriptionFired = true;
+          const civDef = CIVILIZATIONS[this.humanPlayer.civType];
+          const unitDef = civDef.units[0];
+          let spawned = 0;
+          for (let i = 0; i < 2; i++) {
+            if (this.humanPlayer.aliveUnits.length >= this.getPopCap(this.humanPlayerId)) break;
+            const pos = this.map.findWalkableNear(settle.col, settle.row + 3, 6);
+            if (!pos) break;
+            const unit = new Unit(unitDef.type, this.humanPlayer.civType, this.humanPlayerId, pos[0], pos[1], CIV_COLORS[this.humanPlayer.civType]);
+            this.applyCivTraits(unit, this.humanPlayer.civType);
+            this.humanPlayer.addUnit(unit);
+            this.allUnits.push(unit);
+            this.newlySpawnedUnits.push(unit);
+            spawned++;
+          }
+          if (spawned > 0) {
+            this.pendingEventMessages.push(`🚨 ¡Conscripción de emergencia! ${spawned} milicianos acuden a defender la patria`);
+          }
+        }
+      }
+    }
+
     // Hero passive morale aura: hero nearby slowly boosts allied morale (+1/s within 6 tiles)
     const heroesByPlayer = new Map<number, Unit>();
     for (const u of this.allUnits) {
@@ -1039,8 +1117,10 @@ export class Game {
     }
 
     // Panic check: morale ≤ 25 breaks the unit unless its hero stands nearby
+    // Veteran morale floor: level-3 units have seen enough battle — they hold until morale hits 10
     for (const u of this.allUnits) {
-      if (!u.isAlive() || u.isHero || u.panicked || u.morale > 25 || u.garrisonedIn !== null) continue;
+      if (!u.isAlive() || u.isHero || u.panicked || u.garrisonedIn !== null) continue;
+      if (u.level >= 3 ? u.morale > 10 : u.morale > 25) continue;
       const hero = heroesByPlayer.get(u.playerId);
       if (hero && u.distanceTo(hero) <= 8) {
         u.morale = 35; // the hero steadies the line
@@ -1073,6 +1153,19 @@ export class Game {
             u.state     = UnitState.MOVING;
           }
         }
+      }
+    }
+
+    // Panic shelter: routing units that reach a friendly building regain 20 morale and stop fleeing
+    for (const u of this.allUnits) {
+      if (!u.isAlive() || !u.panicked || u.garrisonedIn !== null) continue;
+      const shelter = this.allBuildings.find(
+        b => b.playerId === u.playerId && b.isAlive() && Math.hypot(u.col - b.col, u.row - b.row) <= 2.5,
+      );
+      if (shelter) {
+        u.panicked = false;
+        u.morale   = Math.min(100, u.morale + 20);
+        u.state    = UnitState.IDLE;
       }
     }
 
@@ -1210,6 +1303,15 @@ export class Game {
         if (b.type !== BuildingType.VILLAGE || b.playerId < 0 || !b.isAlive()) continue;
         const curr = incomeByPlayer.get(b.playerId) ?? { food: 0, gold: 0 };
         curr.food += 10; curr.gold += 6;
+        // MAYA trade network: adjacent friendly villages earn +2 bonus gold (trade routes)
+        const owner = this.players[b.playerId];
+        if (owner?.civType === CivilizationType.MAYA) {
+          const hasNeighbour = this.allBuildings.some(
+            v => v !== b && v.type === BuildingType.VILLAGE && v.playerId === b.playerId &&
+                 v.isAlive() && Math.hypot(v.col - b.col, v.row - b.row) <= 10,
+          );
+          if (hasNeighbour) curr.gold += 2;
+        }
         incomeByPlayer.set(b.playerId, curr);
       }
       for (const [pid, income] of incomeByPlayer) {
@@ -1408,6 +1510,22 @@ export class Game {
         b.transferTo(newOwner, CIV_COLORS[civ]);
         for (const u of units) u.captureTarget = null;
         this.newlyCapturedBuildings.push({ building: b, fromPlayerId: oldOwner, toPlayerId: newOwner });
+        // Village capture celebration: nearby allied units gain morale from the victory
+        if (b.type === BuildingType.VILLAGE) {
+          const newOwnerPlayer = this.players[newOwner];
+          if (newOwnerPlayer) {
+            let celebrated = 0;
+            for (const u of newOwnerPlayer.aliveUnits) {
+              if (Math.hypot(u.col - b.col, u.row - b.row) <= 10) {
+                u.morale = Math.min(100, u.morale + 15);
+                celebrated++;
+              }
+            }
+            if (newOwner === this.humanPlayerId && celebrated > 0) {
+              this.pendingEventMessages.push(`🏰 ¡Aldea capturada! ${celebrated} tropas celebran la victoria (+15 moral)`);
+            }
+          }
+        }
       }
     }
 
@@ -1575,6 +1693,27 @@ export class Game {
       const garrisonDefMult = bldg.garrison.length > 0 ? 0.85 : 1.0;
       const rawDmg = Math.max(1, Math.round((unit.attack - 5) * assaultMult * siegeMult * garrisonDefMult)); // buildings have some armor
       bldg.takeDamage(rawDmg);
+      // Garrison sortie: when human building reaches ≤30% HP with ≥2 garrison, half exit to counterattack
+      if (bldg.isAlive() && bldg.playerId === this.humanPlayerId &&
+          !this._sortiedBuildings.has(bldg.id) &&
+          bldg.hp <= bldg.maxHp * 0.30 && bldg.garrison.length >= 2) {
+        this._sortiedBuildings.add(bldg.id);
+        const sortieCount = Math.ceil(bldg.garrison.length / 2);
+        const sortieUnits = bldg.garrison.splice(0, sortieCount);
+        let exited = 0;
+        for (const su of sortieUnits) {
+          if (!su.isAlive()) continue;
+          const near = this.map.findWalkableNear(bldg.col + Math.floor(Math.random() * 3) - 1, bldg.row + 3, 4);
+          if (near) { su.col = near[0]; su.row = near[1]; su.worldX = near[0] * TILE_SIZE; su.worldZ = near[1] * TILE_SIZE; }
+          su.garrisonedIn = null;
+          su.mesh.visible = true;
+          su.attackTarget = unit;
+          su.state = UnitState.ATTACKING;
+          exited++;
+        }
+        if (exited > 0)
+          this.pendingEventMessages.push(`🏰 ¡Salida de guarnición! ${exited} defensor${exited > 1 ? 'es' : ''} salen a contraatacar`);
+      }
       if (!bldg.isAlive()) {
         this.newlyDestroyedBuildings.push(bldg);
         // Award XP to the unit that delivers the killing blow to a building
