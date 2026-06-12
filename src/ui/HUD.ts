@@ -561,6 +561,7 @@ export class HUD {
     const woundBadge   = unit.hp < unit.maxHp * 0.25 ? `<span title="Herida grave — -20% ataque, -30% movimiento" style="color:#ff4444">🩸HERIDO</span>` : '';
     const burnBadge    = unit.burning     > 0 ? `<span title="En llamas" style="color:#ff8822">🔥${Math.ceil(unit.burning)}s</span>`       : '';
     const poisonBadge  = unit.poisoned    > 0 ? `<span title="Envenenado" style="color:#44dd44">☠️${Math.ceil(unit.poisoned)}s</span>`       : '';
+    const slowedBadge  = unit.slowed      > 0 ? `<span title="Aturdido por pedrada — -40% veloc." style="color:#aaaaff">🌀${Math.ceil(unit.slowed)}s</span>` : '';
     const berserkBadge = unit.berserkTimer > 0 ? `<span title="¡Frenesí! +25% daño" style="color:#ff6600">🔥FRENESÍ ${Math.ceil(unit.berserkTimer)}s</span>` : '';
     const chargeBadge  = unit.chargeReady  ? `<span title="Carga de caballería lista — +60% daño en primer golpe" style="color:#ffe066">⚡CARGA</span>` : '';
     const deployBadge  = unit.type === 'CANNON' && unit.stationaryTimer < 4
@@ -590,6 +591,11 @@ export class HUD {
       : unit.buffAttackTimer > 0
         ? `<span title="Buff de grito de guerra: +25% atk" style="color:#ffd700">📯${Math.ceil(unit.buffAttackTimer)}s</span>`
         : '';
+    const heroPowerBadge = unit.isHero
+      ? unit.heroCooldown2 > 0
+        ? `<span title="Habilidad del héroe en recarga (H)" style="color:#888">🦅${Math.ceil(unit.heroCooldown2)}s</span>`
+        : `<span title="Habilidad especial del héroe lista — pulsa H para activar" style="color:#ff9944">🦅LISTA</span>`
+      : '';
     const FORM_LABELS: Record<string, string> = { LOOSE: '💨SUELTA', PHALANX: '🛡️FALANGE', WEDGE: '⚔️CUÑA' };
     const FORM_TIPS:   Record<string, string> = {
       LOOSE:   'Formación suelta — +20% veloc., -10% atk, -15% def · F4 para cancelar',
@@ -618,7 +624,7 @@ export class HUD {
       `<span>🛡️ ${unit.defense}</span>` +
       `<span>💨 ${unit.speed.toFixed(1)}</span>` +
       `<span>🎯 ${unit.attackRange.toFixed(1)}</span>` +
-      woundBadge + holdBadge + entrenchedBadge + fatigueBadge + burnBadge + poisonBadge + berserkBadge + chargeBadge + deployBadge + formBadge + moraleBadge + ammoBadge + orderBadge + officerBadge + pinnedBadge + supplyBadge + healingBadge + warCryBadge + nightBadge + reloadBadge;
+      woundBadge + holdBadge + entrenchedBadge + fatigueBadge + burnBadge + poisonBadge + slowedBadge + berserkBadge + chargeBadge + deployBadge + formBadge + moraleBadge + ammoBadge + orderBadge + officerBadge + pinnedBadge + supplyBadge + healingBadge + warCryBadge + heroPowerBadge + nightBadge + reloadBadge;
 
     // XP bar (only if unit can still level up)
     const xpEl = document.getElementById('unit-xp-row');
