@@ -128,8 +128,10 @@ export class AISystem {
         this.applyFormation(player, null);
         this.rallyTroops(player, game);
         // Guerrilla raids: small mobile forces harass workers and resource nodes
-        // instead of standing idle while waiting to mass enough for a frontal wave
-        if (player.aliveUnits.length >= 2 && player.aliveUnits.length <= 5) {
+        // instead of standing idle while waiting to mass enough for a frontal wave.
+        // At night the darkness provides cover — double the raid trigger chance.
+        const raidSizeOk = player.aliveUnits.length >= 2 && player.aliveUnits.length <= 5;
+        if (raidSizeOk || (game.isNight && player.aliveUnits.length >= 2 && Math.random() < 0.5)) {
           this.guerrillaRaid(player, game);
         }
         // Scout probe: during first GATHER_DURATION/2 of every gather phase, send

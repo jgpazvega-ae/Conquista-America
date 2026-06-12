@@ -1,4 +1,4 @@
-import { CivilizationType, UnitState, UnitType } from './types';
+import { CivilizationType, UnitState, UnitType, TerrainType } from './types';
 import { GameMap } from './Map';
 import { findPath } from './Pathfinding';
 import { Unit } from './Unit';
@@ -826,16 +826,21 @@ export class Game {
       }
     }
 
-    // Fire spread: burning units have a 25% chance per second to ignite adjacent units
+    // Fire spread: burning units have a 25% chance per second to ignite adjacent units.
+    // In jungle terrain the fire behaves as wildfire: 2× spread chance, 2-tile radius.
     this._fireSpreadTimer += dt;
     if (this._fireSpreadTimer >= 1) {
       this._fireSpreadTimer = 0;
       const burningUnits = this.allUnits.filter(u => u.isAlive() && u.burning > 0);
       for (const burner of burningUnits) {
-        if (Math.random() > 0.25) continue; // 25% chance to spread per burning unit per second
+        const burnerTile = this.map.getTile(Math.round(burner.col), Math.round(burner.row));
+        const inJungle   = burnerTile?.terrain === TerrainType.JUNGLE;
+        const spreadChance = inJungle ? 0.50 : 0.25;
+        const spreadRadius = inJungle ? 2.0  : 1.5;
+        if (Math.random() > spreadChance) continue;
         for (const other of this.allUnits) {
           if (!other.isAlive() || other === burner || other.burning > 0) continue;
-          if (Math.hypot(other.col - burner.col, other.row - burner.row) > 1.5) continue;
+          if (Math.hypot(other.col - burner.col, other.row - burner.row) > spreadRadius) continue;
           other.burning = Math.max(other.burning, 3); // 3s burn; doesn't extend existing longer burns
         }
       }
