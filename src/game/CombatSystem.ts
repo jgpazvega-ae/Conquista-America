@@ -185,6 +185,7 @@ export class CombatSystem {
             } else {
               dmg = Math.round(dmg * 1.6);
               isCharge = true;
+              unit.chargeSpeedTimer = 2.0; // 2s speed burst from charge momentum
               if (!target.isHero) target.loseMorale(15); // charge breaks enemy morale
             }
           }

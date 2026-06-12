@@ -1230,6 +1230,13 @@ class GameInstance {
     } else if (this.game.humanPlayer.aliveUnits.some(u => u.lowAmmo)) {
       this.hintOnce('lowAmmo', '💡 Munición baja (🏹 en ámbar). Retira tus arqueros/ballesteros al asentamiento propio para reabastecer. Pulsa V para descarga sincronizada.');
     }
+    // War cry ready hint: after 3 minutes, remind player if hero war cry is available
+    if (this.game.gameTime > 180) {
+      const hero = this.game.humanPlayer.aliveUnits.find(u => u.isHero);
+      if (hero && hero.isAlive() && hero.warCryCooldown === 0) {
+        this.hintOnce('warCryReady', '💡 Tu héroe tiene el Grito de Guerra listo — pulsa Y junto a tus tropas para dar +25% de ataque por 12s');
+      }
+    }
 
     this.hud.update(selectedNow);
     this.renderer.render();

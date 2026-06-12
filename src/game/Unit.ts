@@ -94,8 +94,9 @@ export class Unit {
   private _poisonTick = 0;
 
   // Cavalry charge: ready after 3s idle; consumed on first attack
-  chargeReady     = false;
+  chargeReady      = false;
   private _chargeIdleTime = 0;
+  chargeSpeedTimer = 0; // seconds of post-charge speed boost remaining
 
   // Kill streak / berserk
   killStreak  = 0;          // consecutive kills without taking damage
@@ -937,6 +938,15 @@ export class Unit {
         this.chargeReady = false;
       }
       // While ATTACKING: chargeReady persists until consumed in CombatSystem
+    }
+
+    // Charge speed burst: apply +0.6 speed for 2s after a successful cavalry charge
+    if (this.chargeSpeedTimer > 0) {
+      this.chargeSpeedTimer = Math.max(0, this.chargeSpeedTimer - dt);
+      this.speed = Math.max(this.speed, this._defSpeed + 0.6);
+      if (this.chargeSpeedTimer === 0) {
+        this.speed = Math.max(0.1, this.speed - 0.6); // remove burst when timer expires
+      }
     }
 
     // Ammo resupply: 1 round per 1.5 s when near own settlement OR a Storehouse supply depot
