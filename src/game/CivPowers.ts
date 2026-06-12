@@ -111,7 +111,11 @@ export function updateCivPowers(game: Game, dt: number) {
   const def    = CIV_POWER_DEFS[player.civType];
 
   if (player.powerCooldown > 0) {
-    player.powerCooldown = Math.max(0, player.powerCooldown - dt);
+    // Temple blessing: owning a completed Temple reduces civ power cooldown 30% faster
+    const hasTemple = game.allBuildings.some(
+      b => b.playerId === player.id && (b.type as string) === 'TEMPLE' && b.isComplete() && b.isAlive(),
+    );
+    player.powerCooldown = Math.max(0, player.powerCooldown - dt * (hasTemple ? 1.3 : 1.0));
   }
 
   if (player.powerActive && player.powerActiveTimer > 0) {

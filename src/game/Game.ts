@@ -171,9 +171,15 @@ export class Game {
   };
 
   private spawnHero(player: Player): Unit | null {
-    const heroDef  = Game.HERO_DEFS[player.civType];
-    const [baseCol, baseRow] = START_POSITIONS[player.civType];
-    const pos = this.map.findWalkableNear(baseCol, baseRow + 2, 6);
+    const heroDef = Game.HERO_DEFS[player.civType];
+    // Prefer current settlement for respawn; fall back to historical start position
+    const settlement = this.allBuildings.find(
+      b => b.playerId === player.id && b.type === BuildingType.SETTLEMENT && b.isAlive(),
+    );
+    const [baseCol, baseRow] = settlement
+      ? [settlement.col, settlement.row]
+      : START_POSITIONS[player.civType];
+    const pos = this.map.findWalkableNear(baseCol, baseRow, 4);
     if (!pos) return null;
     const unit = new Unit(heroDef.unitType, player.civType, player.id, pos[0], pos[1], CIV_COLORS[player.civType]);
     unit.markAsHero(heroDef.name);
