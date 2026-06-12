@@ -1,4 +1,4 @@
-import { UnitState, TerrainType, UnitType } from './types';
+import { UnitState, TerrainType, UnitType, CivilizationType } from './types';
 import type { Unit } from './Unit';
 import type { GameMap } from './Map';
 import { findPath } from './Pathfinding';
@@ -162,6 +162,8 @@ export class CombatSystem {
           }
           // Close ranks: formation fighters shield each other
           if (target.inFormation) dmg = Math.max(1, dmg - 2);
+          // Supply depot: troops near a friendly Storehouse have better equipment (+2 defense)
+          if (target._nearSupplyDepot) dmg = Math.max(1, dmg - 2);
           // Officer aura: a nearby level-3 champion / hero steadies the line (+2 def)
           if (target.nearOfficer) dmg = Math.max(1, dmg - 2);
           // Routed targets are cut down more easily; cavalry pursuit is especially lethal
@@ -184,6 +186,7 @@ export class CombatSystem {
               // No charge bonus, no morale shock; defenders gain confidence (+10 morale).
               chargeBlocked = true;
               if (!target.isHero) target.morale = Math.min(100, target.morale + 10);
+              if (!target.isHero) target.counterChargeBuff = true; // next attack gets counter-charge bonus
             } else {
               dmg = Math.round(dmg * 1.6);
               isCharge = true;
@@ -216,6 +219,8 @@ export class CombatSystem {
           if (unit.nearSynergy) dmg = Math.round(dmg * 1.10);
           // Hero passive specialization: +15% when hero's signature unit type fights nearby
           if (unit.heroPowerBuff) dmg = Math.round(dmg * 1.15);
+          // Counter-charge: spear unit that absorbed a cavalry charge strikes back +20%
+          if (unit.counterChargeBuff) { dmg = Math.round(dmg * 1.20); unit.counterChargeBuff = false; }
           // Inspired fury: +15% damage for 5s after landing a kill at ≥80 morale
           if (unit.inspiredTimer > 0) dmg = Math.round(dmg * 1.15);
           // Ambush striker: JAGUAR_KNIGHT/CUACHIC first attack after ≥5s still — stalk-and-pounce +35%
@@ -310,10 +315,11 @@ export class CombatSystem {
               }
             }
           }
-          // Jungle melee: 20% chance to poison target
+          // Jungle melee: 20% chance to poison target (MAYA specialists: 35% chance)
           if (unit.attackRange < 2) {
             const attackerTile = map.getTile(unit.col, unit.row);
-            if (attackerTile?.terrain === TerrainType.JUNGLE && Math.random() < 0.20) {
+            const poisonChance = unit.civType === CivilizationType.MAYA ? 0.35 : 0.20;
+            if (attackerTile?.terrain === TerrainType.JUNGLE && Math.random() < poisonChance) {
               target.poisoned = Math.max(target.poisoned, 6);
             }
           }

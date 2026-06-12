@@ -153,6 +153,8 @@ export class Unit {
   // Inspired fury: landing a killing blow at ≥80 morale grants +15% damage for 5s.
   inspiredTimer = 0;
 
+  // Counter-charge: spear unit that absorbs a cavalry charge deals +20% on their next attack.
+  counterChargeBuff = false;
   // Ambush ready: JAGUAR_KNIGHT/CUACHIC held still for ≥5s — first strike deals +35% damage.
   ambushReady = false;
 
@@ -921,6 +923,8 @@ export class Unit {
       }
       this.morale = Math.min(100, this.morale + regen * dt);
     }
+    // Poison disrupts morale recovery — toxins sap the will to fight
+    if (this.poisoned > 0) this.morale = Math.max(0, this.morale - 0.5 * dt);
     if (this.panicked && this.morale >= 50) { this.panicked = false; this.justRallied = true; }
 
     // Passive idle healing: 2 HP every 0.5 s after 5 s without damage
