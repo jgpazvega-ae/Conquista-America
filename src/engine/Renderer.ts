@@ -77,9 +77,12 @@ export class Renderer {
   private _rainActive = false;
   private static readonly RAIN_COUNT = 1200;
 
+  private readonly _isMobile: boolean;
+
   constructor(canvas: HTMLCanvasElement) {
     const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
                      navigator.maxTouchPoints > 1;
+    this._isMobile = isMobile;
 
     this.renderer = new THREE.WebGLRenderer({
       canvas,
@@ -109,6 +112,10 @@ export class Renderer {
   }
 
   private setupScene() {
+    // Default sky color so WebGL clear shows blue instead of black on mobile
+    // (setDayNight() overwrites this later, but may not run before first frame)
+    this.scene.background = new THREE.Color(0x84b4dc);
+
     // ── Atmospheric fog tuned to the sky horizon ──────────────────────────────
     const horizon = new THREE.Color(0xbcd6e8);
     this.scene.fog = new THREE.Fog(horizon.getHex(), 70, 220);
@@ -125,6 +132,7 @@ export class Renderer {
         offset:      { value: 40 },
       },
       vertexShader: /* glsl */`
+        precision highp float;
         varying vec3 vPos;
         void main() {
           vPos = position;
@@ -132,6 +140,7 @@ export class Renderer {
         }
       `,
       fragmentShader: /* glsl */`
+        precision highp float;
         uniform vec3 topColor; uniform vec3 midColor; uniform vec3 bottomColor; uniform float offset;
         varying vec3 vPos;
         void main() {
@@ -352,7 +361,8 @@ export class Renderer {
     floor.receiveShadow = true;
     this.tileGroup.add(floor);
 
-    const waterGeo = new THREE.PlaneGeometry(W * 1.4, D * 1.4, 80, 80);
+    const waterSubdiv = this._isMobile ? 32 : 80;
+    const waterGeo = new THREE.PlaneGeometry(W * 1.4, D * 1.4, waterSubdiv, waterSubdiv);
     this.waterMat = new THREE.ShaderMaterial({
       transparent: true,
       uniforms: {
@@ -362,6 +372,7 @@ export class Renderer {
         sunDir:     { value: this.sunDir.clone() },
       },
       vertexShader: /* glsl */`
+        precision highp float;
         uniform float time;
         varying float vWave;
         varying vec3  vWorld;
@@ -378,6 +389,7 @@ export class Renderer {
         }
       `,
       fragmentShader: /* glsl */`
+        precision highp float;
         uniform vec3 shallow; uniform vec3 deep; uniform vec3 sunDir; uniform float time;
         varying float vWave; varying vec3 vWorld;
         void main() {
