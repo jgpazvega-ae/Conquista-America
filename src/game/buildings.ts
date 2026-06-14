@@ -1,6 +1,7 @@
 export enum BuildingType {
   SETTLEMENT = 'SETTLEMENT',      // Centro urbano (produce trabajadores)
-  BARRACKS = 'BARRACKS',          // Cuartel (produce guerreros)
+  HOUSE = 'HOUSE',                // Casa/Cabaña — aumenta límite de población (+12 por casa)
+  BARRACKS = 'BARRACKS',          // Cuartel (produce guerreros de élite)
   TEMPLE = 'TEMPLE',              // Templo (produce chamanes/misioneros, investigación)
   WATCHTOWER = 'WATCHTOWER',      // Torre de vigilancia (defensa)
   STOREHOUSE = 'STOREHOUSE',      // Almacén (bonus recursos)
