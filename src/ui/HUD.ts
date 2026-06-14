@@ -405,6 +405,8 @@ export class HUD {
   }
 
   private updateScoreboard() {
+    const scores = this.game.players.map(p => ({ id: p.id, score: this.game.getConquestScore(p.id) }));
+    const maxScore = Math.max(...scores.map(s => s.score), 1);
     const html = this.game.players.map(p => {
       const settle = this.game.allBuildings.find(
         b => b.playerId === p.id && b.type === BuildingType.SETTLEMENT,
@@ -415,6 +417,9 @@ export class HUD {
       const pop    = p.aliveUnits.length;
       const kills  = this.game.killsByPlayer.get(p.id) ?? 0;
       const bldgs  = this.game.allBuildings.filter(b => b.playerId === p.id && b.isAlive() && b.isComplete()).length;
+      const score  = this.game.getConquestScore(p.id);
+      const scorePct = Math.round((score / maxScore) * 100);
+      const isLeading = score === maxScore && score > 0;
       const label  = p.isHuman ? '(Tú)' : CIV_NAMES[p.civType].slice(0, 6);
       if (defeated) {
         return `<div class="sb-row sb-defeated">
@@ -430,7 +435,9 @@ export class HUD {
         <span class="sb-pop" title="Unidades vivas">👥${pop}</span>
         <span class="sb-kills" title="Bajas enemigas">⚔️${kills}</span>
         <span class="sb-bldgs" title="Edificios construidos">🏛️${bldgs}</span>
+        <span class="sb-score" title="Puntuación de conquista (unidades+edificios+bajas+tecnologías)" style="color:${isLeading ? '#ffd700' : '#aaa'}">${isLeading ? '🏆' : '⚡'}${score}</span>
         <div class="sb-hp-wrap"><div class="sb-hp-fill" style="width:${hpPct}%;background:${hpColor}"></div></div>
+        <div class="sb-score-wrap"><div class="sb-score-fill" style="width:${scorePct}%;background:${isLeading ? '#cc9900' : '#445'}"></div></div>
       </div>`;
     }).join('');
     this.elScoreboard.innerHTML = html;

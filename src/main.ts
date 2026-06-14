@@ -1420,6 +1420,11 @@ class GameInstance {
       if (isRaid) this.hintOnce('cavalryRaid', '💡 Raída de caballería: tus jinetes saquean ⚜️ oro al destruir edificios enemigos. ¡Úsalos para cortar el suministro enemigo!');
     }
 
+    // Historical events chain — show as prominent overlay
+    for (const msg of this.game.histEventMessages) {
+      this._showHistoricalEventOverlay(msg);
+    }
+
     // Era advancement notifications
     for (const evt of this.game.eraAdvanceEvents) {
       const isHuman = evt.playerId === this.game.humanPlayerId;
@@ -1759,6 +1764,33 @@ class GameInstance {
     document.getElementById('village-alliance-reject')?.addEventListener('click', () => {
       document.getElementById('village-alliance-prompt')?.classList.add('hidden');
     });
+  }
+
+  private _showHistoricalEventOverlay(msg: string) {
+    const el = document.getElementById('hist-event-overlay');
+    const textEl = document.getElementById('hist-event-text');
+    const scoreEl = document.getElementById('hist-event-score');
+    if (!el || !textEl) return;
+    const dash = msg.indexOf(' — ');
+    if (dash >= 0) {
+      textEl.innerHTML = `<span style="color:#ffd700;font-weight:900;font-size:18px">${msg.slice(0, dash)}</span><br><span style="color:#fff;font-size:13px">${msg.slice(dash + 3)}</span>`;
+    } else {
+      textEl.textContent = msg;
+    }
+    if (scoreEl) {
+      const myScore  = this.game.getConquestScore(this.game.humanPlayerId);
+      const topScore = Math.max(...this.game.players.filter(p => p.id !== this.game.humanPlayerId && !p.isDefeated()).map(p => this.game.getConquestScore(p.id)), 0);
+      const leading  = myScore >= topScore;
+      scoreEl.textContent = `⚡ Tu poder de conquista: ${myScore} pts ${leading ? '🏆 Liderando' : `(rival: ${topScore})`}`;
+    }
+    el.classList.remove('hidden');
+    (el as HTMLElement).style.opacity = '1';
+    this.hud.notify(msg.slice(0, 60) + (msg.length > 60 ? '…' : ''), 'success');
+    this.audio.playBuild();
+    setTimeout(() => {
+      (el as HTMLElement).style.opacity = '0';
+      setTimeout(() => el.classList.add('hidden'), 500);
+    }, 5000);
   }
 
   private _aiDiploShown = false;

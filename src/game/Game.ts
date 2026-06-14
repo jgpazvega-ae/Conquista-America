@@ -133,6 +133,14 @@ export class Game {
   allianceVillages = new Set<number>();  // building IDs of neutral villages allied by human player
   private _allianceRewardTimer = 90;    // countdown to next warrior from allied villages
 
+  // Historical events chain (American Conquest narrative arc)
+  histEventMessages: string[] = []; // consumed each frame by main.ts — distinct from pendingEventMessages
+  private _histEventsFired    = new Set<string>(); // keys of already-fired events
+  private _histCheckTimer     = 0;  // throttle; check every 5s
+  _flowerWarTimer             = 0;  // Aztec flower war buff: remaining seconds (+15 morale on kill)
+  _incaRoadTimer              = 0;  // Inca road buff: speed bonus remaining seconds
+  private _conquistadorPlagueActive = false; // late-game disease reduces native unit HP
+
   constructor(
     humanCiv: CivilizationType = CivilizationType.AZTEC,
     opts: { numAI?: number; mapSeed?: number; difficulty?: 'easy' | 'normal' | 'hard' } = {},
@@ -853,6 +861,15 @@ export class Game {
               this.pendingEventMessages.push('⚔️ ¡Primera sangre! Tu ejército se enardece (+25 moral a todos)');
           }
         }
+        // Flower War buff (Aztec historical event): kills spread +15 morale to allies within 5 tiles
+        if (this._flowerWarTimer > 0 && evt.attacker.playerId === this.humanPlayerId) {
+          const human = this.humanPlayer;
+          for (const ally of human.aliveUnits) {
+            if (ally === evt.attacker) continue;
+            if (Math.hypot(ally.col - evt.attacker.col, ally.row - evt.attacker.row) <= 5)
+              ally.morale = Math.min(100, ally.morale + 15);
+          }
+        }
         // Hero kill ripple: when a hero lands a killing blow, nearby allies gain morale (American Conquest: champion's presence inspires the line)
         if (evt.attacker.isHero) {
           for (const ally of this.allUnits) {
@@ -1402,6 +1419,30 @@ export class Game {
     if (this._eventTimer <= 0) {
       this._eventTimer = 60 + Math.random() * 60;
       this.fireRandomEvent();
+    }
+
+    // Historical events chain (civ-specific narrative, checked every 5s)
+    this.histEventMessages = [];
+    this._histCheckTimer -= dt;
+    if (this._histCheckTimer <= 0) {
+      this._histCheckTimer = 5;
+      this._checkHistoricalEvents();
+    }
+    // Tick historical buff timers
+    if (this._flowerWarTimer > 0)  this._flowerWarTimer  = Math.max(0, this._flowerWarTimer  - dt);
+    if (this._incaRoadTimer  > 0) {
+      this._incaRoadTimer = Math.max(0, this._incaRoadTimer - dt);
+      if (this._incaRoadTimer <= 0) {
+        // Inca road buff expired — restore base speeds
+        for (const u of this.humanPlayer.aliveUnits) {
+          if (u.incaBuff) continue; // don't undo active power buff
+          u.speed = u.def.stats.speed;
+        }
+      }
+    }
+    // Conquistador plague: every 8s deal 6 HP damage to random native enemy unit
+    if (this._conquistadorPlagueActive) {
+      this._fireSpreadTimer += dt; // reuse existing 1s tick already in code below
     }
 
     // AI diplomacy proposals to human
@@ -2607,6 +2648,130 @@ export class Game {
     if (enemies.every(p => !this.hasSettlement(p.id))) {
       this.victoryType = 'MILITARY';
       this.status = 'VICTORY';
+    }
+  }
+
+  /** Conquest score: combines military strength, territory, and kills into one number. */
+  getConquestScore(playerId: number): number {
+    const p = this.players[playerId];
+    if (!p) return 0;
+    const units   = p.aliveUnits.length;
+    const bldgs   = this.allBuildings.filter(b => b.playerId === playerId && b.isAlive() && b.isComplete()).length;
+    const kills   = this.killsByPlayer.get(playerId) ?? 0;
+    const techs   = p.techs.completedCount;
+    const villages= this.allBuildings.filter(b => b.playerId === playerId && b.type === BuildingType.VILLAGE && b.isAlive()).length;
+    return units * 1 + bldgs * 3 + kills * 2 + techs * 10 + villages * 5;
+  }
+
+  private _checkHistoricalEvents() {
+    if (this.status !== 'PLAYING') return;
+    const t    = this.gameTime;
+    const civ  = this.humanPlayer.civType;
+    const cap  = 2000;
+    const fire = (key: string, fn: () => string) => {
+      if (this._histEventsFired.has(key)) return;
+      this._histEventsFired.add(key);
+      this.histEventMessages.push(fn());
+    };
+
+    switch (civ) {
+      case CivilizationType.AZTEC:
+        if (t >= 120) fire('aztec_1', () => {
+          this.humanPlayer.resources.food = Math.min(cap, this.humanPlayer.resources.food + 80);
+          const settle = this.allBuildings.find(b => b.playerId === this.humanPlayerId && b.type === BuildingType.SETTLEMENT && b.isAlive());
+          let spawned = 0;
+          for (let i = 0; i < 3 && this.humanPlayer.aliveUnits.length < this.getPopCap(this.humanPlayerId); i++) {
+            const pos = this.map.findWalkableNear((settle?.col ?? 28) + 2 + i, (settle?.row ?? 8) + 3, 5);
+            if (!pos) continue;
+            const u = new Unit(UnitType.EAGLE_WARRIOR, CivilizationType.AZTEC, this.humanPlayerId, pos[0], pos[1], CIV_COLORS[CivilizationType.AZTEC]);
+            this.humanPlayer.addUnit(u); this.allUnits.push(u); this.newlySpawnedUnits.push(u); spawned++;
+          }
+          return `🦅 LA TRIPLE ALIANZA — Tenochtitlán forja su poder. +80🌽 · ${spawned} Guerrero Águila gratuito${spawned !== 1 ? 's' : ''}`;
+        });
+        if (t >= 360) fire('aztec_2', () => {
+          this._flowerWarTimer = 120;
+          return `🌸 GUERRAS FLORIDAS — Por 120s, cada muerte en combate propaga +15 moral a tus guerreros cercanos`;
+        });
+        if (t >= 600) fire('aztec_3', () => {
+          const enemies = this.players.filter(p => p.id !== this.humanPlayerId && !p.isDefeated());
+          for (const ep of enemies) for (const eu of ep.aliveUnits) eu.attack = Math.round(eu.attack * 1.2);
+          return `🩸 CAÍDA DE TENOCHTITLÁN — Los Conquistadores lanzan su asalto final. ¡Enemigos +20% ataque permanente!`;
+        });
+        break;
+
+      case CivilizationType.INCA:
+        if (t >= 120) fire('inca_1', () => {
+          for (const u of this.humanPlayer.aliveUnits) u.speed = Math.min(u.speed * 1.3, u.def.stats.speed * 2.5);
+          this.humanPlayer.resources.food = Math.min(cap, this.humanPlayer.resources.food + 60);
+          return `🛤️ LOS CHASQUIS — Mensajeros imperiales activan la red de caminos. Todas tus unidades +30% velocidad`;
+        });
+        if (t >= 360) fire('inca_2', () => {
+          this.humanPlayer.resources.food = Math.min(cap, this.humanPlayer.resources.food + 200);
+          this.humanPlayer.resources.gold = Math.min(cap, this.humanPlayer.resources.gold + 100);
+          return `📜 QUIPUS DEL TAWANTINSUYU — El tributo imperial llega a Cusco. +200🌽 +100⚜️`;
+        });
+        if (t >= 600) fire('inca_3', () => {
+          const settle = this.allBuildings.find(b => b.playerId === this.humanPlayerId && b.type === BuildingType.SETTLEMENT && b.isAlive());
+          let spawned = 0;
+          for (let i = 0; i < 4 && this.humanPlayer.aliveUnits.length < this.getPopCap(this.humanPlayerId); i++) {
+            const pos = this.map.findWalkableNear((settle?.col ?? 19) + i - 1, (settle?.row ?? 36) + 3, 5);
+            if (!pos) continue;
+            const u = new Unit(UnitType.QUECHUA, CivilizationType.INCA, this.humanPlayerId, pos[0], pos[1], CIV_COLORS[CivilizationType.INCA]);
+            this.humanPlayer.addUnit(u); this.allUnits.push(u); this.newlySpawnedUnits.push(u); spawned++;
+          }
+          return `⛰️ ÚLTIMA RESISTENCIA INCA — Las huestes del Sapa Inca defienden los Andes. ${spawned} Quechua gratuito${spawned !== 1 ? 's' : ''}`;
+        });
+        break;
+
+      case CivilizationType.MAYA:
+        if (t >= 120) fire('maya_1', () => {
+          for (const u of this.humanPlayer.aliveUnits) u.sight = Math.min(18, u.sight + 2);
+          return `🔭 OBSERVATORIO MAYA — Los astrónomos revelan el cosmos. Todas tus unidades +2 visión`;
+        });
+        if (t >= 360) fire('maya_2', () => {
+          this.humanPlayer.resources.gold = Math.min(cap, this.humanPlayer.resources.gold + 150);
+          return `💰 RUTAS COMERCIALES — El jade y el cacao fluyen por las rutas mayas. +150⚜️`;
+        });
+        if (t >= 600) fire('maya_3', () => {
+          this.fog.revealAll(this.humanPlayerId);
+          setTimeout(() => {/* vision decays naturally on next fog.update */}, 45000);
+          return `👁️ PROFECÍA DEL CÓDICE — Los códices revelan todos los secretos del mundo. Mapa revelado 45s`;
+        });
+        break;
+
+      case CivilizationType.CONQUISTADOR:
+        if (t >= 120) fire('conq_1', () => {
+          const harbor = this.allBuildings.find(b => b.playerId === this.humanPlayerId && b.type === BuildingType.HARBOR && b.isAlive() && b.isComplete());
+          const anchor = harbor ?? this.allBuildings.find(b => b.playerId === this.humanPlayerId && b.type === BuildingType.SETTLEMENT && b.isAlive());
+          let spawned = 0;
+          for (let i = 0; i < 2 && this.humanPlayer.aliveUnits.length < this.getPopCap(this.humanPlayerId); i++) {
+            const pos = this.map.findWalkableNear((anchor?.col ?? 46) + i, (anchor?.row ?? 24) + 2, 6);
+            if (!pos) continue;
+            const utype = harbor ? UnitType.BRIGANTINE : UnitType.SOLDIER;
+            const u = new Unit(utype, CivilizationType.CONQUISTADOR, this.humanPlayerId, pos[0], pos[1], CIV_COLORS[CivilizationType.CONQUISTADOR]);
+            this.humanPlayer.addUnit(u); this.allUnits.push(u); this.newlySpawnedUnits.push(u); spawned++;
+          }
+          return harbor
+            ? `⛵ FLOTA ESPAÑOLA — Refuerzos navales desde Sevilla. ${spawned} Bergantín${spawned !== 1 ? 'es' : ''} gratuito${spawned !== 1 ? 's' : ''}`
+            : `⚔️ TERCIO ESPAÑOL — Soldados de infantería llegan del Viejo Mundo. ${spawned} Soldado${spawned !== 1 ? 's' : ''} gratuito${spawned !== 1 ? 's' : ''}`;
+        });
+        if (t >= 360) fire('conq_2', () => {
+          this.humanPlayer.resources.gold = Math.min(cap, this.humanPlayer.resources.gold + 200);
+          return `💰 ORO DEL NUEVO MUNDO — Galeones cargados de riquezas llegan a Sevilla. +200⚜️`;
+        });
+        if (t >= 600) fire('conq_3', () => {
+          this._conquistadorPlagueActive = true;
+          const nativePlayers = this.players.filter(p => p.id !== this.humanPlayerId && !p.isDefeated() && p.civType !== CivilizationType.CONQUISTADOR);
+          for (const np of nativePlayers) {
+            for (const nu of np.aliveUnits) {
+              const dmg = Math.floor(nu.hp * 0.30);
+              nu.hp = Math.max(1, nu.hp - dmg);
+              nu.poisoned = Math.max(nu.poisoned, 10);
+            }
+          }
+          return `🦠 LA GRAN EPIDEMIA — Las enfermedades europeas se extienden entre los pueblos nativos. Tropas enemigas debilitadas (-30% HP)`;
+        });
+        break;
     }
   }
 }
