@@ -128,6 +128,8 @@ export class Game {
   villageIncomeEvents: { playerId: number; food: number; gold: number }[] = [];
   pendingAIDiploProposal: { fromId: number; civType: CivilizationType } | null = null;
   private _aiDiploCheckTimer = 60;
+  private _playerEraCache   = new Map<number, 1 | 2 | 3>(); // tracks prior era per player for advancement detection
+  eraAdvanceEvents: { playerId: number; era: 2 | 3 }[] = []; // consumed by main.ts each frame
 
   constructor(
     humanCiv: CivilizationType = CivilizationType.AZTEC,
@@ -1372,6 +1374,23 @@ export class Game {
           const path = findPath(this.map, unit.gridPos(), { col: near[0], row: near[1] }, 80);
           if (path.length > 0) unit.moveTo(path);
         }
+      }
+    }
+
+    // Era advancement detection
+    this.eraAdvanceEvents = [];
+    for (const p of this.players) {
+      if (p.isDefeated()) continue;
+      const prev = this._playerEraCache.get(p.id) ?? 1;
+      const curr = this.getEra(p.id);
+      if (curr > prev) {
+        this._playerEraCache.set(p.id, curr);
+        this.eraAdvanceEvents.push({ playerId: p.id, era: curr as 2 | 3 });
+        // Era bonus: resource boost and small morale lift for advancing player
+        p.resources.food  = Math.min(2000, p.resources.food  + (curr === 2 ? 150 : 200));
+        p.resources.gold  = Math.min(2000, p.resources.gold  + (curr === 2 ? 80  : 120));
+        p.resources.stone = Math.min(2000, p.resources.stone + (curr === 2 ? 60  : 80));
+        for (const u of p.aliveUnits) u.morale = Math.min(100, u.morale + 20);
       }
     }
 
