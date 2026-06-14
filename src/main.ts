@@ -23,6 +23,7 @@ import { ResourceType } from './game/ResourceNode';
 import { findPath } from './game/Pathfinding';
 import { WorkerTask } from './game/Worker';
 import type { Difficulty } from './ui/CivSelect';
+import { TECH_DEFS } from './game/Tech';
 import { activateCivPower, CIV_POWER_DEFS } from './game/CivPowers';
 
 // ── Kill gold rewards ──────────────────────────────────────────────────────────
@@ -370,11 +371,13 @@ class GameInstance {
         if (player.resources.food  < cost.food)          return;
         if (player.resources.gold  < cost.gold)          return;
         if (player.resources.stone < (cost.stone ?? 0))  return;
+        if (player.resources.wood  < (cost.wood  ?? 0))  return;
         if (!building.trainUnit(unitType))                return;
         player.resources.food  -= cost.food;
         player.resources.gold  -= cost.gold;
         player.resources.stone -= cost.stone ?? 0;
-        this._totalResourcesSpent += cost.food + cost.gold + (cost.stone ?? 0);
+        player.resources.wood  -= cost.wood  ?? 0;
+        this._totalResourcesSpent += cost.food + cost.gold + (cost.stone ?? 0) + (cost.wood ?? 0);
         this.audio.playBuild();
         this.prodPanel.refresh();
       };
@@ -459,6 +462,17 @@ class GameInstance {
           this.audio.playBuild();
         } else {
           this.hud.notify('👥 Límite de población alcanzado o sin recursos', 'warning');
+        }
+      };
+      this.prodPanel.onResearchTech = (tech) => {
+        const ok = this.game.startTechResearch(tech, this.game.humanPlayerId);
+        if (ok) {
+          this.prodPanel.refresh();
+          this.audio.playBuild();
+          const def = TECH_DEFS[tech];
+          this.hud.notify(`🔬 Investigando: ${def?.name ?? tech}`, 'info');
+        } else {
+          this.hud.notify('⚜️ Sin recursos suficientes o ya investigado', 'warning');
         }
       };
     };

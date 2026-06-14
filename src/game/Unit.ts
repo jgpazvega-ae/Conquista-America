@@ -88,6 +88,7 @@ export class Unit {
   _nearSupplyDepot = false; // true when within 4 tiles of a friendly complete Storehouse
   _isolated        = false; // set each frame by Game.ts; no friendly unit within 6 tiles
   wantsRetreat     = false; // set by takeDamage when HP < 20%; cleared by Game
+  _missionaryTimer = 0;    // conversion/curse timer for Missionary and Shaman units
 
   // Status effects (damage over time)
   burning  = 0;  // remaining burn duration (s); 2 HP every 0.5 s

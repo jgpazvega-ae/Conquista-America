@@ -37,6 +37,15 @@ export enum UnitType {
   ARQUEBUSIER = 'ARQUEBUSIER',
   CAVALRY = 'CAVALRY',
   CANNON = 'CANNON',
+  // Naval — native civs
+  CANOE = 'CANOE',
+  WAR_CANOE = 'WAR_CANOE',
+  // Naval — Conquistador
+  BRIGANTINE = 'BRIGANTINE',
+  GALLEON = 'GALLEON',
+  // Spiritual/conversion units
+  SHAMAN = 'SHAMAN',         // native civs — heals & curses
+  MISSIONARY = 'MISSIONARY', // Conquistador — converts enemies
 }
 
 export enum UnitState {

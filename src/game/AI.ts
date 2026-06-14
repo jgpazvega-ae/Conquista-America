@@ -13,6 +13,7 @@ import { CIV_COLORS } from './constants';
 import { TRAIN_COSTS } from './unitProduction';
 import { STRATEGY_BY_CIV } from './AIStrategy';
 import { getDamageMultiplier } from './UnitBalancing';
+import { TechType } from './Tech';
 
 const AI_BUILD_INTERVAL    = 14.0;
 const AI_WORKER_INTERVAL   = 5.0;
@@ -671,7 +672,8 @@ export class AISystem {
       if (!cost) return false;
       return player.resources.food >= cost.food &&
              player.resources.gold >= cost.gold &&
-             player.resources.stone >= (cost.stone ?? 0);
+             player.resources.stone >= (cost.stone ?? 0) &&
+             player.resources.wood  >= (cost.wood  ?? 0);
     });
     if (affordable.length === 0) return;
 
@@ -709,6 +711,7 @@ export class AISystem {
       player.resources.food  -= cost.food;
       player.resources.gold  -= cost.gold;
       player.resources.stone -= cost.stone ?? 0;
+      player.resources.wood  -= cost.wood  ?? 0;
     }
   }
 
@@ -718,6 +721,19 @@ export class AISystem {
       if (!player.upgrades[upg]) {
         game.applyUpgrade(upg, player.id);
         return; // one at a time
+      }
+    }
+    // Also research available techs via the tech tree
+    if (!player.techs.getResearchingTech()) {
+      const militaryTechs = [TechType.BRONZE_WORKING, TechType.IRON_WORKING, TechType.SIEGE_ENGINEERING, TechType.CAVALRY_TRAINING];
+      const civTechs = [TechType.AZTEC_JAGUAR_ELITE, TechType.INCA_ROAD_SYSTEM, TechType.MAYA_ASTRONOMY, TechType.CONQUISTADOR_GUNPOWDER];
+      const econTechs = [TechType.AGRICULTURE, TechType.MINING];
+      const allTechs = [...econTechs, ...militaryTechs, ...civTechs];
+      for (const tech of allTechs) {
+        if (player.techs.canResearch(tech, player.civType)) {
+          game.startTechResearch(tech, player.id);
+          return;
+        }
       }
     }
   }

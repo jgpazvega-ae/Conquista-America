@@ -28,8 +28,9 @@ export class ResourceSystem {
         if (distToBase <= 1.5) {
           const res = worker.dropResources();
           if (res) {
-            if (res.type === 'food')  player.resources.food  += res.amount;
+            if (res.type === 'food')       player.resources.food  += res.amount;
             else if (res.type === 'gold')  player.resources.gold  += res.amount;
+            else if (res.type === 'wood')  player.resources.wood  += res.amount;
             else                           player.resources.stone += res.amount;
           }
           worker.task = WorkerTask.IDLE;
@@ -48,7 +49,8 @@ export class ResourceSystem {
       // ── Storehouse proximity bonus: +20% gather speed within 5 tiles ─────────
       const isGathering = worker.task === WorkerTask.GATHERING_FOOD ||
                           worker.task === WorkerTask.GATHERING_GOLD ||
-                          worker.task === WorkerTask.GATHERING_STONE;
+                          worker.task === WorkerTask.GATHERING_STONE ||
+                          worker.task === WorkerTask.GATHERING_WOOD;
       if (isGathering) {
         const nearStorehouse = game.allBuildings.some(
           b => b.playerId === worker.playerId &&
@@ -73,6 +75,11 @@ export class ResourceSystem {
           const incaBonus = playerCiv === CivilizationType.INCA ? 0.15 : 0;
           worker.taskProgress += game.lastDt * (0.25 + incaBonus);
         }
+        // Wood is harvested from jungle/forest tiles — native civs +15% efficiency
+        if (worker.task === WorkerTask.GATHERING_WOOD && workerTile?.terrain === TerrainType.JUNGLE) {
+          const nativeBonus = (playerCiv === CivilizationType.AZTEC || playerCiv === CivilizationType.MAYA || playerCiv === CivilizationType.INCA) ? 0.15 : 0;
+          worker.taskProgress += game.lastDt * (0.20 + nativeBonus);
+        }
       }
 
       // ── Find resource to gather (auto-assign idle workers) ──────────────────
@@ -86,6 +93,7 @@ export class ResourceSystem {
         // Already next to node — start gathering
         const task = node.type === ResourceType.FOOD  ? WorkerTask.GATHERING_FOOD :
                      node.type === ResourceType.GOLD  ? WorkerTask.GATHERING_GOLD :
+                     node.type === ResourceType.WOOD  ? WorkerTask.GATHERING_WOOD :
                                                         WorkerTask.GATHERING_STONE;
         worker.setTask(task, node.col, node.row);
       } else {
