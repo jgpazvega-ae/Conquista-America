@@ -33,6 +33,7 @@ export class HUD {
   private elFood      = document.getElementById('res-food')!;
   private elGold      = document.getElementById('res-gold')!;
   private elStone     = document.getElementById('res-stone')!;
+  private elWood      = document.getElementById('res-wood');
   private elFoodRate  = document.getElementById('res-food-rate');
   private elGoldRate  = document.getElementById('res-gold-rate');
   private elStoneRate = document.getElementById('res-stone-rate');
@@ -143,6 +144,7 @@ export class HUD {
     this.elFood.textContent  = String(Math.floor(player.resources.food));
     this.elGold.textContent  = String(Math.floor(player.resources.gold));
     this.elStone.textContent = String(Math.floor(player.resources.stone));
+    if (this.elWood) this.elWood.textContent = String(Math.floor(player.resources.wood ?? 0));
 
     // Economy rate indicators
     const econStats = this.game.getEconomyStats(player.id);

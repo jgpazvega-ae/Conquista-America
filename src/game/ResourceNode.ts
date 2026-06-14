@@ -7,6 +7,7 @@ export enum ResourceType {
   FOOD = 'FOOD',
   GOLD = 'GOLD',
   STONE = 'STONE',
+  WOOD = 'WOOD',
 }
 
 export class ResourceNode {
@@ -63,6 +64,19 @@ export class ResourceNode {
         const a = Math.random() * Math.PI * 2;
         nug.position.set(Math.cos(a) * 0.3, 0.25 + Math.random() * 0.3, Math.sin(a) * 0.3);
         this.mesh.add(nug);
+      }
+    } else if (this.type === ResourceType.WOOD) {
+      // Timber logs — stacked brown cylinders
+      const bark = new THREE.MeshStandardMaterial({ color: 0x5c3d1e, roughness: 1, flatShading: true });
+      const grain = new THREE.MeshStandardMaterial({ color: 0x8B5A2B, roughness: 0.9 });
+      for (let i = 0; i < 3; i++) {
+        const log = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 0.7, 8), bark);
+        log.rotation.z = Math.PI / 2;
+        log.position.set((i - 1) * 0.22, 0.16 + Math.floor(i / 2) * 0.28, (i % 2) * 0.1 - 0.05);
+        log.castShadow = true; this.mesh.add(log);
+        const end = new THREE.Mesh(new THREE.CircleGeometry(0.14, 8), grain);
+        end.rotation.y = Math.PI / 2; end.position.set((i - 1) * 0.22 + 0.35, 0.16 + Math.floor(i / 2) * 0.28, (i % 2) * 0.1 - 0.05);
+        this.mesh.add(end);
       }
     } else {
       // Stone — pile of grey boulders

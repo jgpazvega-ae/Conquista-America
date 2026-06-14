@@ -218,6 +218,7 @@
           <span class="res"><span class="res-icon">🌽</span><span id="res-food">200</span><span id="res-food-rate" class="res-rate"></span></span>
           <span class="res"><span class="res-icon">⚜️</span><span id="res-gold">100</span><span id="res-gold-rate" class="res-rate"></span><span id="treasury-wrap" class="hidden" title="Progreso victoria económica (800 ⚜️)"><div id="treasury-bar-fill"></div></span></span>
           <span class="res"><span class="res-icon">🪨</span><span id="res-stone">150</span><span id="res-stone-rate" class="res-rate"></span></span>
+          <span class="res"><span class="res-icon">🪵</span><span id="res-wood">150</span></span>
         </div>
         <div id="hud-extras">
           <span id="hud-pop" title="Población actual / Límite (Almacenes +5 cada uno)">👥 <span id="pop-count">0/25</span><div id="pop-bar-wrap"><div id="pop-bar-fill"></div></div></span>
@@ -353,7 +354,8 @@
         <div class="prod-tabs">
           <button id="prod-tab-train" class="prod-tab active">⚔️ Entrenar</button>
           <button id="prod-tab-build" class="prod-tab">🏗️ Construir</button>
-          <button id="prod-tab-upgrade" class="prod-tab">🔬 Mejoras</button>
+          <button id="prod-tab-upgrade" class="prod-tab">🛡️ Mejoras</button>
+          <button id="prod-tab-tech" class="prod-tab">🔬 Tecnología</button>
         </div>
         <div id="prod-train-section">
           <div class="prod-section-label">Selecciona unidad</div>
@@ -370,8 +372,15 @@
           <div class="prod-section-label prod-hint-label">Clic en el mapa para colocar</div>
         </div>
         <div id="prod-upgrade-section" class="hidden">
-          <div class="prod-section-label">Investigaciones permanentes</div>
+          <div class="prod-section-label">Mejoras permanentes</div>
           <div id="prod-upgrade-list" class="prod-unit-list"></div>
+        </div>
+        <div id="prod-tech-section" class="hidden">
+          <div class="prod-section-label">Árbol Tecnológico</div>
+          <div id="prod-tech-progress-wrap" class="prod-progress-wrap hidden" style="margin-bottom:6px;">
+            <div id="prod-tech-progress" class="prod-progress-bar" style="background:#4e9aff;"></div>
+          </div>
+          <div id="prod-tech-list" class="prod-unit-list"></div>
         </div>
       </div>
 

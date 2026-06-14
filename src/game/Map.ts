@@ -264,6 +264,26 @@ export class GameMap {
     return TERRAIN_WALKABLE[tile.terrain] ?? false;
   }
 
+  isNavalWalkable(col: number, row: number): boolean {
+    const tile = this.getTile(col, row);
+    if (!tile) return false;
+    return tile.terrain === 'WATER';
+  }
+
+  findNavalNear(col: number, row: number, radius = 10): [number, number] | null {
+    if (this.isNavalWalkable(col, row)) return [col, row];
+    for (let r = 1; r <= radius; r++) {
+      for (let dc = -r; dc <= r; dc++) {
+        for (let dr = -r; dr <= r; dr++) {
+          if (Math.abs(dc) !== r && Math.abs(dr) !== r) continue;
+          const nc = col + dc, nr = row + dr;
+          if (this.isNavalWalkable(nc, nr)) return [nc, nr];
+        }
+      }
+    }
+    return null;
+  }
+
   getNeighborCoords(col: number, row: number): [number, number][] {
     const dirs: [number, number][] = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]];
     return dirs

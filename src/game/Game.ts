@@ -21,6 +21,7 @@ import { BuildingType } from './buildings';
 import { BUILDING_DEFS } from './buildingDefs';
 import { WeatherSystem } from './WeatherSystem';
 import type { WeatherState } from './WeatherSystem';
+import { TechType, TECH_DEFS } from './Tech';
 
 // Positions aligned to the real-geography map:
 // Mexico (top-center), Yucatan (top-right), Peru/Andes (mid-left), Caribbean (mid-right)
@@ -307,10 +308,19 @@ export class Game {
         const tile = this.map.getTile(c, r);
         if (!tile || !this.map.isWalkable(c, r)) continue;
 
+        // Jungle tiles prefer wood; highland/mountain prefer stone; beaches prefer gold
+        let type: ResourceType;
         const rand = Math.random();
-        const type = rand < 0.4 ? ResourceType.FOOD : rand < 0.7 ? ResourceType.GOLD : ResourceType.STONE;
+        if (tile.terrain === TerrainType.JUNGLE) {
+          type = rand < 0.55 ? ResourceType.WOOD : rand < 0.80 ? ResourceType.FOOD : ResourceType.GOLD;
+        } else if (tile.terrain === TerrainType.HIGHLAND || tile.terrain === TerrainType.MOUNTAIN) {
+          type = rand < 0.50 ? ResourceType.STONE : rand < 0.75 ? ResourceType.GOLD : ResourceType.FOOD;
+        } else if (tile.terrain === TerrainType.BEACH) {
+          type = rand < 0.45 ? ResourceType.GOLD : rand < 0.70 ? ResourceType.FOOD : ResourceType.WOOD;
+        } else {
+          type = rand < 0.35 ? ResourceType.FOOD : rand < 0.60 ? ResourceType.GOLD : rand < 0.80 ? ResourceType.STONE : ResourceType.WOOD;
+        }
         const amount = 200 + Math.floor(Math.random() * 200);
-
         this.resourceNodes.push(new ResourceNode(type, c, r, amount));
       }
     }
@@ -1377,7 +1387,125 @@ export class Game {
       this.wonderCountdown -= dt;
     }
 
+    // Tech tree: update research timers for all players
+    for (const player of this.players) {
+      const completed = player.techs.update(dt);
+      if (completed) {
+        this.applyTechEffect(completed, player.id);
+        this.newlyResearchedUpgrades.push({ playerId: player.id, upgrade: completed });
+        if (player.id === this.humanPlayerId) {
+          const def = TECH_DEFS[completed as TechType];
+          this.pendingEventMessages.push(`🔬 Investigación completada: ${def?.name ?? completed}`);
+        }
+      }
+    }
+
+    // Naval units: restrict movement to water tiles
+    for (const unit of this.allUnits) {
+      if (!unit.isAlive()) continue;
+      const isNaval = unit.type === UnitType.CANOE || unit.type === UnitType.WAR_CANOE ||
+                      unit.type === UnitType.BRIGANTINE || unit.type === UnitType.GALLEON;
+      if (!isNaval) continue;
+      const tile = this.map.getTile(Math.floor(unit.col), Math.floor(unit.row));
+      if (tile && tile.terrain !== TerrainType.WATER) {
+        // Push naval unit back to nearest water tile
+        unit.state = UnitState.IDLE;
+        unit.path = [];
+        unit.pathIndex = 0;
+      }
+    }
+
+    // Missionary conversion: Missionaries convert adjacent enemy units over 6 seconds
+    for (const unit of this.allUnits) {
+      if (!unit.isAlive()) continue;
+      if (unit.type !== UnitType.MISSIONARY && unit.type !== UnitType.SHAMAN) continue;
+      if (unit.state !== UnitState.IDLE && unit.state !== UnitState.HOLD) continue;
+      unit._missionaryTimer = (unit._missionaryTimer ?? 0) + dt;
+      if (unit._missionaryTimer < 6) continue;
+      unit._missionaryTimer = 0;
+      // Find nearest enemy unit within 3.5 tiles
+      let target: Unit | null = null;
+      let bestDist = 3.5;
+      for (const other of this.allUnits) {
+        if (!other.isAlive() || other.playerId === unit.playerId) continue;
+        if (other.type === UnitType.MISSIONARY || other.type === UnitType.SHAMAN) continue;
+        if (other.isHero) continue;
+        const d = Math.hypot(other.col - unit.col, other.row - unit.row);
+        if (d < bestDist) { bestDist = d; target = other; }
+      }
+      if (target) {
+        if (unit.type === UnitType.MISSIONARY) {
+          // Convert: switch unit to converter's team
+          const origPlayer = this.players[target.playerId];
+          const newPlayer = this.players[unit.playerId];
+          if (origPlayer && newPlayer) {
+            origPlayer.units = origPlayer.units.filter(u => u !== target);
+            (target! as any).playerId = unit.playerId;
+            newPlayer.units.push(target!);
+            target!.morale = 50;
+            if (unit.playerId === this.humanPlayerId) {
+              this.pendingEventMessages.push(`✝️ ¡El misionero convirtió a un ${target!.def.name}!`);
+            }
+          }
+        } else {
+          // Shaman: curse — reduce target morale and attack temporarily
+          target.morale = Math.max(0, target.morale - 20);
+          target.takeDamage(8);
+          if (unit.playerId === this.humanPlayerId) {
+            this.pendingEventMessages.push(`🌀 El chamán maldice a un ${target.def.name}`);
+          }
+        }
+      }
+    }
+
     this.checkEndConditions();
+  }
+
+  /** Apply a completed tech's effects to all existing player units and store the bonus. */
+  private applyTechEffect(tech: string, playerId: number) {
+    const player = this.players[playerId];
+    if (!player) return;
+    for (const unit of this.allUnits) {
+      if (unit.playerId !== playerId || !unit.isAlive()) continue;
+      switch (tech) {
+        case 'BRONZE_WORKING':
+          unit.attack   = Math.min(unit.attack   + 3, unit.def.stats.attack   * 2);
+          unit.defense  = Math.min(unit.defense  + 3, unit.def.stats.defense  * 2);
+          break;
+        case 'IRON_WORKING':
+          unit.attack   = Math.min(unit.attack   + 5, unit.def.stats.attack   * 2);
+          unit.defense  = Math.min(unit.defense  + 5, unit.def.stats.defense  * 2);
+          break;
+        case 'CAVALRY_TRAINING':
+          if (unit.def.isCavalry) unit.speed = Math.min(unit.speed + 1.2, unit.def.stats.speed * 2);
+          break;
+        case 'SIEGE_ENGINEERING': {
+          const isRanged = unit.def.isRanged || unit.type === UnitType.CANNON || unit.type === UnitType.GALLEON;
+          if (isRanged) {
+            unit.attackRange = Math.min(unit.attackRange + 1.5, unit.def.stats.attackRange * 1.5);
+            unit.attack = Math.min(unit.attack + Math.round(unit.def.stats.attack * 0.2), unit.def.stats.attack * 2);
+          }
+          break;
+        }
+        case 'INCA_ROAD_SYSTEM':
+          unit.speed = Math.min(unit.speed + 0.9, unit.def.stats.speed * 2);
+          break;
+        case 'MAYA_ASTRONOMY':
+          unit.sight = Math.min(unit.sight + 2, 18);
+          break;
+        case 'AZTEC_JAGUAR_ELITE':
+          if (unit.type === UnitType.JAGUAR_KNIGHT) {
+            unit.maxHp += 50; unit.hp = Math.min(unit.hp + 50, unit.maxHp);
+            unit.attack = Math.min(unit.attack + 12, unit.def.stats.attack * 2);
+          }
+          break;
+        case 'CONQUISTADOR_GUNPOWDER':
+          if (unit.type === UnitType.ARQUEBUSIER || unit.type === UnitType.CANNON || unit.type === UnitType.GALLEON || unit.type === UnitType.BRIGANTINE) {
+            unit.attack = Math.min(unit.attack + Math.round(unit.def.stats.attack * 0.4), unit.def.stats.attack * 2);
+          }
+          break;
+      }
+    }
   }
 
   private spawnProducedUnit(building: Building) {
@@ -1902,6 +2030,25 @@ export class Game {
         }
       }
     }
+    return true;
+  }
+
+  /** Start researching a tech at Temple or Forge. Returns false if can't afford or already done. */
+  startTechResearch(tech: string, playerId: number): boolean {
+    const player = this.players[playerId];
+    if (!player) return false;
+    const techType = tech as TechType;
+    if (!player.techs.canResearch(techType, player.civType)) return false;
+    const def = TECH_DEFS[techType];
+    if (!def) return false;
+    // Tech costs: gold-based; also requires stone for military techs
+    const goldCost = def.costGold;
+    const foodCost = Math.round(goldCost * 0.3);
+    if (player.resources.gold < goldCost)  return false;
+    if (player.resources.food < foodCost)  return false;
+    player.resources.gold -= goldCost;
+    player.resources.food -= foodCost;
+    player.techs.startResearch(techType);
     return true;
   }
 

@@ -6,6 +6,7 @@ import type { UnitType } from '../game/types';
 import { CivilizationType } from '../game/types';
 import { BuildingType } from '../game/buildings';
 import { BUILDING_DEFS } from '../game/buildingDefs';
+import { TechType, TECH_DEFS } from '../game/Tech';
 
 type UpgradeDef = { key: keyof PlayerUpgrades; name: string; emoji: string; desc: string; food: number; gold: number; stone: number; civ?: CivilizationType };
 
@@ -33,11 +34,12 @@ export class ProductionPanel {
   private el:       HTMLElement;
   private building: Building | null = null;
   private player:   Player   | null = null;
-  private tab:      'train' | 'build' | 'upgrade' = 'train';
+  private tab:      'train' | 'build' | 'upgrade' | 'tech' = 'train';
 
   onTrain:   ((unitType: UnitType) => void)                    | null = null;
   onBuild:   ((type: BuildingType) => void)                    | null = null;
   onUpgrade: ((key: keyof PlayerUpgrades) => void)             | null = null;
+  onResearchTech: ((tech: TechType) => void)                   | null = null;
   onCancel:  (() => void)                                      | null = null;
   onCancelProduction: (() => void)                             | null = null;
   onDemolish: (() => void)                                     | null = null;
@@ -49,6 +51,7 @@ export class ProductionPanel {
     document.getElementById('prod-tab-train')?.addEventListener('click', () => this.switchTab('train'));
     document.getElementById('prod-tab-build')?.addEventListener('click', () => this.switchTab('build'));
     document.getElementById('prod-tab-upgrade')?.addEventListener('click', () => this.switchTab('upgrade'));
+    document.getElementById('prod-tab-tech')?.addEventListener('click', () => this.switchTab('tech'));
   }
 
   show(building: Building, player: Player) {
@@ -69,7 +72,7 @@ export class ProductionPanel {
     return !this.el.classList.contains('hidden');
   }
 
-  get currentTab(): 'train' | 'build' | 'upgrade' {
+  get currentTab(): 'train' | 'build' | 'upgrade' | 'tech' {
     return this.tab;
   }
 
@@ -86,7 +89,7 @@ export class ProductionPanel {
     if (this.building && this.player) this.render();
   }
 
-  private switchTab(tab: 'train' | 'build' | 'upgrade') {
+  private switchTab(tab: 'train' | 'build' | 'upgrade' | 'tech') {
     this.tab = tab;
     this.render();
   }
@@ -103,20 +106,25 @@ export class ProductionPanel {
     document.getElementById('prod-tab-train')?.classList.toggle('active', this.tab === 'train');
     document.getElementById('prod-tab-build')?.classList.toggle('active', this.tab === 'build');
     document.getElementById('prod-tab-upgrade')?.classList.toggle('active', this.tab === 'upgrade');
+    document.getElementById('prod-tab-tech')?.classList.toggle('active', this.tab === 'tech');
 
     const trainSection   = document.getElementById('prod-train-section')!;
     const buildSection   = document.getElementById('prod-build-section')!;
     const upgradeSection = document.getElementById('prod-upgrade-section')!;
+    const techSection    = document.getElementById('prod-tech-section')!;
 
     trainSection.classList.toggle('hidden',   this.tab !== 'train');
     buildSection.classList.toggle('hidden',   this.tab !== 'build');
     upgradeSection.classList.toggle('hidden', this.tab !== 'upgrade');
+    techSection.classList.toggle('hidden',    this.tab !== 'tech');
 
     if (this.tab === 'train') {
       this.renderTrainList(b, p, civDef);
       this.renderQueue();
     } else if (this.tab === 'build') {
       this.renderBuildList(p);
+    } else if (this.tab === 'tech') {
+      this.renderTechList(p);
     } else {
       this.renderUpgradeList(p);
     }
@@ -150,7 +158,7 @@ export class ProductionPanel {
     for (const unitDef of (civDef as any).units) {
       const cost = TRAIN_COSTS[unitDef.type as UnitType];
       if (!cost) continue;
-      const canAfford = p.resources.food >= cost.food && p.resources.gold >= cost.gold && (p.resources.stone ?? 0) >= (cost.stone ?? 0);
+      const canAfford = p.resources.food >= cost.food && p.resources.gold >= cost.gold && (p.resources.stone ?? 0) >= (cost.stone ?? 0) && (p.resources.wood ?? 0) >= (cost.wood ?? 0);
 
       const btn = document.createElement('button');
       btn.className = 'prod-unit-btn' + (canAfford ? '' : ' disabled');
@@ -160,7 +168,7 @@ export class ProductionPanel {
         <div class="prod-unit-info">
           <div class="prod-unit-name">${unitDef.name}</div>
           <div class="prod-unit-cost">
-            🌽${cost.food} ⚜️${cost.gold}${cost.stone ? ` 🪨${cost.stone}` : ''}
+            🌽${cost.food} ⚜️${cost.gold}${cost.stone ? ` 🪨${cost.stone}` : ''}${cost.wood ? ` 🪵${cost.wood}` : ''}
           </div>
         </div>
       `;
@@ -272,5 +280,58 @@ export class ProductionPanel {
       progWrap.parentElement?.insertBefore(cancelBtn, progWrap.nextSibling);
     }
     cancelBtn.classList.toggle('hidden', b.productionQueue.length === 0);
+  }
+
+  private renderTechList(p: Player) {
+    const listEl = document.getElementById('prod-tech-list')!;
+    listEl.innerHTML = '';
+
+    // Show active research progress bar
+    const progWrap = document.getElementById('prod-tech-progress-wrap')!;
+    const progBar  = document.getElementById('prod-tech-progress')!;
+    const progress = p.techs.getResearchProgress();
+    const researchingTech = p.techs.getResearchingTech();
+    if (researchingTech) {
+      progWrap.classList.remove('hidden');
+      progBar.style.width = `${progress * 100}%`;
+      const def = TECH_DEFS[researchingTech];
+      const label = progWrap.querySelector('.prod-section-label') ?? (() => {
+        const el = document.createElement('div'); el.className = 'prod-section-label';
+        progWrap.before(el); return el;
+      })();
+      (label as HTMLElement).textContent = `🔬 Investigando: ${def.name} (${Math.round(progress * 100)}%)`;
+    } else {
+      progWrap.classList.add('hidden');
+    }
+
+    const allTechs = Object.values(TechType) as TechType[];
+    for (const techType of allTechs) {
+      const def = TECH_DEFS[techType];
+      if (!def) continue;
+      if (def.availableTo && !def.availableTo.includes(p.civType)) continue;
+
+      const done = p.techs.isResearched(techType);
+      const researching = researchingTech === techType;
+      const canResearch = p.techs.canResearch(techType, p.civType);
+      const goldCost = def.costGold;
+      const foodCost = Math.round(goldCost * 0.3);
+      const canAfford = canResearch && !researching &&
+                        p.resources.gold >= goldCost && p.resources.food >= foodCost;
+
+      const btn = document.createElement('button');
+      btn.className = 'prod-unit-btn' + (done ? ' done' : researching ? ' active' : canAfford ? '' : ' disabled');
+      btn.title = def.description + '\n' + def.effects.join(', ');
+      btn.innerHTML = `
+        <span class="prod-unit-icon">${done ? '✅' : researching ? '⏳' : '🔬'}</span>
+        <div class="prod-unit-info">
+          <div class="prod-unit-name">${def.name}${done ? ' — Listo' : researching ? ' — Investigando…' : ''}</div>
+          <div class="prod-unit-cost">${done || researching ? def.effects.join(', ') : `🌽${foodCost} ⚜️${goldCost}`}</div>
+        </div>
+      `;
+      if (canAfford && !researchingTech) {
+        btn.addEventListener('click', () => { this.onResearchTech?.(techType); this.render(); });
+      }
+      listEl.appendChild(btn);
+    }
   }
 }
