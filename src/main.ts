@@ -2299,6 +2299,9 @@ class GameInstance {
           for (const u of sel) u.setFormation(orders[e.code] ?? null);
           this.hud.notify(labels[e.code] ?? '', 'info');
           this.hintOnce('formation_order', '💡 Formaciones (F1/F2/F3): SUELTA=+veloc., FALANGE=+def., CUÑA=+atk. Cancela con F4. El ícono aparece en el panel de unidad.');
+          if (e.code === 'F2' && sel.filter(u => u.playerId === this.game.humanPlayerId).length >= 3) {
+            this.hintOnce('shield_wall', '💡 Muro de escudos: 3+ unidades en Falange a ≤2.5 casillas forman un MURO — proyectiles enemigos −40%. ¡Úsalo para defender choke points!');
+          }
         }
         return;
       }

@@ -1852,6 +1852,17 @@ export class Game {
         v => v !== u && v.playerId === u.playerId && v.level >= 3 && !v.isHero &&
              v.type === u.type && Math.hypot(v.col - u.col, v.row - u.row) <= 3.0,
       );
+      // Shield wall: PHALANX unit with 2+ PHALANX allies within 2.5 tiles deflects ranged fire (−40%)
+      if (u.formation === 'PHALANX') {
+        let phalanxNeighbors = 0;
+        for (const o of active) {
+          if (o === u || o.playerId !== u.playerId || o.formation !== 'PHALANX') continue;
+          if (Math.hypot(o.col - u.col, o.row - u.row) <= 2.5) phalanxNeighbors++;
+        }
+        u.shieldWall = phalanxNeighbors >= 2;
+      } else {
+        u.shieldWall = false;
+      }
     }
   }
 

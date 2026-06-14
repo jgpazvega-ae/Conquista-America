@@ -115,6 +115,9 @@ export class Unit {
   // Entrench (X key): dig in for +5 defense; cleared on any movement order
   entrenched = false;
 
+  // Shield wall: set each frame when ≥2 PHALANX allies are adjacent (within 2.5 tiles)
+  shieldWall = false;
+
   // Battle fatigue: prolonged combat lowers effectiveness
   combatTimer      = 0;   // seconds spent continuously in ATTACKING state
   fatigued         = false;

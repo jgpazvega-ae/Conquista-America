@@ -622,6 +622,7 @@ export class HUD {
     this.elHpText.textContent     = `${unit.hp}/${unit.maxHp}`;
 
     const holdBadge    = unit.state === UnitState.HOLD ? `<span title="Posición de defensa (+2 def)" style="color:#88ccff">🛡️DEF</span>` : '';
+    const shieldWallBadge = unit.shieldWall ? `<span title="¡Muro de escudos! — 3+ compañeros en Falange: proyectiles reducidos −40%" style="color:#66aaff;font-weight:700">🛡️MURO</span>` : '';
     const fatigueBadge = unit.fatigued ? `<span title="Fatigado — -10% ataque por combate prolongado. Descansa para recuperar" style="color:#cc8844">😴FATIGADO</span>` : '';
     const woundBadge   = unit.hp < unit.maxHp * 0.25 ? `<span title="Herida grave — -20% ataque, -30% movimiento" style="color:#ff4444">🩸HERIDO</span>` : '';
     const burnBadge    = unit.burning     > 0 ? `<span title="En llamas" style="color:#ff8822">🔥${Math.ceil(unit.burning)}s</span>`       : '';
@@ -689,7 +690,7 @@ export class HUD {
       `<span>🛡️ ${unit.defense}</span>` +
       `<span>💨 ${unit.speed.toFixed(1)}</span>` +
       `<span>🎯 ${unit.attackRange.toFixed(1)}</span>` +
-      woundBadge + holdBadge + entrenchedBadge + fatigueBadge + burnBadge + poisonBadge + slowedBadge + berserkBadge + chargeBadge + deployBadge + formBadge + moraleBadge + ammoBadge + orderBadge + officerBadge + pinnedBadge + supplyBadge + healingBadge + warCryBadge + heroPowerBadge + nightBadge + reloadBadge;
+      woundBadge + holdBadge + entrenchedBadge + shieldWallBadge + fatigueBadge + burnBadge + poisonBadge + slowedBadge + berserkBadge + chargeBadge + deployBadge + formBadge + moraleBadge + ammoBadge + orderBadge + officerBadge + pinnedBadge + supplyBadge + healingBadge + warCryBadge + heroPowerBadge + nightBadge + reloadBadge;
 
     // XP bar (only if unit can still level up)
     const xpEl = document.getElementById('unit-xp-row');
