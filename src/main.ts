@@ -493,6 +493,17 @@ class GameInstance {
         }
       };
 
+      this.prodPanel.onMarketBuy = (resource, goldCost, buyAmt) => {
+        const ok = this.game.executeMarketBuy(this.game.humanPlayerId, resource, goldCost, buyAmt);
+        if (ok) {
+          this.prodPanel.refresh();
+          const emoji = resource === 'food' ? '🌽' : resource === 'wood' ? '🪵' : '🪨';
+          this.hud.notify(`🏪 Compra: -${goldCost}⚜️ +${buyAmt}${emoji}`, 'info');
+        } else {
+          this.hud.notify('🏪 Oro insuficiente para la compra', 'warning');
+        }
+      };
+
       this.prodPanel.onTrainWorker = () => {
         const WORKER_COST = { food: 80, gold: 30 };
         const player = this.game.humanPlayer;
@@ -545,6 +556,7 @@ class GameInstance {
     };
 
     this.bindHUDButtons();
+    this._bindAIDiploButtons();
     this.bindMobileButtons();
     this.bindKeyboardShortcuts();
 
@@ -1384,6 +1396,9 @@ class GameInstance {
       if (isRaid) this.hintOnce('cavalryRaid', '💡 Raída de caballería: tus jinetes saquean ⚜️ oro al destruir edificios enemigos. ¡Úsalos para cortar el suministro enemigo!');
     }
 
+    // AI diplomacy proposal notification
+    this._updateAIDiploUI();
+
     const selectedNow = this.input.getSelectedUnits();
     if (selectedNow.length >= 4) {
       this.hintOnce('formation', '💡 Filas cerradas: 3+ aliados a 3 casillas dan +2 defensa y moral un 50% más rápida (insignia ⚔️FILA).');
@@ -1613,6 +1628,54 @@ class GameInstance {
     document.getElementById('diplo-propose-neutral')?.addEventListener('click', () => propose(AllianceType.NEUTRAL));
     document.getElementById('diplo-propose-ally')?.addEventListener('click',    () => propose(AllianceType.ALLY));
     document.getElementById('diplo-propose-war')?.addEventListener('click',     () => propose(AllianceType.ENEMY));
+  }
+
+  private _aiDiploShown = false;
+
+  private _updateAIDiploUI() {
+    const proposal = this.game.pendingAIDiploProposal;
+    const el = document.getElementById('ai-diplo-proposal');
+    if (!el) return;
+
+    if (!proposal) {
+      el.classList.add('hidden');
+      this._aiDiploShown = false;
+      return;
+    }
+
+    if (!this._aiDiploShown) {
+      this._aiDiploShown = true;
+      const civPlayer = this.game.players[proposal.fromId];
+      if (!civPlayer) return;
+      const civDef = CIVILIZATIONS[civPlayer.civType];
+      const nameEl  = document.getElementById('ai-diplo-civ-name');
+      const emojiEl = document.getElementById('ai-diplo-civ-emoji');
+      if (nameEl)  nameEl.textContent  = civDef.name;
+      if (emojiEl) emojiEl.textContent = civDef.emoji;
+      el.classList.remove('hidden');
+    }
+  }
+
+  private _bindAIDiploButtons() {
+    document.getElementById('ai-diplo-accept')?.addEventListener('click', () => {
+      const p = this.game.pendingAIDiploProposal;
+      if (!p) return;
+      const civPlayer = this.game.players[p.fromId];
+      const civDef = civPlayer ? CIVILIZATIONS[civPlayer.civType] : null;
+      this.game.respondToAIDiplomacy(true);
+      this.hud.notify(`☮️ Tregua aceptada — ${civDef?.name ?? 'el rival'} detiene sus ataques`, 'info');
+      document.getElementById('ai-diplo-proposal')?.classList.add('hidden');
+      this._aiDiploShown = false;
+    });
+    document.getElementById('ai-diplo-reject')?.addEventListener('click', () => {
+      const p = this.game.pendingAIDiploProposal;
+      const civPlayer = p ? this.game.players[p.fromId] : null;
+      const civDef = civPlayer ? CIVILIZATIONS[civPlayer.civType] : null;
+      this.game.respondToAIDiplomacy(false);
+      this.hud.notify(`⚔️ Tregua rechazada — ¡${civDef?.name ?? 'el rival'} continuará la guerra!`, 'warning');
+      document.getElementById('ai-diplo-proposal')?.classList.add('hidden');
+      this._aiDiploShown = false;
+    });
   }
 
   private bindMobileButtons() {
