@@ -58,6 +58,7 @@ export class CivSelectScreen {
   private saveSystem: SaveSystem;
   private selected: CivilizationType = CivilizationType.AZTEC;
   private _difficulty: Difficulty = 'normal';
+  private _numAI = 3;
   private onStart: ((civ: CivilizationType) => void) | null = null;
 
   constructor(saveSystem: SaveSystem) {
@@ -68,6 +69,7 @@ export class CivSelectScreen {
   }
 
   getDifficulty(): Difficulty { return this._difficulty; }
+  getNumAI(): number { return this._numAI; }
 
   setOnStart(cb: (civ: CivilizationType) => void) { this.onStart = cb; }
 
@@ -117,6 +119,16 @@ export class CivSelectScreen {
       btn.addEventListener('click', () => {
         this._difficulty = (btn as HTMLElement).dataset.diff as Difficulty;
         this.el.querySelectorAll('.diff-btn').forEach(b => b.classList.toggle('diff-selected', b === btn));
+      });
+    });
+
+    // Enemy count buttons
+    this.el.querySelectorAll('.enemy-count-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this._numAI = parseInt((btn as HTMLElement).dataset.count ?? '3', 10);
+        this.el.querySelectorAll('.enemy-count-btn').forEach(b =>
+          b.classList.toggle('diff-selected', b === btn),
+        );
       });
     });
 

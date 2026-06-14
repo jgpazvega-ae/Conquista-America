@@ -87,6 +87,8 @@ export class Game {
   humanPlayerId = 0;
   gameTime = 0;
   difficulty: 'easy' | 'normal' | 'hard' = 'normal';
+  numAI = 3;
+  mapSeed = 0;
   pendingEventMessages: string[] = [];
   private _eventTimer = 60 + Math.random() * 60;
   private _autoAttackTimer = 0;
@@ -125,8 +127,14 @@ export class Game {
   private _navalBattleNotified = false; // throttle naval battle notification (1/min)
   villageIncomeEvents: { playerId: number; food: number; gold: number }[] = [];
 
-  constructor(humanCiv: CivilizationType = CivilizationType.AZTEC) {
-    this.map = new GameMap(12345);
+  constructor(
+    humanCiv: CivilizationType = CivilizationType.AZTEC,
+    opts: { numAI?: number; mapSeed?: number; difficulty?: 'easy' | 'normal' | 'hard' } = {},
+  ) {
+    this.numAI     = opts.numAI     ?? 3;
+    this.mapSeed   = opts.mapSeed   ?? (Math.floor(Math.random() * 999983) + 1);
+    this.difficulty = opts.difficulty ?? 'normal';
+    this.map = new GameMap(this.mapSeed);
     this.spawnPlayers(humanCiv);
     this.generateResourceNodes();
     this.spawnInitialBuildings();
@@ -137,14 +145,15 @@ export class Game {
   }
 
   private spawnPlayers(humanCiv: CivilizationType) {
-    // Put the human civ first (player 0), rest as AI
+    // Put the human civ first (player 0), rest as AI (limited by this.numAI)
     const allCivs = [
       CivilizationType.AZTEC,
       CivilizationType.MAYA,
       CivilizationType.INCA,
       CivilizationType.CONQUISTADOR,
     ];
-    const civs = [humanCiv, ...allCivs.filter(c => c !== humanCiv)];
+    const aiCivs = allCivs.filter(c => c !== humanCiv).slice(0, this.numAI);
+    const civs = [humanCiv, ...aiCivs];
 
     civs.forEach((civ, idx) => {
       const isHuman = idx === this.humanPlayerId;

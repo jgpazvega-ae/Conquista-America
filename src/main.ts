@@ -79,9 +79,10 @@ async function boot() {
   }
 
   civSelect.setOnStart(async (civ) => {
-    const diff = civSelect.getDifficulty();
+    const diff   = civSelect.getDifficulty();
+    const numAI  = civSelect.getNumAI();
     civSelect.hide();
-    narrative.play(civ, () => { startGame(civ, diff).catch(showFatalError); });
+    narrative.play(civ, () => { startGame(civ, diff, numAI).catch(showFatalError); });
   });
 }
 
@@ -108,7 +109,7 @@ function showFatalError(err: unknown) {
 }
 
 // ── Game lifecycle ─────────────────────────────────────────────────────────────
-async function startGame(civ: CivilizationType, difficulty: Difficulty = 'normal') {
+async function startGame(civ: CivilizationType, difficulty: Difficulty = 'normal', numAI = 3) {
   // WebGL availability check — fail fast with a clear message
   const testCanvas = document.createElement('canvas');
   const gl = testCanvas.getContext('webgl2') ?? testCanvas.getContext('webgl');
@@ -124,7 +125,7 @@ async function startGame(civ: CivilizationType, difficulty: Difficulty = 'normal
     activeGame = null;
   }
 
-  activeGame = new GameInstance(civ, saveSystem, difficulty);
+  activeGame = new GameInstance(civ, saveSystem, difficulty, numAI);
   await activeGame.init();
 }
 
@@ -201,18 +202,20 @@ class GameInstance {
     this.hud.notify(msg, 'info');
   }
 
-  constructor(civ: CivilizationType, saveSystem: SaveSystem, difficulty: Difficulty = 'normal') {
+  private numAI: number;
+
+  constructor(civ: CivilizationType, saveSystem: SaveSystem, difficulty: Difficulty = 'normal', numAI = 3) {
     this.civ        = civ;
     this.saveSystem = saveSystem;
     this.difficulty = difficulty;
+    this.numAI      = numAI;
   }
 
   async init() {
     const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
 
     // Override human player's civilization
-    this.game     = new Game(this.civ);
-    this.game.difficulty = this.difficulty;
+    this.game = new Game(this.civ, { difficulty: this.difficulty, numAI: this.numAI });
     this.renderer = new Renderer(canvas);
     this.hud      = new HUD(this.game);
     this.camera   = new RTSCamera(this.renderer.camera);
@@ -2368,9 +2371,10 @@ function showRestartMenu() {
   document.getElementById('app')!.classList.add('hidden');
   const civSelect = new CivSelectScreen(saveSystem);
   civSelect.setOnStart(async (civ) => {
-    const diff = civSelect.getDifficulty();
+    const diff  = civSelect.getDifficulty();
+    const numAI = civSelect.getNumAI();
     civSelect.hide();
-    await startGame(civ, diff);
+    await startGame(civ, diff, numAI);
   });
   const sess = saveSystem.getSession();
   civSelect.show(sess?.civType ?? CivilizationType.AZTEC);
