@@ -64,7 +64,9 @@ export class Building {
       case BuildingType.WATCHTOWER: return 4;
       case BuildingType.TEMPLE:     return 3;
       case BuildingType.VILLAGE:    return 2;
-      case BuildingType.BARRACKS:   return 3; // troops can shelter inside their barracks
+      case BuildingType.BARRACKS:   return 3;
+      case BuildingType.HARBOR:     return 2;
+      case BuildingType.WALL:       return 4; // archers on the wall
       default:                      return 0;
     }
   }
@@ -124,6 +126,12 @@ export class Building {
 
     if (this.type === BuildingType.VILLAGE) {
       this.buildVillage();
+    } else if (this.type === BuildingType.HARBOR) {
+      this.buildHarbor(stone, stone2, trim);
+    } else if (this.type === BuildingType.MARKET) {
+      this.buildMarket(stone, stone2, trim);
+    } else if (this.type === BuildingType.WALL) {
+      this.buildWall(stone, stone2, trim);
     } else {
       switch (this.civType) {
         case CivilizationType.CONQUISTADOR: this.buildSpanish(stone, stone2, trim); break;
@@ -338,6 +346,67 @@ export class Building {
     flame.position.set(-0.55, 0.17, 0.30); this.structure.add(flame);
   }
 
+  // ── Harbor / Port ────────────────────────────────────────────────────────────
+  private buildHarbor(stone: THREE.Material, stone2: THREE.Material, _trim: THREE.Material) {
+    const wood = this.mat(0x6b4a28, 0.9);
+    const rope = this.mat(0xc8aa70, 0.95);
+    // Pier base
+    this.box(stone,  1.4, 0.2, 0.7, 0, 0.1, 0);
+    this.box(stone2, 1.2, 0.15, 0.5, 0, 0.23, 0);
+    // Wooden dock planks
+    for (let i = -2; i <= 2; i++) {
+      this.box(wood, 0.14, 0.05, 0.7, i * 0.26, 0.3, 0);
+    }
+    // Bollards
+    for (const bx of [-0.6, 0.6]) {
+      const bollard = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.3, 6), rope);
+      bollard.position.set(bx, 0.45, 0.3); this.structure.add(bollard);
+    }
+    // Crane arm
+    this.box(wood, 0.05, 0.6, 0.05, -0.5, 0.6, 0);
+    this.box(wood, 0.05, 0.05, 0.4, -0.5, 0.88, 0.18);
+    this.addTypeMarker(_trim, 0.9);
+  }
+
+  // ── Market ────────────────────────────────────────────────────────────────────
+  private buildMarket(stone: THREE.Material, stone2: THREE.Material, trim: THREE.Material) {
+    const awning = new THREE.MeshStandardMaterial({ color: 0xe8a020, roughness: 0.8 });
+    const wood   = this.mat(0x7a5a30, 0.9);
+    // Main stall structure
+    this.box(stone,  1.1, 0.55, 0.75, 0, 0.28, 0);
+    this.box(stone2, 1.0, 0.08, 0.65, 0, 0.57, 0);
+    // Wooden posts
+    for (const px of [-0.48, 0.48]) {
+      this.box(wood, 0.07, 0.7, 0.07, px, 0.35, 0.34);
+    }
+    // Awning / canopy
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.07, 0.85), awning);
+    canopy.position.set(0, 0.75, 0); canopy.castShadow = true;
+    this.structure.add(canopy);
+    // Trade goods display (colorful boxes)
+    for (let i = -1; i <= 1; i++) {
+      const box = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.15, 0.18),
+        new THREE.MeshStandardMaterial({ color: [0xd04020, 0x20a040, 0xa06010][i + 1], roughness: 0.7 }));
+      box.position.set(i * 0.25, 0.64, 0.05);
+      this.structure.add(box);
+    }
+    this.addTypeMarker(trim, 0.82);
+  }
+
+  // ── Wall / Palisade ───────────────────────────────────────────────────────────
+  private buildWall(stone: THREE.Material, _stone2: THREE.Material, trim: THREE.Material) {
+    // Thick defensive wall
+    this.box(stone, 1.6, 0.8, 0.45, 0, 0.4, 0);
+    // Walkway on top
+    this.box(stone, 1.55, 0.08, 0.35, 0, 0.82, 0, false);
+    // Arrow slits
+    const dark = this.mat(0x1a1208, 1);
+    for (const sx of [-0.5, 0, 0.5]) {
+      this.box(dark, 0.07, 0.22, 0.06, sx, 0.4, 0.23, false);
+    }
+    this.addTypeMarker(trim, 0.86);
+  }
+
   // Small marker so different building types are still distinguishable
   private addTypeMarker(trim: THREE.Material, y: number) {
     switch (this.type) {
@@ -356,6 +425,31 @@ export class Building {
         const ember = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.16),
           new THREE.MeshStandardMaterial({ color: 0xff5520, emissive: 0xff4400, emissiveIntensity: 1.5 }));
         ember.position.set(0.3, y + 0.2, 0); this.structure.add(ember);
+        break;
+      }
+      case BuildingType.HARBOR: {
+        // Anchor marker
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.5, 6),
+          this.mat(0x5a4030, 0.9));
+        post.position.set(0, y + 0.3, 0); this.structure.add(post);
+        const arm = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 0.05),
+          this.mat(0x5a4030, 0.9));
+        arm.position.set(0, y + 0.52, 0); this.structure.add(arm);
+        break;
+      }
+      case BuildingType.MARKET: {
+        // Awning / canopy marker
+        const awning = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.06, 0.7),
+          new THREE.MeshStandardMaterial({ color: 0xe8a020, roughness: 0.8 }));
+        awning.position.set(0, y + 0.35, 0); this.structure.add(awning);
+        break;
+      }
+      case BuildingType.WALL: {
+        // Battlements on top
+        for (const dx of [-0.35, 0, 0.35]) {
+          const merlon = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.28, 0.18), trim);
+          merlon.position.set(dx, y + 0.22, 0); this.structure.add(merlon);
+        }
         break;
       }
     }

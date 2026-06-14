@@ -2,11 +2,18 @@ import type { Building } from '../game/Building';
 import type { Player, PlayerUpgrades } from '../game/Player';
 import { CIVILIZATIONS } from '../game/civilizations';
 import { TRAIN_COSTS } from '../game/unitProduction';
-import type { UnitType } from '../game/types';
-import { CivilizationType } from '../game/types';
+import { UnitType, CivilizationType } from '../game/types';
 import { BuildingType } from '../game/buildings';
 import { BUILDING_DEFS } from '../game/buildingDefs';
 import { TechType, TECH_DEFS } from '../game/Tech';
+
+const NAVAL_UNITS = new Set<UnitType>([
+  UnitType.CANOE, UnitType.WAR_CANOE,
+  UnitType.BRIGANTINE, UnitType.GALLEON,
+]);
+const SPIRITUAL_UNITS = new Set<UnitType>([
+  UnitType.SHAMAN, UnitType.MISSIONARY,
+]);
 
 type UpgradeDef = { key: keyof PlayerUpgrades; name: string; emoji: string; desc: string; food: number; gold: number; stone: number; civ?: CivilizationType };
 
@@ -23,7 +30,10 @@ const UPGRADE_DEFS: UpgradeDef[] = [
 
 const BUILDABLE: BuildingType[] = [
   BuildingType.BARRACKS,
+  BuildingType.HARBOR,
+  BuildingType.MARKET,
   BuildingType.WATCHTOWER,
+  BuildingType.WALL,
   BuildingType.STOREHOUSE,
   BuildingType.TEMPLE,
   BuildingType.FORGE,
@@ -40,6 +50,7 @@ export class ProductionPanel {
   onBuild:   ((type: BuildingType) => void)                    | null = null;
   onUpgrade: ((key: keyof PlayerUpgrades) => void)             | null = null;
   onResearchTech: ((tech: TechType) => void)                   | null = null;
+  onMarketTrade: ((resource: string, sellAmt: number, goldGain: number) => void) | null = null;
   onCancel:  (() => void)                                      | null = null;
   onCancelProduction: (() => void)                             | null = null;
   onDemolish: (() => void)                                     | null = null;
@@ -155,10 +166,46 @@ export class ProductionPanel {
     const listEl = document.getElementById('prod-unit-list')!;
     listEl.innerHTML = '';
 
+    const isHarbor  = b.type === BuildingType.HARBOR;
+    const isTemple  = b.type === BuildingType.TEMPLE;
+    const isMarket  = b.type === BuildingType.MARKET;
+    const isWall    = b.type === BuildingType.WALL;
+
+    // Market: show trade UI instead of unit list
+    if (isMarket) {
+      this._renderMarketTrade(listEl, p);
+      return;
+    }
+
+    // Wall has no unit production
+    if (isWall) {
+      const msg = document.createElement('div');
+      msg.style.cssText = 'color:#aaa;font-size:12px;padding:12px 8px;text-align:center;';
+      msg.textContent = '🧱 Barrera defensiva — sin producción de unidades.';
+      listEl.appendChild(msg);
+      return;
+    }
+
     for (const unitDef of (civDef as any).units) {
-      const cost = TRAIN_COSTS[unitDef.type as UnitType];
+      const ut = unitDef.type as UnitType;
+      const cost = TRAIN_COSTS[ut];
       if (!cost) continue;
-      const canAfford = p.resources.food >= cost.food && p.resources.gold >= cost.gold && (p.resources.stone ?? 0) >= (cost.stone ?? 0) && (p.resources.wood ?? 0) >= (cost.wood ?? 0);
+
+      const isNaval     = NAVAL_UNITS.has(ut);
+      const isSpiritual = SPIRITUAL_UNITS.has(ut);
+
+      // Naval units only trainable from Harbor
+      if (isNaval && !isHarbor) continue;
+      // Spiritual units only trainable from Temple
+      if (isSpiritual && !isTemple) continue;
+      // Harbor only shows naval units; Temple only shows spiritual units
+      if (isHarbor  && !isNaval)     continue;
+      if (isTemple  && !isSpiritual) continue;
+
+      const canAfford = p.resources.food >= cost.food
+        && p.resources.gold  >= cost.gold
+        && (p.resources.stone ?? 0) >= (cost.stone ?? 0)
+        && (p.resources.wood  ?? 0) >= (cost.wood  ?? 0);
 
       const btn = document.createElement('button');
       btn.className = 'prod-unit-btn' + (canAfford ? '' : ' disabled');
@@ -173,9 +220,52 @@ export class ProductionPanel {
         </div>
       `;
       if (canAfford && b.productionQueue.length < b.MAX_QUEUE) {
-        btn.addEventListener('click', () => this.onTrain?.(unitDef.type as UnitType));
+        btn.addEventListener('click', () => this.onTrain?.(ut));
       }
       listEl.appendChild(btn);
+    }
+
+    if (listEl.children.length === 0) {
+      const msg = document.createElement('div');
+      msg.style.cssText = 'color:#aaa;font-size:12px;padding:12px 8px;text-align:center;';
+      msg.textContent = 'Sin unidades disponibles en este edificio.';
+      listEl.appendChild(msg);
+    }
+  }
+
+  private _renderMarketTrade(container: HTMLElement, p: Player) {
+    const trades: { label: string; emoji: string; sell: keyof typeof p.resources; sellAmt: number; goldGain: number }[] = [
+      { label: 'Vender Comida',  emoji: '🌽', sell: 'food',  sellAmt: 50,  goldGain: 30 },
+      { label: 'Vender Madera',  emoji: '🪵', sell: 'wood',  sellAmt: 50,  goldGain: 35 },
+      { label: 'Vender Piedra',  emoji: '🪨', sell: 'stone', sellAmt: 50,  goldGain: 40 },
+      { label: 'Gran Venta Comida', emoji: '🌽', sell: 'food', sellAmt: 150, goldGain: 100 },
+      { label: 'Gran Venta Piedra', emoji: '🪨', sell: 'stone', sellAmt: 150, goldGain: 130 },
+    ];
+
+    const header = document.createElement('div');
+    header.style.cssText = 'color:#ffd77a;font-size:11px;padding:6px 8px 4px;border-bottom:1px solid rgba(255,200,80,0.2);';
+    header.textContent = '🏪 Mercado — intercambia recursos por oro';
+    container.appendChild(header);
+
+    for (const t of trades) {
+      const canAfford = (p.resources[t.sell] ?? 0) >= t.sellAmt;
+      const btn = document.createElement('button');
+      btn.className = 'prod-unit-btn' + (canAfford ? '' : ' disabled');
+      btn.title = `Vende ${t.sellAmt} ${t.label.split(' ')[1]} y recibe ${t.goldGain}⚜️`;
+      btn.innerHTML = `
+        <span class="prod-unit-icon">${t.emoji}</span>
+        <div class="prod-unit-info">
+          <div class="prod-unit-name">${t.label}</div>
+          <div class="prod-unit-cost">-${t.sellAmt}${t.emoji} → +${t.goldGain}⚜️</div>
+        </div>
+      `;
+      if (canAfford) {
+        btn.addEventListener('click', () => {
+          this.onMarketTrade?.(t.sell, t.sellAmt, t.goldGain);
+          this.render();
+        });
+      }
+      container.appendChild(btn);
     }
   }
 
@@ -189,6 +279,12 @@ export class ProductionPanel {
                         p.resources.gold >= def.cost.gold &&
                         p.resources.stone >= def.cost.stone;
 
+      const costStr = [
+        def.cost.food  ? `🌽${def.cost.food}`  : '',
+        def.cost.gold  ? `⚜️${def.cost.gold}`  : '',
+        def.cost.stone ? `🪨${def.cost.stone}` : '',
+      ].filter(Boolean).join(' ') || '—';
+
       const btn = document.createElement('button');
       btn.className = 'prod-unit-btn' + (canAfford ? '' : ' disabled');
       btn.title = def.description;
@@ -196,9 +292,7 @@ export class ProductionPanel {
         <span class="prod-unit-icon">${def.emoji}</span>
         <div class="prod-unit-info">
           <div class="prod-unit-name">${def.name}</div>
-          <div class="prod-unit-cost">
-            🌽${def.cost.food} ⚜️${def.cost.gold} 🪨${def.cost.stone}
-          </div>
+          <div class="prod-unit-cost">${costStr}</div>
         </div>
       `;
       if (canAfford) {
