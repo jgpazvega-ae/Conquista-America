@@ -589,12 +589,17 @@ export class AISystem {
     // Population pressure: raise the house/storehouse target as the AI fills its cap
     const popRatio = player.aliveUnits.length / Math.max(1, game.getPopCap(player.id));
     const houseTarget      = popRatio >= 0.80 ? 6 : popRatio >= 0.60 ? 4 : 2;
+    const farmTarget       = player.resources.food < 200 || game.gameTime > 90 ? 2 : 1;
     const storehouseTarget = popRatio >= 0.85 ? 5 : popRatio >= 0.65 ? 3 : 2;
 
     // Pop pressure: build houses first (cheap, fast) before storehouses
     let buildType: BuildingType | null = null;
     if (popRatio >= 0.75 && countOf(BuildingType.HOUSE) < houseTarget) {
       buildType = BuildingType.HOUSE;
+    }
+    // Food economy: farms are cheap and critical for sustained army training
+    if (!buildType && countOf(BuildingType.FARM) < farmTarget) {
+      buildType = BuildingType.FARM;
     }
     if (!buildType && popRatio >= 0.85 && countOf(BuildingType.STOREHOUSE) < storehouseTarget) {
       buildType = BuildingType.STOREHOUSE;
@@ -605,14 +610,16 @@ export class AISystem {
       for (const desired of strategy.buildOrder) {
         if (desired === BuildingType.SETTLEMENT || desired === BuildingType.WONDER || desired === BuildingType.VILLAGE) continue;
         const cap = desired === BuildingType.HOUSE       ? houseTarget
+                 : desired === BuildingType.FARM        ? farmTarget
                  : desired === BuildingType.STOREHOUSE   ? storehouseTarget
                  : desired === BuildingType.WATCHTOWER   ? Math.max(1, countOf(BuildingType.BARRACKS))
                  : 1; // one of each other type
         if (countOf(desired) < cap) { buildType = desired; break; }
       }
     }
-    // Fallback: ensure at least 2 houses, 1 barracks, enough storehouses
+    // Fallback: ensure at least 2 houses, 1 farm, 1 barracks, enough storehouses
     if (!buildType && countOf(BuildingType.HOUSE) < 2)        buildType = BuildingType.HOUSE;
+    if (!buildType && countOf(BuildingType.FARM) < 1)         buildType = BuildingType.FARM;
     if (!buildType && countOf(BuildingType.BARRACKS) === 0)   buildType = BuildingType.BARRACKS;
     if (!buildType && countOf(BuildingType.STOREHOUSE) < storehouseTarget) buildType = BuildingType.STOREHOUSE;
     // Late-game wonder rush: once all other buildings are in place and resources are ample, build a wonder

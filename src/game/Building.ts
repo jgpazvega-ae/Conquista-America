@@ -149,6 +149,8 @@ export class Building {
 
     if (this.type === BuildingType.VILLAGE) {
       this.buildVillage();
+    } else if (this.type === BuildingType.FARM) {
+      this.buildFarm(trim);
     } else if (this.type === BuildingType.HOUSE) {
       this.buildHouse(stone, stone2, trim);
     } else if (this.type === BuildingType.HARBOR) {
@@ -416,6 +418,35 @@ export class Building {
       this.structure.add(box);
     }
     this.addTypeMarker(trim, 0.82);
+  }
+
+  // ── Farm / Milpa ─────────────────────────────────────────────────────────────
+  private buildFarm(trim: THREE.Material) {
+    // Tilled soil base (flat dark earth platform)
+    const soilMat = this.mat(0x5c3d1a, 0.98);
+    this.box(soilMat, 1.8, 0.08, 1.8, 0, 0.04, 0);
+    // Crop rows — alternating green stalks (milpa / corn)
+    const cropMat = this.mat(0x3a8a2a, 0.85);
+    const dryMat  = this.mat(0xc4a230, 0.90);
+    for (let row = -1; row <= 1; row++) {
+      for (let col = -1; col <= 1; col++) {
+        const stalk = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.04, 0.05, 0.55, 5),
+          (row + col) % 2 === 0 ? cropMat : dryMat,
+        );
+        stalk.position.set(col * 0.52, 0.30, row * 0.52);
+        stalk.castShadow = true;
+        this.structure.add(stalk);
+        // Leaf fan on top
+        const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.26, 4), cropMat);
+        leaf.position.set(col * 0.52, 0.65, row * 0.52);
+        leaf.castShadow = true;
+        this.structure.add(leaf);
+      }
+    }
+    // Small irrigation ditch border (civ-color trim strip)
+    this.box(trim, 2.0, 0.04, 0.06, 0, 0.06, 0.94, false);
+    this.box(trim, 0.06, 0.04, 2.0, 0.94, 0.06, 0, false);
   }
 
   // ── House / Dwelling ─────────────────────────────────────────────────────────

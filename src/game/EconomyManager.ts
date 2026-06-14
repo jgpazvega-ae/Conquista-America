@@ -62,6 +62,7 @@ export class EconomyManager {
       switch (building.type as string) {
         case 'STOREHOUSE': foodProd += 30; goldProd += 20; stoneProd += 35; woodProd += 15; break;
         case 'SETTLEMENT': foodProd += 50; break;
+        case 'FARM':       foodProd += 50; break; // milpa/chacra — passive crop production
         case 'FORGE':      goldProd += 40; break;
         case 'MARKET':     goldProd += 10; break; // market adds passive gold (5/30s × 5s interval = ~0.83, show as 10 for legibility)
         case 'HARBOR':     woodProd += 10; break; // harbor enables naval timber trade
