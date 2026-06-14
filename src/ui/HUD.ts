@@ -643,6 +643,9 @@ export class HUD {
     // XP bar (only if unit can still level up)
     const xpEl = document.getElementById('unit-xp-row');
     if (xpEl) {
+      const killsLabel = unit.killsTotal > 0
+        ? `<span style="color:#ffcc66;font-size:10px;margin-left:6px" title="Bajas confirmadas">⚔️${unit.killsTotal}</span>`
+        : '';
       if (unit.level < 3) {
         const needed = unit.level === 1 ? 50 : 150;
         const xpPct  = Math.min(100, (unit.xp / needed) * 100);
@@ -650,10 +653,10 @@ export class HUD {
         xpEl.innerHTML =
           `<span class="xp-label">Nv.${unit.level} ${stars}</span>` +
           `<div class="xp-track"><div class="xp-fill" style="width:${xpPct}%"></div></div>` +
-          `<span class="xp-num">${unit.xp}/${needed}</span>`;
+          `<span class="xp-num">${unit.xp}/${needed}</span>` + killsLabel;
         xpEl.classList.remove('hidden');
       } else {
-        xpEl.innerHTML = `<span class="xp-label" style="color:#ff9933">★★ Campeón</span>`;
+        xpEl.innerHTML = `<span class="xp-label" style="color:#ff9933">★★ Campeón</span>` + killsLabel;
         xpEl.classList.remove('hidden');
       }
     }

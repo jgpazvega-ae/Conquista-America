@@ -194,6 +194,7 @@ class GameInstance {
   private _powerReadyFired      = false; // true once power-ready alert fired this cycle
   private _spottedEnemyIds      = new Set<number>(); // unit IDs already seen once (first-sight tracking)
   private _enemyArmySpottedAt   = -999; // gameTime when last "enemy army spotted" fired
+  private _cheatBuffer           = ''; // accumulates typed chars for cheat-code detection
 
   /** Show a tutorial hint at most once per match. */
   private hintOnce(key: string, msg: string) {
@@ -1649,6 +1650,13 @@ class GameInstance {
   private bindKeyboardShortcuts() {
     window.addEventListener('keydown', (e) => {
       if (this.destroyed) return;
+
+      // Cheat codes (AC Easter egg) — buffer last 16 chars
+      if (!e.ctrlKey && !e.altKey && e.key.length === 1) {
+        this._cheatBuffer = (this._cheatBuffer + e.key.toLowerCase()).slice(-16);
+        this._checkCheatCodes();
+      }
+
       // Escape: deselect all, close panels
       if (e.code === 'Escape') {
         if (this._placingType) { this._cancelPlacing(); return; }
@@ -2142,6 +2150,45 @@ class GameInstance {
         return;
       }
     });
+  }
+
+  private _checkCheatCodes() {
+    const b = this._cheatBuffer;
+    const player = this.game.humanPlayer;
+    if (b.endsWith('dorado')) {
+      player.resources.gold += 500;
+      this.hud.notify('💰 ¡El Dorado! +500 ⚜️', 'success');
+      this._cheatBuffer = '';
+    } else if (b.endsWith('maiz')) {
+      player.resources.food += 500;
+      this.hud.notify('🌽 ¡Milpa sagrada! +500 🌽', 'success');
+      this._cheatBuffer = '';
+    } else if (b.endsWith('piedra')) {
+      player.resources.stone += 500;
+      this.hud.notify('⛏️ ¡Cantera inca! +500 🪨', 'success');
+      this._cheatBuffer = '';
+    } else if (b.endsWith('madera')) {
+      player.resources.wood += 500;
+      this.hud.notify('🪵 ¡Selva amazónica! +500 🪵', 'success');
+      this._cheatBuffer = '';
+    } else if (b.endsWith('conquistar')) {
+      // Reveal full map (clear fog of war)
+      this.game.fog.revealAll(this.game.humanPlayerId);
+      this.hud.notify('🗺️ ¡Mapa revelado! — Visión total', 'success');
+      this._cheatBuffer = '';
+    } else if (b.endsWith('ejercito')) {
+      // Spawn 5 free warriors for the human player
+      const settlement = this.game.allBuildings.find(
+        b2 => b2.playerId === this.game.humanPlayerId && b2.type === BuildingType.SETTLEMENT && b2.isAlive(),
+      );
+      if (settlement) {
+        for (let i = 0; i < 5; i++) {
+          this.game.spawnFreeUnit(player, settlement.col + 2 + i, settlement.row + 3);
+        }
+        this.hud.notify('⚔️ ¡Legión divina! 5 guerreros invocados', 'success');
+      }
+      this._cheatBuffer = '';
+    }
   }
 
   private updateSpeedIndicator() {

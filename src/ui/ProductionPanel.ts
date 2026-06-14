@@ -225,7 +225,7 @@ export class ProductionPanel {
       const btn = document.createElement('button');
       btn.className = 'prod-unit-btn' + (canAfford ? '' : ' disabled');
       btn.style.cssText = 'flex:1;';
-      btn.title = unitDef.description;
+      btn.title = `${unitDef.description}\n[Shift+clic = encolar ×5]`;
       btn.innerHTML = `
         <span class="prod-unit-icon">${unitDef.emoji}</span>
         <div class="prod-unit-info">
@@ -236,7 +236,10 @@ export class ProductionPanel {
         </div>
       `;
       if (canAfford && b.productionQueue.length < b.MAX_QUEUE) {
-        btn.addEventListener('click', () => this.onTrain?.(ut));
+        btn.addEventListener('click', (e) => {
+          const count = (e as MouseEvent).shiftKey ? 5 : 1;
+          for (let i = 0; i < count; i++) this.onTrain?.(ut);
+        });
       }
 
       // Auto-train toggle button (🔄 when off, 🔄 pulsing when on)

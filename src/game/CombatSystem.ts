@@ -291,6 +291,7 @@ export class CombatSystem {
           // Kill streak tracking: 3 kills in a row without taking damage → 12s berserk
           if (!target.isAlive()) {
             unit.killStreak++;
+            unit.killsTotal++;
             if (unit.killStreak >= 3) {
               unit.berserkTimer = 12;
               unit.killStreak   = 0;

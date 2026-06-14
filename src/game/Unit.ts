@@ -104,6 +104,7 @@ export class Unit {
 
   // Kill streak / berserk
   killStreak  = 0;          // consecutive kills without taking damage
+  killsTotal  = 0;          // lifetime confirmed kills (for veteran display)
   berserkTimer = 0;         // seconds of berserk buff remaining (3-kill streak → 12s)
 
   // Morale (American Conquest style): 0-100; panic below 25, recover at 50
