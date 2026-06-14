@@ -23,7 +23,7 @@ import { ResourceType } from './game/ResourceNode';
 import { findPath } from './game/Pathfinding';
 import { WorkerTask } from './game/Worker';
 import type { Difficulty } from './ui/CivSelect';
-import { TECH_DEFS } from './game/Tech';
+import { TECH_DEFS, TechType } from './game/Tech';
 import { activateCivPower, CIV_POWER_DEFS } from './game/CivPowers';
 import { AllianceType } from './game/Diplomacy';
 import { CIVILIZATIONS } from './game/civilizations';
@@ -1397,6 +1397,34 @@ class GameInstance {
       if (isRaid) this.hintOnce('cavalryRaid', '💡 Raída de caballería: tus jinetes saquean ⚜️ oro al destruir edificios enemigos. ¡Úsalos para cortar el suministro enemigo!');
     }
 
+    // Era advancement notifications
+    for (const evt of this.game.eraAdvanceEvents) {
+      const isHuman = evt.playerId === this.game.humanPlayerId;
+      if (isHuman) {
+        this._showEraAdvanceOverlay(evt.era);
+      } else {
+        const p = this.game.players[evt.playerId];
+        if (p) {
+          const civDef = CIVILIZATIONS[p.civType];
+          const eraName = evt.era === 2 ? 'Era II' : 'Era III';
+          this.hud.notify(`⚠️ ${civDef.emoji} ${civDef.name} avanzó a ${eraName} — ¡preparate para nuevas amenazas!`, 'warning');
+        }
+      }
+    }
+
+    // Research era-advance reminder: nudge once after 3 min if player can afford Bronze Working
+    if (this.game.gameTime > 180) {
+      const player = this.game.humanPlayer;
+      const era = this.game.getEra(this.game.humanPlayerId);
+      if (era === 1) {
+        const bronzeDef = TECH_DEFS[TechType.BRONZE_WORKING];
+        const canAfford = player.resources.gold >= bronzeDef.costGold && player.resources.food >= Math.round(bronzeDef.costGold * 0.3);
+        if (canAfford && player.techs.canResearch(TechType.BRONZE_WORKING, player.civType)) {
+          this.hintOnce('eraAdvanceHint', '💡 ¡Puedes investigar Trabajo en Bronce! → desbloquea Era II y nuevas unidades de combate (pestaña Tecnología)');
+        }
+      }
+    }
+
     // AI diplomacy proposal notification
     this._updateAIDiploUI();
 
@@ -1650,6 +1678,34 @@ class GameInstance {
         this.hud.notify('💢 ¡Exigencia rechazada! Pueden declarar la guerra', 'warning');
       }
     });
+  }
+
+  private _showEraAdvanceOverlay(era: 2 | 3) {
+    const overlay  = document.getElementById('era-advance-overlay');
+    const iconEl   = document.getElementById('era-advance-icon');
+    const titleEl  = document.getElementById('era-advance-title');
+    const subEl    = document.getElementById('era-advance-sub');
+    const bonusEl  = document.getElementById('era-advance-bonus');
+    if (!overlay) return;
+
+    const ERA_DATA = {
+      2: { icon: '⚔️', title: '¡ERA II — COLONIAL!', sub: 'Jinetes · Arquebuceros · élites desbloqueados', bonus: '+150🌽 +80⚜️ +60🪨 · +20 moral a todas las tropas' },
+      3: { icon: '💣', title: '¡ERA III — IMPERIAL!', sub: 'Cañones · guerreros supremos disponibles',       bonus: '+200🌽 +120⚜️ +80🪨 · +20 moral a todas las tropas' },
+    };
+    const d = ERA_DATA[era];
+    if (iconEl)  iconEl.textContent  = d.icon;
+    if (titleEl) titleEl.textContent = d.title;
+    if (subEl)   subEl.textContent   = d.sub;
+    if (bonusEl) bonusEl.textContent = d.bonus;
+
+    overlay.classList.remove('hidden');
+    (overlay as HTMLElement).style.background = 'rgba(0,0,0,0.55)';
+    this.hud.notify(`🏺 ¡NUEVA ERA! ${d.sub}`, 'success');
+
+    setTimeout(() => {
+      (overlay as HTMLElement).style.background = 'rgba(0,0,0,0)';
+      setTimeout(() => overlay.classList.add('hidden'), 400);
+    }, 4000);
   }
 
   private _aiDiploShown = false;
