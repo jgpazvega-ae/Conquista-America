@@ -1,7 +1,7 @@
 import type { Building } from '../game/Building';
 import type { Player, PlayerUpgrades } from '../game/Player';
 import { CIVILIZATIONS } from '../game/civilizations';
-import { TRAIN_COSTS } from '../game/unitProduction';
+import { TRAIN_COSTS, ELITE_UNITS } from '../game/unitProduction';
 import { UnitType, CivilizationType } from '../game/types';
 import { BuildingType } from '../game/buildings';
 import { BUILDING_DEFS } from '../game/buildingDefs';
@@ -166,10 +166,12 @@ export class ProductionPanel {
     const listEl = document.getElementById('prod-unit-list')!;
     listEl.innerHTML = '';
 
-    const isHarbor  = b.type === BuildingType.HARBOR;
-    const isTemple  = b.type === BuildingType.TEMPLE;
-    const isMarket  = b.type === BuildingType.MARKET;
-    const isWall    = b.type === BuildingType.WALL;
+    const isHarbor   = b.type === BuildingType.HARBOR;
+    const isTemple   = b.type === BuildingType.TEMPLE;
+    const isMarket   = b.type === BuildingType.MARKET;
+    const isWall     = b.type === BuildingType.WALL;
+    const isBarracks = b.type === BuildingType.BARRACKS;
+    const isSettlement = b.type === BuildingType.SETTLEMENT;
 
     // Market: show trade UI instead of unit list
     if (isMarket) {
@@ -193,14 +195,20 @@ export class ProductionPanel {
 
       const isNaval     = NAVAL_UNITS.has(ut);
       const isSpiritual = SPIRITUAL_UNITS.has(ut);
+      const isElite     = ELITE_UNITS.has(ut);
 
       // Naval units only trainable from Harbor
       if (isNaval && !isHarbor) continue;
       // Spiritual units only trainable from Temple
       if (isSpiritual && !isTemple) continue;
-      // Harbor only shows naval units; Temple only shows spiritual units
-      if (isHarbor  && !isNaval)     continue;
-      if (isTemple  && !isSpiritual) continue;
+      // Elite units only trainable from Barracks
+      if (isElite && !isBarracks) continue;
+      // Harbor only shows naval; Temple only spiritual; Barracks only elite
+      if (isHarbor   && !isNaval)     continue;
+      if (isTemple   && !isSpiritual) continue;
+      if (isBarracks && !isElite)     continue;
+      // Settlement excludes naval/spiritual/elite (they need specialized buildings)
+      if (isSettlement && (isNaval || isSpiritual || isElite)) continue;
 
       const canAfford = p.resources.food >= cost.food
         && p.resources.gold  >= cost.gold
@@ -230,6 +238,16 @@ export class ProductionPanel {
       msg.style.cssText = 'color:#aaa;font-size:12px;padding:12px 8px;text-align:center;';
       msg.textContent = 'Sin unidades disponibles en este edificio.';
       listEl.appendChild(msg);
+    }
+
+    // Settlement: show hint about elite units if no Barracks content
+    if (isSettlement || isBarracks) {
+      const hint = document.createElement('div');
+      hint.style.cssText = 'color:#f5a623;font-size:10px;padding:6px 8px 2px;border-top:1px solid rgba(255,166,35,0.2);text-align:center;';
+      hint.textContent = isSettlement
+        ? '⚔️ Unidades de élite requieren Cuartel (Barracks)'
+        : '🏛️ Unidades básicas se entrenan en el Asentamiento';
+      listEl.appendChild(hint);
     }
   }
 

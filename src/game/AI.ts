@@ -10,7 +10,7 @@ import type { Worker } from './Worker';
 import { WorkerTask } from './Worker';
 import { ResourceType } from './ResourceNode';
 import { CIV_COLORS } from './constants';
-import { TRAIN_COSTS } from './unitProduction';
+import { TRAIN_COSTS, ELITE_UNITS } from './unitProduction';
 import { STRATEGY_BY_CIV } from './AIStrategy';
 import { getDamageMultiplier } from './UnitBalancing';
 import { TechType } from './Tech';
@@ -668,6 +668,8 @@ export class AISystem {
   private static readonly SPIRITUAL_UNIT_TYPES = new Set<UnitType>([
     UnitType.SHAMAN, UnitType.MISSIONARY,
   ]);
+  // Alias for shared ELITE_UNITS set (Barracks-only training)
+  private static readonly ELITE_UNIT_TYPES = ELITE_UNITS;
 
   private orderTraining(player: Player, game: Game) {
     const civDef = player.civDef;
@@ -714,6 +716,40 @@ export class AISystem {
       }
     }
 
+    // Try to train elite units from Barracks (60% chance per cycle)
+    const barracks = game.allBuildings.find(
+      b => b.playerId === player.id && b.type === BuildingType.BARRACKS && b.isComplete() &&
+           b.productionQueue.length < 2,
+    );
+    if (barracks && Math.random() < 0.6 && player.aliveUnits.length < game.getPopCap(player.id)) {
+      const eliteUnits = civDef.units.filter(u => AISystem.ELITE_UNIT_TYPES.has(u.type as UnitType));
+      const strategy = STRATEGY_BY_CIV[player.civType];
+      const preferredTypes = new Set(strategy.unitComposition);
+      const affordableElites = eliteUnits.filter(u => {
+        const cost = TRAIN_COSTS[u.type as UnitType];
+        if (!cost) return false;
+        return player.resources.food >= cost.food &&
+               player.resources.gold >= cost.gold &&
+               player.resources.stone >= (cost.stone ?? 0) &&
+               player.resources.wood  >= (cost.wood  ?? 0);
+      });
+      if (affordableElites.length > 0) {
+        const pool = affordableElites.flatMap(u => {
+          const weight = preferredTypes.has(u.type) ? 3 : 1;
+          return Array<typeof u>(weight).fill(u);
+        });
+        const pick = pool[Math.floor(Math.random() * pool.length)];
+        const cost = TRAIN_COSTS[pick.type as UnitType]!;
+        if (barracks.trainUnit(pick.type as UnitType)) {
+          player.resources.food  -= cost.food;
+          player.resources.gold  -= cost.gold;
+          player.resources.stone -= cost.stone ?? 0;
+          player.resources.wood  -= cost.wood  ?? 0;
+          return;
+        }
+      }
+    }
+
     const settlement = game.allBuildings.find(
       b => b.playerId === player.id && b.type === BuildingType.SETTLEMENT && b.isComplete(),
     );
@@ -725,8 +761,9 @@ export class AISystem {
     const strategy = STRATEGY_BY_CIV[player.civType];
     const preferredTypes = new Set(strategy.unitComposition);
     const affordable = civDef.units.filter(u => {
-      if (AISystem.NAVAL_UNIT_TYPES.has(u.type as UnitType)) return false; // trained from Harbor only
+      if (AISystem.NAVAL_UNIT_TYPES.has(u.type as UnitType)) return false;    // trained from Harbor only
       if (AISystem.SPIRITUAL_UNIT_TYPES.has(u.type as UnitType)) return false; // trained from Temple only
+      if (AISystem.ELITE_UNIT_TYPES.has(u.type as UnitType)) return false;     // trained from Barracks only
       const cost = TRAIN_COSTS[u.type];
       if (!cost) return false;
       return player.resources.food >= cost.food &&
