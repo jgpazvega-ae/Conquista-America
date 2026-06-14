@@ -123,6 +123,45 @@ const UNIT_DEFS: Record<UnitType, UnitDef> = {
     description: 'Artillería devastadora, lento pero mortal.',
     stats: { maxHp: 80, attack: 60, defense: 10, speed: 1.0, attackRange: 8.0, sight: 10, attackCooldown: 5.0 },
   },
+  // ── NAVAL — NATIVAS ────────────────────────────────────
+  [UnitType.CANOE]: {
+    type: UnitType.CANOE, name: 'Canoa', emoji: '🛶',
+    isRanged: false, isCavalry: false,
+    description: 'Embarcación ligera nativa. Solo navega en agua. Rápida y ágil.',
+    stats: { maxHp: 70, attack: 14, defense: 8, speed: 4.5, attackRange: 1.5, sight: 8, attackCooldown: 1.6 },
+  },
+  [UnitType.WAR_CANOE]: {
+    type: UnitType.WAR_CANOE, name: 'Canoa de Guerra', emoji: '⚓',
+    isRanged: true, isCavalry: false,
+    description: 'Canoa blindada con arqueros. Dispara flechas a corta distancia.',
+    stats: { maxHp: 100, attack: 22, defense: 12, speed: 3.5, attackRange: 4.0, sight: 9, attackCooldown: 1.8 },
+  },
+  // ── NAVAL — CONQUISTADOR ───────────────────────────────
+  [UnitType.BRIGANTINE]: {
+    type: UnitType.BRIGANTINE, name: 'Bergantín', emoji: '⛵',
+    isRanged: true, isCavalry: false,
+    description: 'Buque ligero español. Dispara cañonazos a media distancia.',
+    stats: { maxHp: 150, attack: 35, defense: 18, speed: 3.0, attackRange: 6.0, sight: 10, attackCooldown: 3.5 },
+  },
+  [UnitType.GALLEON]: {
+    type: UnitType.GALLEON, name: 'Galeón', emoji: '🚢',
+    isRanged: true, isCavalry: false,
+    description: 'Poderoso galeón de guerra con cañones pesados. Domina el océano.',
+    stats: { maxHp: 280, attack: 70, defense: 30, speed: 2.0, attackRange: 9.0, sight: 12, attackCooldown: 5.0 },
+  },
+  // ── ESPIRITUAL ─────────────────────────────────────────
+  [UnitType.SHAMAN]: {
+    type: UnitType.SHAMAN, name: 'Chamán', emoji: '🌀',
+    isRanged: false, isCavalry: false,
+    description: 'Chamán nativo. Cura aliados y puede maldecir enemigos cercanos.',
+    stats: { maxHp: 55, attack: 8, defense: 6, speed: 2.5, attackRange: 3.0, sight: 7, attackCooldown: 2.5 },
+  },
+  [UnitType.MISSIONARY]: {
+    type: UnitType.MISSIONARY, name: 'Misionero', emoji: '✝️',
+    isRanged: false, isCavalry: false,
+    description: 'Convierte unidades enemigas al bando español con el tiempo.',
+    stats: { maxHp: 50, attack: 5, defense: 5, speed: 2.5, attackRange: 3.5, sight: 7, attackCooldown: 4.0 },
+  },
 };
 
 export const CIVILIZATIONS: Record<CivilizationType, CivDef> = {
@@ -133,7 +172,7 @@ export const CIVILIZATIONS: Record<CivilizationType, CivDef> = {
     color: 0x1aaa60,
     accentColor: 0x0d7040,
     description: 'El poderoso Imperio Mexica, maestros de la guerra florida.',
-    units: [UNIT_DEFS[UnitType.EAGLE_WARRIOR], UNIT_DEFS[UnitType.JAGUAR_KNIGHT], UNIT_DEFS[UnitType.ATLATL], UNIT_DEFS[UnitType.CUACHIC]],
+    units: [UNIT_DEFS[UnitType.EAGLE_WARRIOR], UNIT_DEFS[UnitType.JAGUAR_KNIGHT], UNIT_DEFS[UnitType.ATLATL], UNIT_DEFS[UnitType.CUACHIC], UNIT_DEFS[UnitType.CANOE], UNIT_DEFS[UnitType.WAR_CANOE], UNIT_DEFS[UnitType.SHAMAN]],
     startUnits: [
       ...Array(8).fill(UnitType.EAGLE_WARRIOR),
       ...Array(5).fill(UnitType.JAGUAR_KNIGHT),
@@ -148,7 +187,7 @@ export const CIVILIZATIONS: Record<CivilizationType, CivDef> = {
     color: 0xd4a810,
     accentColor: 0xa07808,
     description: 'El vasto Imperio Inca, maestros de organización y arquitectura.',
-    units: [UNIT_DEFS[UnitType.QUECHUA], UNIT_DEFS[UnitType.SLINGER], UNIT_DEFS[UnitType.CHAKANA_GUARD], UNIT_DEFS[UnitType.ANTIS_WARRIOR]],
+    units: [UNIT_DEFS[UnitType.QUECHUA], UNIT_DEFS[UnitType.SLINGER], UNIT_DEFS[UnitType.CHAKANA_GUARD], UNIT_DEFS[UnitType.ANTIS_WARRIOR], UNIT_DEFS[UnitType.CANOE], UNIT_DEFS[UnitType.SHAMAN]],
     startUnits: [
       ...Array(8).fill(UnitType.QUECHUA),
       ...Array(6).fill(UnitType.SLINGER),
@@ -163,7 +202,7 @@ export const CIVILIZATIONS: Record<CivilizationType, CivDef> = {
     color: 0x20b040,
     accentColor: 0x107828,
     description: 'Las ciudades-estado mayas, guerreros de la selva y ciencias avanzadas.',
-    units: [UNIT_DEFS[UnitType.SPEARMAN], UNIT_DEFS[UnitType.ARCHER], UNIT_DEFS[UnitType.AHAU_WARRIOR], UNIT_DEFS[UnitType.BALAM_JAGUAR]],
+    units: [UNIT_DEFS[UnitType.SPEARMAN], UNIT_DEFS[UnitType.ARCHER], UNIT_DEFS[UnitType.AHAU_WARRIOR], UNIT_DEFS[UnitType.BALAM_JAGUAR], UNIT_DEFS[UnitType.WAR_CANOE], UNIT_DEFS[UnitType.SHAMAN]],
     startUnits: [
       ...Array(8).fill(UnitType.SPEARMAN),
       ...Array(6).fill(UnitType.ARCHER),
@@ -178,7 +217,7 @@ export const CIVILIZATIONS: Record<CivilizationType, CivDef> = {
     color: 0xcc2020,
     accentColor: 0x901010,
     description: 'Soldados europeos con tecnología superior: acero, pólvora y caballos.',
-    units: [UNIT_DEFS[UnitType.SOLDIER], UNIT_DEFS[UnitType.ARQUEBUSIER], UNIT_DEFS[UnitType.CAVALRY], UNIT_DEFS[UnitType.CANNON]],
+    units: [UNIT_DEFS[UnitType.SOLDIER], UNIT_DEFS[UnitType.ARQUEBUSIER], UNIT_DEFS[UnitType.CAVALRY], UNIT_DEFS[UnitType.CANNON], UNIT_DEFS[UnitType.BRIGANTINE], UNIT_DEFS[UnitType.GALLEON], UNIT_DEFS[UnitType.MISSIONARY]],
     startUnits: [
       ...Array(7).fill(UnitType.SOLDIER),
       ...Array(6).fill(UnitType.ARQUEBUSIER),

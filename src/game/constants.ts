@@ -82,6 +82,7 @@ export const STARTING_RESOURCES = {
   food:  400,
   gold:  200,
   stone: 250,
+  wood:  150,
 };
 
 export const CAMERA_PAN_SPEED = 24;

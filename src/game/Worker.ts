@@ -12,6 +12,7 @@ export enum WorkerTask {
   GATHERING_FOOD = 'GATHERING_FOOD',
   GATHERING_GOLD = 'GATHERING_GOLD',
   GATHERING_STONE = 'GATHERING_STONE',
+  GATHERING_WOOD = 'GATHERING_WOOD',
   RETURNING = 'RETURNING',
   REPAIRING = 'REPAIRING',
 }
@@ -30,7 +31,7 @@ export class Worker {
   targetRow: number;
   path: GridPos[] = [];
   pathIndex: number = 0;
-  carrying: 'food' | 'gold' | 'stone' | null = null;
+  carrying: 'food' | 'gold' | 'stone' | 'wood' | null = null;
   carryAmount: number = 0;
   repairTarget: import('./Building').Building | null = null;
 
@@ -99,7 +100,7 @@ export class Worker {
 
   update(dt: number, _map: GameMap) {
     this.animT += dt;
-    const gathering = this.task === WorkerTask.GATHERING_FOOD || this.task === WorkerTask.GATHERING_GOLD || this.task === WorkerTask.GATHERING_STONE;
+    const gathering = this.task === WorkerTask.GATHERING_FOOD || this.task === WorkerTask.GATHERING_GOLD || this.task === WorkerTask.GATHERING_STONE || this.task === WorkerTask.GATHERING_WOOD;
 
     if (this.task === WorkerTask.MOVING || this.task === WorkerTask.RETURNING) {
       this.updateMovement(dt);
@@ -109,6 +110,7 @@ export class Worker {
         this.carryAmount = 30;
         if (this.task === WorkerTask.GATHERING_FOOD) this.carrying = 'food';
         else if (this.task === WorkerTask.GATHERING_GOLD) this.carrying = 'gold';
+        else if (this.task === WorkerTask.GATHERING_WOOD) this.carrying = 'wood';
         else this.carrying = 'stone';
         this.updateResourceIndicator();
         this.task = WorkerTask.IDLE;
@@ -177,15 +179,16 @@ export class Worker {
       const mat = this.resourceIndicator.material as THREE.MeshStandardMaterial;
       if (this.carrying === 'food') mat.color.setHex(0xddaa44);
       else if (this.carrying === 'gold') mat.color.setHex(0xffd000);
+      else if (this.carrying === 'wood') mat.color.setHex(0x8B5A2B);
       else mat.color.setHex(0x999999);
     } else {
       this.resourceIndicator.visible = false;
     }
   }
 
-  dropResources(): { type: 'food' | 'gold' | 'stone'; amount: number } | null {
+  dropResources(): { type: 'food' | 'gold' | 'stone' | 'wood'; amount: number } | null {
     if (!this.carrying) return null;
-    const res = { type: this.carrying as 'food' | 'gold' | 'stone', amount: this.carryAmount };
+    const res = { type: this.carrying as 'food' | 'gold' | 'stone' | 'wood', amount: this.carryAmount };
     this.carrying = null;
     this.carryAmount = 0;
     this.updateResourceIndicator();
