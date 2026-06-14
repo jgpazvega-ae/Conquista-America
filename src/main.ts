@@ -1321,7 +1321,23 @@ class GameInstance {
     for (const objType of this.game.objectives.newlyCompleted) {
       const obj = this.game.objectives.objectives.find(o => o.type === objType);
       if (obj) {
-        this.hud.notify(`🏆 ¡Objetivo completado! ${obj.title}`, 'success');
+        const r = obj.reward;
+        if (r) {
+          const p = this.game.humanPlayer;
+          if (r.food)  p.resources.food  = Math.min(2000, p.resources.food  + r.food);
+          if (r.gold)  p.resources.gold  = Math.min(2000, p.resources.gold  + r.gold);
+          if (r.stone) p.resources.stone = Math.min(2000, p.resources.stone + r.stone);
+          if (r.wood)  p.resources.wood  = Math.min(2000, (p.resources.wood ?? 0) + r.wood);
+          const rewardStr = [
+            r.food  ? `+${r.food}🌽`  : '',
+            r.gold  ? `+${r.gold}⚜️`  : '',
+            r.stone ? `+${r.stone}🪨` : '',
+            r.wood  ? `+${r.wood}🪵`  : '',
+          ].filter(Boolean).join(' ');
+          this.hud.notify(`🏆 ${obj.title} — ${rewardStr}`, 'success');
+        } else {
+          this.hud.notify(`🏆 ¡Objetivo completado! ${obj.title}`, 'success');
+        }
         this.audio.playLevelUp();
       }
     }

@@ -9,6 +9,15 @@ export enum ObjectiveType {
   SURVIVE_TIME = 'SURVIVE_TIME',
   BUILD_WONDERS = 'BUILD_WONDERS',
   CAPTURE_VILLAGES = 'CAPTURE_VILLAGES',
+  KILL_MILESTONE = 'KILL_MILESTONE',
+  TRAIN_ARMY = 'TRAIN_ARMY',
+}
+
+export interface ObjectiveReward {
+  food?: number;
+  gold?: number;
+  stone?: number;
+  wood?: number;
 }
 
 export interface Objective {
@@ -18,11 +27,12 @@ export interface Objective {
   target: number;
   progress: number;
   completed: boolean;
+  reward?: ObjectiveReward;
 }
 
 export class ObjectiveSystem {
   objectives: Objective[] = [];
-  /** IDs of objectives that just completed this frame — consumed by main.ts for notifications. */
+  /** Objectives that just completed this frame — consumed by main.ts for notifications + rewards. */
   newlyCompleted: ObjectiveType[] = [];
 
   constructor(game: Game) {
@@ -46,6 +56,7 @@ export class ObjectiveSystem {
       target: 40,
       progress: 0,
       completed: false,
+      reward: { food: 150, gold: 80 },
     });
 
     this.objectives.push({
@@ -55,6 +66,7 @@ export class ObjectiveSystem {
       target: 15,
       progress: 0,
       completed: false,
+      reward: { food: 100, stone: 100 },
     });
 
     this.objectives.push({
@@ -64,6 +76,7 @@ export class ObjectiveSystem {
       target: 3,
       progress: 0,
       completed: false,
+      reward: { gold: 120 },
     });
 
     this.objectives.push({
@@ -73,6 +86,36 @@ export class ObjectiveSystem {
       target: 1,
       progress: 0,
       completed: false,
+    });
+
+    this.objectives.push({
+      type: ObjectiveType.RESEARCH_TECH,
+      title: 'Avance tecnológico',
+      description: 'Investiga 3 tecnologías',
+      target: 3,
+      progress: 0,
+      completed: false,
+      reward: { gold: 100, food: 80 },
+    });
+
+    this.objectives.push({
+      type: ObjectiveType.KILL_MILESTONE,
+      title: 'Primera victoria militar',
+      description: 'Elimina 25 unidades enemigas',
+      target: 25,
+      progress: 0,
+      completed: false,
+      reward: { food: 200, gold: 50 },
+    });
+
+    this.objectives.push({
+      type: ObjectiveType.TRAIN_ARMY,
+      title: 'Forja tu ejército',
+      description: 'Entrena 20 unidades militares',
+      target: 20,
+      progress: 0,
+      completed: false,
+      reward: { stone: 150, wood: 150 },
     });
   }
 
@@ -102,6 +145,15 @@ export class ObjectiveSystem {
           obj.progress = game.allBuildings.filter(
             b => b.type === BuildingType.WONDER && b.playerId === player.id && b.isComplete(),
           ).length;
+          break;
+        case ObjectiveType.RESEARCH_TECH:
+          obj.progress = player.techs.completedCount;
+          break;
+        case ObjectiveType.KILL_MILESTONE:
+          obj.progress = game.killsByPlayer.get(player.id) ?? 0;
+          break;
+        case ObjectiveType.TRAIN_ARMY:
+          obj.progress = Math.min(obj.target, player.aliveUnits.filter(u => !u.isHero).length);
           break;
       }
 
