@@ -142,4 +142,15 @@ export class FogOfWarManager {
     const fog = this.fogMaps.get(playerId);
     return fog ? fog.isVisible(col, row) : true;
   }
+
+  revealAll(playerId: number) {
+    const fog = this.fogMaps.get(playerId);
+    if (!fog) return;
+    for (let r = 0; r < MAP_ROWS; r++) {
+      for (let c = 0; c < MAP_COLS; c++) {
+        fog['playerVisibility'][r][c] = TileVisibility.VISIBLE;
+        fog['playerMemory'][r][c] = 1;
+      }
+    }
+  }
 }

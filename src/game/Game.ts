@@ -252,6 +252,20 @@ export class Game {
     }
   }
 
+  /** Spawn a basic warrior for a player at a specific tile (used by cheat codes). */
+  spawnFreeUnit(player: Player, col: number, row: number) {
+    const civDef = CIVILIZATIONS[player.civType];
+    const basicType = civDef.startUnits[0];
+    const pos = this.map.findWalkableNear(col, row, 5);
+    if (!pos) return null;
+    const unit = new Unit(basicType, player.civType, player.id, pos[0], pos[1], CIV_COLORS[player.civType]);
+    this.applyCivTraits(unit, player.civType);
+    player.addUnit(unit);
+    this.allUnits.push(unit);
+    this.newlySpawnedUnits.push(unit);
+    return unit;
+  }
+
   private spawnInitialBuildings() {
     const civs = [
       CivilizationType.AZTEC,
