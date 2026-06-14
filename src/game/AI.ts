@@ -275,6 +275,7 @@ export class AISystem {
       if (state.upgradeTimer >= AI_UPGRADE_INTERVAL * diffMult) {
         state.upgradeTimer = 0;
         this.applyAIUpgrades(player, game);
+        this.orderMarketTrade(player, game);
       }
     }
   }
@@ -661,8 +662,58 @@ export class AISystem {
     player.resources.stone -= def.cost.stone;
   }
 
+  private static readonly NAVAL_UNIT_TYPES = new Set<UnitType>([
+    UnitType.CANOE, UnitType.WAR_CANOE, UnitType.BRIGANTINE, UnitType.GALLEON,
+  ]);
+  private static readonly SPIRITUAL_UNIT_TYPES = new Set<UnitType>([
+    UnitType.SHAMAN, UnitType.MISSIONARY,
+  ]);
+
   private orderTraining(player: Player, game: Game) {
     const civDef = player.civDef;
+
+    // Also try to train naval units from Harbor
+    const harbor = game.allBuildings.find(
+      b => b.playerId === player.id && b.type === BuildingType.HARBOR && b.isComplete() &&
+           b.productionQueue.length < 2,
+    );
+    if (harbor && Math.random() < 0.4) {
+      const navalUnits = civDef.units.filter(u => AISystem.NAVAL_UNIT_TYPES.has(u.type as UnitType));
+      for (const nu of navalUnits) {
+        const cost = TRAIN_COSTS[nu.type as UnitType];
+        if (!cost) continue;
+        if (player.resources.food >= cost.food && player.resources.gold >= cost.gold &&
+            (player.resources.wood ?? 0) >= (cost.wood ?? 0)) {
+          if (harbor.trainUnit(nu.type as UnitType)) {
+            player.resources.food -= cost.food;
+            player.resources.gold -= cost.gold;
+            player.resources.wood = (player.resources.wood ?? 0) - (cost.wood ?? 0);
+            return;
+          }
+        }
+      }
+    }
+
+    // Also try to train spiritual units from Temple
+    const temple = game.allBuildings.find(
+      b => b.playerId === player.id && b.type === BuildingType.TEMPLE && b.isComplete() &&
+           b.productionQueue.length < 2,
+    );
+    if (temple && Math.random() < 0.25) {
+      const spiritualUnits = civDef.units.filter(u => AISystem.SPIRITUAL_UNIT_TYPES.has(u.type as UnitType));
+      for (const su of spiritualUnits) {
+        const cost = TRAIN_COSTS[su.type as UnitType];
+        if (!cost) continue;
+        if (player.resources.food >= cost.food && player.resources.gold >= cost.gold) {
+          if (temple.trainUnit(su.type as UnitType)) {
+            player.resources.food -= cost.food;
+            player.resources.gold -= cost.gold;
+            return;
+          }
+        }
+      }
+    }
+
     const settlement = game.allBuildings.find(
       b => b.playerId === player.id && b.type === BuildingType.SETTLEMENT && b.isComplete(),
     );
@@ -674,6 +725,8 @@ export class AISystem {
     const strategy = STRATEGY_BY_CIV[player.civType];
     const preferredTypes = new Set(strategy.unitComposition);
     const affordable = civDef.units.filter(u => {
+      if (AISystem.NAVAL_UNIT_TYPES.has(u.type as UnitType)) return false; // trained from Harbor only
+      if (AISystem.SPIRITUAL_UNIT_TYPES.has(u.type as UnitType)) return false; // trained from Temple only
       const cost = TRAIN_COSTS[u.type];
       if (!cost) return false;
       return player.resources.food >= cost.food &&
@@ -718,6 +771,21 @@ export class AISystem {
       player.resources.gold  -= cost.gold;
       player.resources.stone -= cost.stone ?? 0;
       player.resources.wood  -= cost.wood  ?? 0;
+    }
+  }
+
+  private orderMarketTrade(player: Player, game: Game) {
+    const hasMarket = game.allBuildings.some(b => b.playerId === player.id && b.type === BuildingType.MARKET && b.isComplete());
+    if (!hasMarket) return;
+    // Trade excess food or stone for gold when gold is low
+    if (player.resources.gold < 100) {
+      if ((player.resources.food ?? 0) > 300) {
+        game.executeMarketTrade(player.id, 'food', 50, 30);
+      } else if ((player.resources.stone ?? 0) > 300) {
+        game.executeMarketTrade(player.id, 'stone', 50, 40);
+      } else if ((player.resources.wood ?? 0) > 300) {
+        game.executeMarketTrade(player.id, 'wood', 50, 35);
+      }
     }
   }
 

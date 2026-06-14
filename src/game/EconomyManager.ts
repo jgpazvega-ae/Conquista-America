@@ -6,10 +6,11 @@ export interface EconomyStats {
   foodProduction: number;
   goldProduction: number;
   stoneProduction: number;
+  woodProduction: number;
   foodConsumption: number;
   goldConsumption: number;
   stoneConsumption: number;
-  netProduction: { food: number; gold: number; stone: number };
+  netProduction: { food: number; gold: number; stone: number; wood: number };
 }
 
 export class EconomyManager {
@@ -32,32 +33,38 @@ export class EconomyManager {
       player.resources.food  = Math.min(cap, Math.max(0, player.resources.food  + stats.netProduction.food  * rate));
       player.resources.gold  = Math.min(cap, Math.max(0, player.resources.gold  + stats.netProduction.gold  * rate));
       player.resources.stone = Math.min(cap, Math.max(0, player.resources.stone + stats.netProduction.stone * rate));
+      player.resources.wood  = Math.min(cap, Math.max(0, (player.resources.wood ?? 0) + stats.netProduction.wood * rate));
     }
   }
 
   private calculateStats(player: Player, game: Game): EconomyStats {
-    let foodProd = 50; // base
-    let goldProd = 30;
+    let foodProd  = 50; // base
+    let goldProd  = 30;
     let stoneProd = 40;
+    let woodProd  = 20;
 
-    // Count workers and their efficiency
+    // Count workers by task for per-resource attribution
     const playerWorkers = game.allWorkers.filter(w => w.playerId === player.id);
-    foodProd += playerWorkers.length * 15;
-    goldProd += (playerWorkers.length / 2) * 20;
-    stoneProd += playerWorkers.length * 18;
+    const gatheringFood  = playerWorkers.filter(w => (w.task as string).includes('FOOD')).length;
+    const gatheringGold  = playerWorkers.filter(w => (w.task as string).includes('GOLD')).length;
+    const gatheringStone = playerWorkers.filter(w => (w.task as string).includes('STONE')).length;
+    const gatheringWood  = playerWorkers.filter(w => (w.task as string).includes('WOOD')).length;
+    const allGathering   = playerWorkers.length;
+    foodProd  += gatheringFood  * 25 + (allGathering - gatheringFood)  * 5;
+    goldProd  += gatheringGold  * 30 + (allGathering - gatheringGold)  * 5;
+    stoneProd += gatheringStone * 28 + (allGathering - gatheringStone) * 5;
+    woodProd  += gatheringWood  * 22 + (allGathering - gatheringWood)  * 3;
 
     // Count buildings and their bonuses
     for (const building of game.allBuildings) {
       if (building.playerId !== player.id || !building.isComplete()) continue;
 
-      if (building.type === 'STOREHOUSE') {
-        foodProd += 30;
-        goldProd += 20;
-        stoneProd += 35;
-      } else if (building.type === 'SETTLEMENT') {
-        foodProd += 50;
-      } else if (building.type === 'FORGE') {
-        goldProd += 40;
+      switch (building.type as string) {
+        case 'STOREHOUSE': foodProd += 30; goldProd += 20; stoneProd += 35; woodProd += 15; break;
+        case 'SETTLEMENT': foodProd += 50; break;
+        case 'FORGE':      goldProd += 40; break;
+        case 'MARKET':     goldProd += 10; break; // market adds passive gold (5/30s × 5s interval = ~0.83, show as 10 for legibility)
+        case 'HARBOR':     woodProd += 10; break; // harbor enables naval timber trade
       }
     }
 
@@ -70,25 +77,28 @@ export class EconomyManager {
         if (d <= 10) routes++;
       }
     }
-    goldProd += routes * 20; // 20 gold/5s per route (~60 gold/min each)
+    goldProd += routes * 20;
 
     // Unit consumption
     const unitCount = player.aliveUnits.length;
-    const foodConsumption = unitCount * 1.5;
-    const goldConsumption = unitCount * 0.5;
+    const foodConsumption  = unitCount * 1.5;
+    const goldConsumption  = unitCount * 0.5;
     const stoneConsumption = 0;
+    const woodConsumption  = 0;
 
     return {
       foodProduction: foodProd,
       goldProduction: goldProd,
       stoneProduction: stoneProd,
+      woodProduction: woodProd,
       foodConsumption,
       goldConsumption,
       stoneConsumption,
       netProduction: {
-        food: foodProd - foodConsumption,
-        gold: goldProd - goldConsumption,
+        food:  foodProd  - foodConsumption,
+        gold:  goldProd  - goldConsumption,
         stone: stoneProd - stoneConsumption,
+        wood:  woodProd  - woodConsumption,
       },
     };
   }

@@ -37,6 +37,7 @@ export class HUD {
   private elFoodRate  = document.getElementById('res-food-rate');
   private elGoldRate  = document.getElementById('res-gold-rate');
   private elStoneRate = document.getElementById('res-stone-rate');
+  private elWoodRate  = document.getElementById('res-wood-rate');
   private elStatus  = document.getElementById('game-status')!;
   private elWeather = document.getElementById('weather-badge');
   private elCivBadge = document.getElementById('civ-badge')!;
@@ -152,6 +153,7 @@ export class HUD {
       this.setRateEl(this.elFoodRate,  econStats.netProduction.food);
       this.setRateEl(this.elGoldRate,  econStats.netProduction.gold);
       this.setRateEl(this.elStoneRate, econStats.netProduction.stone);
+      this.setRateEl(this.elWoodRate,  econStats.netProduction.wood ?? 0);
     }
 
     // Low resource warnings — pulse the resource chip red

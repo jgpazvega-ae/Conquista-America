@@ -121,6 +121,7 @@ export class Game {
   private _warDrumTimer               = 90.0; // countdown to next settlement war drum pulse
   private _sortiedBuildings           = new Set<number>(); // building ids that already triggered a garrison sortie
   private _emergencyConscriptionFired = false; // one-time free militia spawn when human drops to < 3 units
+  private _navalBattleNotified = false; // throttle naval battle notification (1/min)
   villageIncomeEvents: { playerId: number; food: number; gold: number }[] = [];
 
   constructor(humanCiv: CivilizationType = CivilizationType.AZTEC) {
@@ -773,6 +774,21 @@ export class Game {
         // Army rout tracking: count friendly deaths in the 30s window
         if (evt.target.playerId === this.humanPlayerId) this._recentHumanDeaths++;
       }
+    }
+
+    // Naval battle notification: first time a naval unit fight is detected this minute
+    const navalTypes = Game.NAVAL_UNIT_TYPES;
+    for (const evt of this.damageEvents) {
+      if (!evt.attacker || !navalTypes.has(evt.attacker.type) || !navalTypes.has(evt.target.type)) continue;
+      // Only notify human player if involved or observing
+      const humanInvolved = evt.attacker.playerId === this.humanPlayerId || evt.target.playerId === this.humanPlayerId;
+      if (!humanInvolved) break;
+      if (!this._navalBattleNotified) {
+        this._navalBattleNotified = true;
+        setTimeout(() => { this._navalBattleNotified = false; }, 60000);
+        this.pendingEventMessages.push('⚓ ¡Batalla naval! Tus barcos entran en combate');
+      }
+      break;
     }
 
     // Morale shock: allies near a fallen comrade lose morale (hero deaths hit harder)
