@@ -421,6 +421,16 @@
         </div>
       </div>
 
+      <!-- Village alliance prompt -->
+      <div id="village-alliance-prompt" class="hidden" style="position:fixed;bottom:140px;right:20px;z-index:700;background:rgba(20,18,14,0.96);border:1px solid rgba(150,220,100,0.5);border-radius:10px;padding:12px 18px;min-width:240px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.7);">
+        <div style="font-size:13px;color:#aaffaa;margin-bottom:6px;">🏡 Aldea Neutral</div>
+        <div style="font-size:11px;color:#ccc;margin-bottom:10px;">Esta aldea puede convertirse en tu aliada.<br>Pagarás 80⚜️ y recibirás un guerrero cada 90s.</div>
+        <div style="display:flex;gap:10px;justify-content:center;">
+          <button id="village-alliance-accept" style="padding:6px 14px;border-radius:6px;border:none;background:rgba(60,160,60,0.8);color:#fff;font-size:12px;cursor:pointer;">🤝 Aliarse (80⚜️)</button>
+          <button id="village-alliance-reject" style="padding:6px 14px;border-radius:6px;border:none;background:rgba(80,80,80,0.6);color:#ccc;font-size:12px;cursor:pointer;">✕ Ignorar</button>
+        </div>
+      </div>
+
       <!-- AI diplomacy proposal popup -->
       <div id="ai-diplo-proposal" class="hidden" style="position:fixed;bottom:140px;left:50%;transform:translateX(-50%);z-index:700;background:rgba(20,18,14,0.96);border:1px solid rgba(255,200,80,0.5);border-radius:10px;padding:12px 18px;min-width:260px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.7);">
         <div style="font-size:13px;color:#ffd77a;margin-bottom:6px;">🕊️ Propuesta de Tregua</div>
