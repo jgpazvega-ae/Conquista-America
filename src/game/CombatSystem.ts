@@ -162,6 +162,9 @@ export class CombatSystem {
           }
           // Close ranks: formation fighters shield each other
           if (target.inFormation) dmg = Math.max(1, dmg - 2);
+          // Shield wall: 3+ PHALANX allies shoulder-to-shoulder deflect ranged volleys (−40%)
+          const isRangedAttack = unit.attackRange > 1.5 && unit.type !== UnitType.CANNON;
+          if (target.shieldWall && isRangedAttack) dmg = Math.max(1, Math.round(dmg * 0.60));
           // Fire vulnerability: burning targets take +10% damage (heat and smoke weaken defense)
           if (target.burning > 0) dmg = Math.round(dmg * 1.10);
           // Supply depot: troops near a friendly Storehouse have better equipment (+2 defense)
