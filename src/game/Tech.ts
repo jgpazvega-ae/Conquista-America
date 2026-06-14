@@ -166,6 +166,8 @@ export class PlayerTechs {
     return this.researchProgress / this.researchTime;
   }
 
+  get completedCount(): number { return this.researched.size; }
+
   getResearchingTech(): TechType | null {
     return this.researching;
   }
