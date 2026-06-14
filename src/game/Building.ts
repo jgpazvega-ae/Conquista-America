@@ -48,6 +48,25 @@ export class Building {
   finishedUnit: UnitType | null = null;
   readonly MAX_QUEUE = 5;
 
+  // Worker training (Settlement only): separate from unit queue
+  workerTrainTimer = 0;   // elapsed seconds; 0 = idle
+  workerTrainTotal = 0;   // total seconds for current worker
+  workerFinished   = false; // set to true when worker is ready to spawn
+
+  trainWorker(totalTime: number): boolean {
+    if (!this.isComplete()) return false;
+    if (this.workerTrainTimer > 0 && this.workerTrainTimer < this.workerTrainTotal) return false; // already training
+    this.workerTrainTotal = totalTime;
+    this.workerTrainTimer = 0.001; // tiny non-zero to mark started
+    this.workerFinished   = false;
+    return true;
+  }
+
+  get workerProductionProgress(): number {
+    if (this.workerTrainTotal <= 0) return 0;
+    return Math.min(1, this.workerTrainTimer / this.workerTrainTotal);
+  }
+
   // Attack capability (watchtower)
   attackTimer: number = 0;
 
@@ -533,6 +552,14 @@ export class Building {
   }
 
   updateProduction(dt: number) {
+    // Tick worker training if active
+    if (this.workerTrainTimer > 0 && !this.workerFinished) {
+      this.workerTrainTimer += dt;
+      if (this.workerTrainTimer >= this.workerTrainTotal) {
+        this.workerFinished = true;
+      }
+    }
+
     if (this._prodQueue.length === 0) return;
     const item = this._prodQueue[0];
     // Veteran garrison training bonus: a garrisoned level-2+ unit trains recruits 20% faster

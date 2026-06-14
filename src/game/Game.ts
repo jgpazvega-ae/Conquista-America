@@ -269,8 +269,8 @@ export class Game {
       settlement.progressBar.visible = false;
       this.allBuildings.push(settlement);
 
-      for (let w = 0; w < 3; w++) {
-        const pos = this.findSpawnPos(baseCol + w - 1, baseRow + 2);
+      for (let w = 0; w < 5; w++) {
+        const pos = this.findSpawnPos(baseCol + (w % 3) - 1, baseRow + 2 + Math.floor(w / 3));
         if (pos) {
           const worker = new Worker(idx, pos[0], pos[1], color);
           this.allWorkers.push(worker);
@@ -323,6 +323,21 @@ export class Game {
         }
         const amount = 200 + Math.floor(Math.random() * 200);
         this.resourceNodes.push(new ResourceNode(type, c, r, amount));
+      }
+    }
+
+    // Fishing grounds: dense FOOD nodes on beach tiles adjacent to water (fishing economy)
+    for (let r = 3; r < this.map.rows - 3; r += 6) {
+      for (let c = 3; c < this.map.cols - 3; c += 6) {
+        const tile = this.map.getTile(c, r);
+        if (!tile || tile.terrain !== TerrainType.BEACH) continue;
+        // Only spawn a fishing ground if adjacent to water
+        const neighbors = this.map.getNeighborCoords(c, r);
+        const hasWater = neighbors.some(([nc, nr]) => this.map.getTile(nc, nr)?.terrain === TerrainType.WATER);
+        if (!hasWater) continue;
+        if (Math.random() < 0.5) continue; // sparse placement
+        const amount = 300 + Math.floor(Math.random() * 200);
+        this.resourceNodes.push(new ResourceNode(ResourceType.FOOD, c, r, amount));
       }
     }
   }
@@ -622,6 +637,38 @@ export class Game {
         if (building.finishedUnit !== null) {
           this.spawnProducedUnit(building);
         }
+        // Spawn workers trained from Settlement
+        if (building.type === BuildingType.SETTLEMENT && building.workerFinished) {
+          building.workerFinished   = false;
+          building.workerTrainTimer = 0;
+          building.workerTrainTotal = 0;
+          const wpos = this.map.findWalkableNear(building.col, building.row + 2, 5);
+          if (wpos) {
+            const wp = this.players[building.playerId];
+            if (wp) {
+              const wColor = CIV_COLORS[wp.civType];
+              const newWorker = new Worker(building.playerId, wpos[0], wpos[1], wColor);
+              this.allWorkers.push(newWorker);
+              if (building.playerId === this.humanPlayerId) {
+                this.pendingEventMessages.push('👷 ¡Nuevo trabajador listo!');
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Post-combat healing aura: idle/moving units near own Settlement or Barracks regen HP
+    for (const unit of this.allUnits) {
+      if (!unit.isAlive() || unit.garrisonedIn !== null) continue;
+      if (unit.state === UnitState.ATTACKING || unit.state === UnitState.ATTACK_MOVE) continue;
+      const nearBase = this.allBuildings.some(b =>
+        b.playerId === unit.playerId && b.isAlive() && b.isComplete() &&
+        (b.type === BuildingType.SETTLEMENT || b.type === BuildingType.BARRACKS) &&
+        Math.hypot(b.col - unit.col, b.row - unit.row) <= 5,
+      );
+      if (nearBase && unit.hp < unit.maxHp) {
+        unit.hp = Math.min(unit.maxHp, unit.hp + 2.5 * dt);
       }
     }
 

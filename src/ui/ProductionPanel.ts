@@ -52,6 +52,7 @@ export class ProductionPanel {
   onUpgrade: ((key: keyof PlayerUpgrades) => void)             | null = null;
   onResearchTech: ((tech: TechType) => void)                   | null = null;
   onMarketTrade: ((resource: string, sellAmt: number, goldGain: number) => void) | null = null;
+  onTrainWorker: (() => void)                                  | null = null;
   onCancel:  (() => void)                                      | null = null;
   onCancelProduction: (() => void)                             | null = null;
   onDemolish: (() => void)                                     | null = null;
@@ -241,13 +242,35 @@ export class ProductionPanel {
       listEl.appendChild(msg);
     }
 
-    // Settlement: show hint about elite units if no Barracks content
-    if (isSettlement || isBarracks) {
+    // Settlement: worker training button + elite hint
+    if (isSettlement) {
+      const WORKER_COST = { food: 80, gold: 30 };
+      const workerTraining = b.workerTrainTimer > 0 && !b.workerFinished;
+      const workerProgress = b.workerProductionProgress;
+      const canAffordWorker = p.resources.food >= WORKER_COST.food && p.resources.gold >= WORKER_COST.gold;
+      const workerBtn = document.createElement('button');
+      workerBtn.className = 'prod-unit-btn' + (workerTraining ? ' active' : canAffordWorker ? '' : ' disabled');
+      workerBtn.title = 'Entrena un nuevo Trabajador para recolectar recursos — 80🌽 30⚜️ (18s)';
+      workerBtn.innerHTML = `
+        <span class="prod-unit-icon">👷</span>
+        <div class="prod-unit-info">
+          <div class="prod-unit-name">Trabajador${workerTraining ? ` — ${Math.round(workerProgress * 100)}%` : ''}</div>
+          <div class="prod-unit-cost">${workerTraining ? '⏳ Entrenando…' : '🌽80 ⚜️30 · 18s'}</div>
+        </div>
+      `;
+      if (!workerTraining && canAffordWorker) {
+        workerBtn.addEventListener('click', () => { this.onTrainWorker?.(); this.render(); });
+      }
+      listEl.appendChild(workerBtn);
+
+      const hint = document.createElement('div');
+      hint.style.cssText = 'color:#f5a623;font-size:10px;padding:4px 8px 2px;border-top:1px solid rgba(255,166,35,0.2);text-align:center;';
+      hint.textContent = '⚔️ Unidades de élite requieren Cuartel';
+      listEl.appendChild(hint);
+    } else if (isBarracks) {
       const hint = document.createElement('div');
       hint.style.cssText = 'color:#f5a623;font-size:10px;padding:6px 8px 2px;border-top:1px solid rgba(255,166,35,0.2);text-align:center;';
-      hint.textContent = isSettlement
-        ? '⚔️ Unidades de élite requieren Cuartel (Barracks)'
-        : '🏛️ Unidades básicas se entrenan en el Asentamiento';
+      hint.textContent = '🏛️ Unidades básicas se entrenan en el Asentamiento';
       listEl.appendChild(hint);
     }
   }

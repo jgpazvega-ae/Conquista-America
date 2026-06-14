@@ -488,6 +488,21 @@ class GameInstance {
           this.hud.notify('🏪 Recursos insuficientes para el intercambio', 'warning');
         }
       };
+
+      this.prodPanel.onTrainWorker = () => {
+        const WORKER_COST = { food: 80, gold: 30 };
+        const player = this.game.humanPlayer;
+        if (player.resources.food < WORKER_COST.food || player.resources.gold < WORKER_COST.gold) {
+          this.hud.notify('👷 Recursos insuficientes para entrenar trabajador', 'warning');
+          return;
+        }
+        if (building.trainWorker(18)) {
+          player.resources.food -= WORKER_COST.food;
+          player.resources.gold -= WORKER_COST.gold;
+          this.audio.playBuild();
+          this.prodPanel.refresh();
+        }
+      };
     };
 
     this.input.onTerrainHover = (col, row) => {
