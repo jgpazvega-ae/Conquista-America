@@ -130,6 +130,8 @@ export class Game {
   private _aiDiploCheckTimer = 60;
   private _playerEraCache   = new Map<number, 1 | 2 | 3>(); // tracks prior era per player for advancement detection
   eraAdvanceEvents: { playerId: number; era: 2 | 3 }[] = []; // consumed by main.ts each frame
+  allianceVillages = new Set<number>();  // building IDs of neutral villages allied by human player
+  private _allianceRewardTimer = 90;    // countdown to next warrior from allied villages
 
   constructor(
     humanCiv: CivilizationType = CivilizationType.AZTEC,
@@ -1498,6 +1500,30 @@ export class Game {
       }
     }
 
+    // Alliance village warrior rewards (every 90s, each allied neutral village sends a warrior)
+    if (this.allianceVillages.size > 0) {
+      this._allianceRewardTimer -= dt;
+      if (this._allianceRewardTimer <= 0) {
+        this._allianceRewardTimer = 90;
+        const human = this.humanPlayer;
+        const popCap = this.getPopCap(this.humanPlayerId);
+        for (const villageId of this.allianceVillages) {
+          const village = this.allBuildings.find(b => b.id === villageId);
+          if (!village || !village.isAlive()) { this.allianceVillages.delete(villageId); continue; }
+          if (village.playerId >= 0) { this.allianceVillages.delete(villageId); continue; }
+          if (human.aliveUnits.length >= popCap) break;
+          const pos = this.map.findWalkableNear(village.col, village.row, 4);
+          if (!pos) continue;
+          const unit = new Unit(UnitType.SPEARMAN, human.civType, human.id, pos[0], pos[1], CIV_COLORS[human.civType]);
+          this.applyCivTraits(unit, human.civType);
+          human.addUnit(unit);
+          this.allUnits.push(unit);
+          this.newlySpawnedUnits.push(unit);
+          this.pendingEventMessages.push('🏡 ¡Refuerzo aliado! La aldea aliada te envía un guerrero');
+        }
+      }
+    }
+
     // Auto-brace: spear units auto-switch to PHALANX when enemy cavalry closes within 6 tiles
     this._autobraceTimer -= dt;
     if (this._autobraceTimer <= 0) {
@@ -2294,6 +2320,29 @@ export class Game {
       this.diplomacy.setRelation(this.humanPlayerId, p.fromId, AllianceType.NEUTRAL);
       this.diplomacy.setRelation(p.fromId, this.humanPlayerId, AllianceType.NEUTRAL);
     }
+  }
+
+  /** Burn own building to deny enemy capture (scorched earth). Deals 80% damage. Returns false if not owned or not applicable. */
+  scorchedEarth(buildingId: number, playerId: number): boolean {
+    const b = this.allBuildings.find(b => b.id === buildingId);
+    if (!b || b.playerId !== playerId || b.type === BuildingType.SETTLEMENT) return false;
+    if (!b.isAlive() || !b.isComplete()) return false;
+    const burnDmg = Math.floor(b.maxHp * 0.80);
+    b.takeDamage(burnDmg);
+    if (!b.isAlive()) this.newlyDestroyedBuildings.push(b);
+    return true;
+  }
+
+  /** Pay 80 gold to ally with a neutral village (building). Returns false if already allied or can't afford. */
+  allyWithVillage(buildingId: number): boolean {
+    const building = this.allBuildings.find(b => b.id === buildingId);
+    if (!building || building.type !== BuildingType.VILLAGE || building.playerId >= 0) return false;
+    if (this.allianceVillages.has(buildingId)) return false;
+    const human = this.humanPlayer;
+    if (human.resources.gold < 80) return false;
+    human.resources.gold -= 80;
+    this.allianceVillages.add(buildingId);
+    return true;
   }
 
   /** Check whether two players are currently allies (for combat targeting). */

@@ -355,6 +355,17 @@ class GameInstance {
     this.input.onBuildingClick = (buildingId) => {
       const building = this.game.getBuildingById(buildingId);
       if (!building || !building.isComplete()) return;
+
+      // Neutral village: offer alliance
+      if (building.type === BuildingType.VILLAGE && building.playerId < 0) {
+        if (this.game.allianceVillages.has(building.id)) {
+          this.hud.notify('🤝 Ya tienes alianza con esta aldea — recibirás guerreros cada 90s', 'info');
+        } else {
+          this._showVillageAlliancePrompt(building.id);
+        }
+        return;
+      }
+
       if (building.playerId !== this.game.humanPlayerId) return;
       this._cancelPlacing();
       this._panelBuilding = building;
@@ -456,6 +467,17 @@ class GameInstance {
         this.hud.notify(`🔥 Edificio demolido — recuperados ${refFood}🌽 ${refGold}⚜️`, 'warning');
         this.audio.playBuild();
       };
+      this.prodPanel.onScorchedEarth = () => {
+        const b = this._panelBuilding;
+        if (!b) return;
+        const ok = this.game.scorchedEarth(b.id, this.game.humanPlayerId);
+        if (ok) {
+          this.hud.notify('🔥 Tierra quemada — edificio gravemente dañado para negar al enemigo', 'warning');
+          this.prodPanel.hide();
+          this._panelBuilding = null;
+        }
+      };
+
       this.prodPanel.onHireMercenary = () => {
         const b = this._panelBuilding;
         if (!b) return;
@@ -558,6 +580,7 @@ class GameInstance {
 
     this.bindHUDButtons();
     this._bindAIDiploButtons();
+    this._bindVillageAllianceButtons();
     this.bindMobileButtons();
     this.bindKeyboardShortcuts();
 
@@ -1706,6 +1729,36 @@ class GameInstance {
       (overlay as HTMLElement).style.background = 'rgba(0,0,0,0)';
       setTimeout(() => overlay.classList.add('hidden'), 400);
     }, 4000);
+  }
+
+  private _villageAllianceTargetId = -1;
+
+  private _showVillageAlliancePrompt(buildingId: number) {
+    this._villageAllianceTargetId = buildingId;
+    const el = document.getElementById('village-alliance-prompt');
+    const canAfford = this.game.humanPlayer.resources.gold >= 80;
+    const btn = document.getElementById('village-alliance-accept') as HTMLButtonElement | null;
+    if (btn) {
+      btn.textContent = canAfford ? '🤝 Aliarse (80⚜️)' : `Sin oro (80⚜️ necesario)`;
+      btn.disabled = !canAfford;
+    }
+    el?.classList.remove('hidden');
+  }
+
+  private _bindVillageAllianceButtons() {
+    document.getElementById('village-alliance-accept')?.addEventListener('click', () => {
+      const ok = this.game.allyWithVillage(this._villageAllianceTargetId);
+      if (ok) {
+        this.hud.notify('🤝 ¡Alianza! La aldea enviará un guerrero cada 90s', 'success');
+        this.hintOnce('villageAlliance', '💡 Aldeas aliadas envían guerreros cada 90s mientras no sean capturadas.');
+      } else {
+        this.hud.notify('🤝 Sin oro suficiente (necesitas 80⚜️)', 'warning');
+      }
+      document.getElementById('village-alliance-prompt')?.classList.add('hidden');
+    });
+    document.getElementById('village-alliance-reject')?.addEventListener('click', () => {
+      document.getElementById('village-alliance-prompt')?.classList.add('hidden');
+    });
   }
 
   private _aiDiploShown = false;

@@ -73,8 +73,9 @@ export class ProductionPanel {
   onTrainWorker: (() => void)                                  | null = null;
   onCancel:  (() => void)                                      | null = null;
   onCancelProduction: (() => void)                             | null = null;
-  onDemolish: (() => void)                                     | null = null;
-  onHireMercenary: (() => void)                                | null = null;
+  onDemolish:       (() => void)                                | null = null;
+  onScorchedEarth:  (() => void)                                | null = null;
+  onHireMercenary:  (() => void)                                | null = null;
 
   constructor() {
     this.el = document.getElementById('production-panel')!;
@@ -175,8 +176,13 @@ export class ProductionPanel {
       const def = BUILDING_DEFS[b.type];
       const refoodPct = Math.floor(def.cost.food * 0.25);
       const refgoldPct = Math.floor(def.cost.gold * 0.25);
-      demolishEl.innerHTML = `<button id="prod-demolish-btn" style="width:100%;padding:5px 8px;background:rgba(180,30,30,0.35);border:1px solid rgba(200,60,60,0.5);border-radius:5px;color:#ffaaaa;cursor:pointer;font-size:11px;" title="Destruye el edificio al instante — recupera el 25% de los materiales (${refoodPct}🌽 ${refgoldPct}⚜️). Útil para tierra quemada.">🔥 Demolir (+${refoodPct}🌽 +${refgoldPct}⚜️)</button>`;
+      demolishEl.innerHTML = `
+        <div style="display:flex;gap:4px;">
+          <button id="prod-demolish-btn" style="flex:1;padding:5px 8px;background:rgba(180,30,30,0.35);border:1px solid rgba(200,60,60,0.5);border-radius:5px;color:#ffaaaa;cursor:pointer;font-size:11px;" title="Destruye el edificio al instante — recupera el 25% de los materiales (${refoodPct}🌽 ${refgoldPct}⚜️).">🔥 Demolir (+${refoodPct}🌽 +${refgoldPct}⚜️)</button>
+          <button id="prod-scorch-btn" style="padding:5px 7px;background:rgba(140,60,0,0.4);border:1px solid rgba(200,120,40,0.5);border-radius:5px;color:#ffcc88;cursor:pointer;font-size:11px;" title="Tierra quemada — daña el edificio gravemente (80% HP) sin destruirlo. Útil para negar al enemigo antes de retirarse.">🔥 Quemar</button>
+        </div>`;
       document.getElementById('prod-demolish-btn')?.addEventListener('click', () => this.onDemolish?.());
+      document.getElementById('prod-scorch-btn')?.addEventListener('click',   () => this.onScorchedEarth?.());
     } else {
       demolishEl.innerHTML = '';
     }
