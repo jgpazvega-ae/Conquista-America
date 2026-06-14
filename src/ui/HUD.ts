@@ -73,6 +73,12 @@ export class HUD {
   onGroupStop:    (() => void) | null = null;
   onGroupHold:    (() => void) | null = null;
   onGroupRetreat: (() => void) | null = null;
+  onUnitHold:      (() => void) | null = null;
+  onUnitEntrench:  (() => void) | null = null;
+  onUnitVolley:    (() => void) | null = null;
+  onUnitWarCry:    (() => void) | null = null;
+  onUnitHeroPower: (() => void) | null = null;
+  onFormation:     ((type: string | null) => void) | null = null;
   private _combatPings:    { col: number; row: number; ts: number }[] = [];
   private _lastSeenUnits:  Map<number, { col: number; row: number }> = new Map();
   private _killFeedEl      = document.getElementById('kill-feed');
@@ -107,6 +113,23 @@ export class HUD {
     document.getElementById('grp-stop')?.addEventListener('click',    () => this.onGroupStop?.());
     document.getElementById('grp-hold')?.addEventListener('click',    () => this.onGroupHold?.());
     document.getElementById('grp-retreat')?.addEventListener('click', () => this.onGroupRetreat?.());
+
+    // Unit action bar buttons
+    document.getElementById('act-hold')?.addEventListener('click',      () => this.onUnitHold?.());
+    document.getElementById('act-entrench')?.addEventListener('click',  () => this.onUnitEntrench?.());
+    document.getElementById('act-volley')?.addEventListener('click',    () => this.onUnitVolley?.());
+    document.getElementById('act-warcry')?.addEventListener('click',    () => this.onUnitWarCry?.());
+    document.getElementById('act-heropower')?.addEventListener('click', () => this.onUnitHeroPower?.());
+    // Formation buttons — single unit panel
+    document.getElementById('form-loose')?.addEventListener('click',   () => this.onFormation?.('LOOSE'));
+    document.getElementById('form-phalanx')?.addEventListener('click', () => this.onFormation?.('PHALANX'));
+    document.getElementById('form-wedge')?.addEventListener('click',   () => this.onFormation?.('WEDGE'));
+    document.getElementById('form-free')?.addEventListener('click',    () => this.onFormation?.(null));
+    // Formation buttons — group action bar
+    document.getElementById('grp-form-loose')?.addEventListener('click',   () => this.onFormation?.('LOOSE'));
+    document.getElementById('grp-form-phalanx')?.addEventListener('click', () => this.onFormation?.('PHALANX'));
+    document.getElementById('grp-form-wedge')?.addEventListener('click',   () => this.onFormation?.('WEDGE'));
+    document.getElementById('grp-form-free')?.addEventListener('click',    () => this.onFormation?.(null));
 
     this.minimapCanvas.addEventListener('click', (e) => {
       if (!this.minimapBuilt) return;
@@ -254,9 +277,21 @@ export class HUD {
       this.elStatus.textContent = alive > 0 ? `⚔️ Enemigos: ${alive}` : '';
     }
 
-    // Group action bar
+    // Group action bar (2+ units)
     const groupBar = document.getElementById('group-action-bar');
     groupBar?.classList.toggle('hidden', selectedUnits.length <= 1);
+
+    // Sync formation active state in group bar based on most common formation
+    if (selectedUnits.length > 1) {
+      const ownSel = selectedUnits.filter(u => u.playerId === this.game.humanPlayerId);
+      const formCounts: Record<string, number> = { LOOSE: 0, PHALANX: 0, WEDGE: 0, none: 0 };
+      for (const u of ownSel) formCounts[u.formation ?? 'none']++;
+      const top = (Object.entries(formCounts).sort((a, b) => b[1] - a[1])[0]?.[0]) ?? 'none';
+      document.getElementById('grp-form-loose')?.classList.toggle('active',   top === 'LOOSE');
+      document.getElementById('grp-form-phalanx')?.classList.toggle('active', top === 'PHALANX');
+      document.getElementById('grp-form-wedge')?.classList.toggle('active',   top === 'WEDGE');
+      document.getElementById('grp-form-free')?.classList.toggle('active',    top === 'none');
+    }
 
     // Unit panel
     if (selectedUnits.length === 1) {
@@ -675,6 +710,81 @@ export class HUD {
         xpEl.innerHTML = `<span class="xp-label" style="color:#ff9933">★★ Campeón</span>` + killsLabel;
         xpEl.classList.remove('hidden');
       }
+    }
+
+    // Action bar: context-sensitive buttons for own units
+    const actionBar    = document.getElementById('unit-action-bar');
+    const actHold      = document.getElementById('act-hold')      as HTMLButtonElement | null;
+    const actEntrench  = document.getElementById('act-entrench')  as HTMLButtonElement | null;
+    const actVolley    = document.getElementById('act-volley')    as HTMLButtonElement | null;
+    const actWarcry    = document.getElementById('act-warcry')    as HTMLButtonElement | null;
+    const actHeropower = document.getElementById('act-heropower') as HTMLButtonElement | null;
+    const isOwn = unit.playerId === this.game.humanPlayerId;
+    const isHeroOwn = isOwn && unit.isHero;
+
+    if (actionBar && actHold && actEntrench && actVolley && actWarcry && actHeropower) {
+      // Hold / defend
+      if (isOwn) {
+        actHold.classList.remove('hidden');
+        actHold.classList.toggle('active', unit.state === UnitState.HOLD || unit.entrenched);
+        actHold.textContent = (unit.state === UnitState.HOLD || unit.entrenched) ? '🛡️ En Pos.' : '🛡️ Defender';
+      } else {
+        actHold.classList.add('hidden');
+      }
+      // Entrench
+      if (isOwn) {
+        actEntrench.classList.remove('hidden');
+        actEntrench.classList.toggle('active', unit.entrenched);
+        actEntrench.textContent = unit.entrenched ? '🏕️ En Fortín' : '🏕️ Fortín';
+      } else {
+        actEntrench.classList.add('hidden');
+      }
+      // Volley (ranged only)
+      if (isOwn && unit.ammo >= 0) {
+        actVolley.classList.remove('hidden');
+        const noTarget = !unit.attackTarget?.isAlive();
+        actVolley.classList.toggle('cooldown', unit.outOfAmmo || noTarget);
+        actVolley.textContent = unit.outOfAmmo ? `🔫 Sin ammo` : `🔫 Descarga (${unit.ammo})`;
+        actVolley.title = noTarget ? 'Selecciona un objetivo primero' : 'Descarga sincronizada ×2.5 daño (V)';
+      } else {
+        actVolley.classList.add('hidden');
+      }
+      // War cry (hero only)
+      if (isHeroOwn) {
+        actWarcry.classList.remove('hidden');
+        const wcd = unit.warCryCooldown;
+        actWarcry.classList.toggle('cooldown', wcd > 0);
+        actWarcry.textContent = wcd > 0 ? `📯 ${Math.ceil(wcd)}s` : '📯 Grito';
+      } else {
+        actWarcry.classList.add('hidden');
+      }
+      // Hero power (hero only)
+      if (isHeroOwn) {
+        actHeropower.classList.remove('hidden');
+        const hcd = unit.heroCooldown2;
+        actHeropower.classList.toggle('cooldown', hcd > 0);
+        actHeropower.textContent = hcd > 0 ? `🦅 ${Math.ceil(hcd)}s` : '🦅 Poder';
+      } else {
+        actHeropower.classList.add('hidden');
+      }
+      // Formation quick-keys inside action bar
+      const fLoose   = document.getElementById('form-loose');
+      const fPhalanx = document.getElementById('form-phalanx');
+      const fWedge   = document.getElementById('form-wedge');
+      const fFree    = document.getElementById('form-free');
+      if (fLoose && fPhalanx && fWedge && fFree) {
+        if (isOwn) {
+          [fLoose, fPhalanx, fWedge, fFree].forEach(b => b.classList.remove('hidden'));
+          fLoose.classList.toggle('active',   unit.formation === 'LOOSE');
+          fPhalanx.classList.toggle('active', unit.formation === 'PHALANX');
+          fWedge.classList.toggle('active',   unit.formation === 'WEDGE');
+          fFree.classList.toggle('active',    !unit.formation);
+        } else {
+          [fLoose, fPhalanx, fWedge, fFree].forEach(b => b.classList.add('hidden'));
+        }
+      }
+      // Show bar if player owns this unit
+      actionBar.classList.toggle('hidden', !isOwn);
     }
   }
 
