@@ -31,6 +31,7 @@ const UPGRADE_DEFS: UpgradeDef[] = [
 const BUILDABLE: BuildingType[] = [
   BuildingType.HOUSE,
   BuildingType.BARRACKS,
+  BuildingType.SETTLEMENT,
   BuildingType.HARBOR,
   BuildingType.MARKET,
   BuildingType.WATCHTOWER,
@@ -479,14 +480,29 @@ export class ProductionPanel {
       const canAfford = canResearch && !researching &&
                         p.resources.gold >= goldCost && p.resources.food >= foodCost;
 
+      // Check if blocked by unmet prerequisites (different from just can't afford)
+      const prereqsMet = !def.requires || def.requires.every(r => p.techs.isResearched(r));
+      const isLocked = !done && !prereqsMet;
+
+      // Build prerequisite label for locked techs
+      let prereqLabel = '';
+      if (isLocked && def.requires) {
+        const missing = def.requires.filter(r => !p.techs.isResearched(r));
+        prereqLabel = missing.map(r => TECH_DEFS[r].name).join(', ');
+      }
+
       const btn = document.createElement('button');
-      btn.className = 'prod-unit-btn' + (done ? ' done' : researching ? ' active' : canAfford ? '' : ' disabled');
-      btn.title = def.description + '\n' + def.effects.join(', ');
+      btn.className = 'prod-unit-btn' + (done ? ' done' : researching ? ' active' : isLocked ? ' disabled' : canAfford ? '' : ' disabled');
+      btn.title = isLocked
+        ? `🔒 Requiere: ${prereqLabel}\n${def.description}`
+        : def.description + '\n' + def.effects.join(', ');
       btn.innerHTML = `
-        <span class="prod-unit-icon">${done ? '✅' : researching ? '⏳' : '🔬'}</span>
+        <span class="prod-unit-icon">${done ? '✅' : researching ? '⏳' : isLocked ? '🔒' : '🔬'}</span>
         <div class="prod-unit-info">
-          <div class="prod-unit-name">${def.name}${done ? ' — Listo' : researching ? ' — Investigando…' : ''}</div>
-          <div class="prod-unit-cost">${done || researching ? def.effects.join(', ') : `🌽${foodCost} ⚜️${goldCost}`}</div>
+          <div class="prod-unit-name">${def.name}${done ? ' — Listo' : researching ? ' — Investigando…' : isLocked ? ' — Bloqueado' : ''}</div>
+          <div class="prod-unit-cost" style="${isLocked ? 'color:#f5a623;' : ''}">
+            ${done || researching ? def.effects.join(', ') : isLocked ? `🔒 Requiere: ${prereqLabel}` : `🌽${foodCost} ⚜️${goldCost}`}
+          </div>
         </div>
       `;
       if (canAfford && !researchingTech) {

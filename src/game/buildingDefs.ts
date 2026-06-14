@@ -14,13 +14,13 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
   },
   [BuildingType.SETTLEMENT]: {
     type: BuildingType.SETTLEMENT,
-    name: 'Asentamiento',
+    name: 'Nuevo Asentamiento',
     emoji: '🏘️',
-    cost: { food: 100, gold: 50, stone: 75 },
-    buildTime: 15,
+    cost: { food: 250, gold: 200, stone: 300 },
+    buildTime: 30,
     maxHp: 200,
     buildRadius: 4,
-    description: 'Centro urbano. Produce trabajadores y proporciona control territorial.',
+    description: 'Funda un nuevo asentamiento lejos de tu base. Permite expandir tu territorio y entrenar trabajadores allí.',
   },
   [BuildingType.BARRACKS]: {
     type: BuildingType.BARRACKS,
