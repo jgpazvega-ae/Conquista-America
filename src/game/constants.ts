@@ -79,10 +79,10 @@ export const WONDER_EMOJIS: Record<string, string> = {
 };
 
 export const STARTING_RESOURCES = {
-  food:  400,
-  gold:  200,
-  stone: 250,
-  wood:  150,
+  food:  700,
+  gold:  350,
+  stone: 350,
+  wood:  250,
 };
 
 export const CAMERA_PAN_SPEED = 24;

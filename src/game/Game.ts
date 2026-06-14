@@ -1045,7 +1045,7 @@ export class Game {
         }
         if (!this._popPressureNotified) {
           this._popPressureNotified = true;
-          this.pendingEventMessages.push(`👥 ¡Tropas abarrotadas! ${count}/${cap} unidades — construye un Almacén para ampliar el límite`);
+          this.pendingEventMessages.push(`👥 ¡Tropas abarrotadas! ${count}/${cap} — construye Casas 🏠 (+12 cada una) o Almacenes para ampliar el límite`);
         }
       } else if (ratio < 0.8) {
         this._popPressureNotified = false;
@@ -2005,13 +2005,16 @@ export class Game {
   }
 
   getPopCap(playerId: number): number {
+    const houses = this.allBuildings.filter(
+      b => b.playerId === playerId && b.type === BuildingType.HOUSE && b.isComplete(),
+    ).length;
     const storehouses = this.allBuildings.filter(
       b => b.playerId === playerId && b.type === BuildingType.STOREHOUSE && b.isComplete(),
     ).length;
     const villages = this.allBuildings.filter(
       b => b.playerId === playerId && b.type === BuildingType.VILLAGE && b.isAlive(),
     ).length;
-    return 25 + storehouses * 5 + villages * 5;
+    return 20 + houses * 12 + storehouses * 5 + villages * 5;
   }
 
   applyUpgrade(upgrade: keyof import('./Player').PlayerUpgrades, playerId: number): boolean {

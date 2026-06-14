@@ -66,6 +66,7 @@ export class Building {
       case BuildingType.VILLAGE:    return 2;
       case BuildingType.BARRACKS:   return 3;
       case BuildingType.HARBOR:     return 2;
+      case BuildingType.HOUSE:      return 2; // shelter — up to 2 units can hide inside
       case BuildingType.WALL:       return 4; // archers on the wall
       default:                      return 0;
     }
@@ -126,6 +127,8 @@ export class Building {
 
     if (this.type === BuildingType.VILLAGE) {
       this.buildVillage();
+    } else if (this.type === BuildingType.HOUSE) {
+      this.buildHouse(stone, stone2, trim);
     } else if (this.type === BuildingType.HARBOR) {
       this.buildHarbor(stone, stone2, trim);
     } else if (this.type === BuildingType.MARKET) {
@@ -391,6 +394,26 @@ export class Building {
       this.structure.add(box);
     }
     this.addTypeMarker(trim, 0.82);
+  }
+
+  // ── House / Dwelling ─────────────────────────────────────────────────────────
+  private buildHouse(stone: THREE.Material, stone2: THREE.Material, trim: THREE.Material) {
+    // Small square base
+    this.box(stone, 1.0, 0.5, 0.9, 0, 0.25, 0);
+    // Door opening
+    const dark = this.mat(0x1a0e06, 1);
+    this.box(dark, 0.2, 0.3, 0.06, 0, 0.15, 0.48, false);
+    // Thatched roof (pyramid)
+    const roofMat = this.mat(THATCH, 0.95);
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(0.75, 0.55, 4), roofMat);
+    roof.rotation.y = Math.PI / 4;
+    roof.position.set(0, 0.78, 0);
+    roof.castShadow = true;
+    this.structure.add(roof);
+    // Small chimney
+    this.box(stone2, 0.12, 0.25, 0.12, 0.3, 0.95, 0.1);
+    // Civ-color stripe on door frame
+    this.box(trim, 0.28, 0.36, 0.05, 0, 0.18, 0.49, false);
   }
 
   // ── Wall / Palisade ───────────────────────────────────────────────────────────

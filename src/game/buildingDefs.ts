@@ -2,6 +2,16 @@ import { BuildingType } from './buildings';
 import type { BuildingDef } from './buildings';
 
 export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
+  [BuildingType.HOUSE]: {
+    type: BuildingType.HOUSE,
+    name: 'Casa / Cabaña',
+    emoji: '🏠',
+    cost: { food: 40, gold: 15, stone: 30 },
+    buildTime: 7,
+    maxHp: 80,
+    buildRadius: 2,
+    description: 'Vivienda para tus súbditos. Cada casa aumenta el límite de población en +12 unidades.',
+  },
   [BuildingType.SETTLEMENT]: {
     type: BuildingType.SETTLEMENT,
     name: 'Asentamiento',

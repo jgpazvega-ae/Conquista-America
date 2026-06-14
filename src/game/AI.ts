@@ -586,14 +586,17 @@ export class AISystem {
     const ownedBuildings = game.allBuildings.filter(b => b.playerId === player.id);
     const countOf = (t: BuildingType) => ownedBuildings.filter(b => b.type === t).length;
 
-    // Population pressure: raise the storehouse target as the AI fills its cap so its
-    // army keeps growing late-game (more storehouses = higher pop cap)
+    // Population pressure: raise the house/storehouse target as the AI fills its cap
     const popRatio = player.aliveUnits.length / Math.max(1, game.getPopCap(player.id));
+    const houseTarget      = popRatio >= 0.80 ? 6 : popRatio >= 0.60 ? 4 : 2;
     const storehouseTarget = popRatio >= 0.85 ? 5 : popRatio >= 0.65 ? 3 : 2;
 
-    // Expanding under pop pressure takes top priority — without it the AI stalls
+    // Pop pressure: build houses first (cheap, fast) before storehouses
     let buildType: BuildingType | null = null;
-    if (popRatio >= 0.85 && countOf(BuildingType.STOREHOUSE) < storehouseTarget) {
+    if (popRatio >= 0.75 && countOf(BuildingType.HOUSE) < houseTarget) {
+      buildType = BuildingType.HOUSE;
+    }
+    if (!buildType && popRatio >= 0.85 && countOf(BuildingType.STOREHOUSE) < storehouseTarget) {
       buildType = BuildingType.STOREHOUSE;
     }
 
@@ -601,14 +604,16 @@ export class AISystem {
     if (!buildType) {
       for (const desired of strategy.buildOrder) {
         if (desired === BuildingType.SETTLEMENT || desired === BuildingType.WONDER || desired === BuildingType.VILLAGE) continue;
-        const cap = desired === BuildingType.STOREHOUSE ? storehouseTarget
-                 : desired === BuildingType.WATCHTOWER  ? Math.max(1, countOf(BuildingType.BARRACKS))
+        const cap = desired === BuildingType.HOUSE       ? houseTarget
+                 : desired === BuildingType.STOREHOUSE   ? storehouseTarget
+                 : desired === BuildingType.WATCHTOWER   ? Math.max(1, countOf(BuildingType.BARRACKS))
                  : 1; // one of each other type
         if (countOf(desired) < cap) { buildType = desired; break; }
       }
     }
-    // Fallback: always ensure at least 1 barracks and enough storehouses
-    if (!buildType && countOf(BuildingType.BARRACKS) === 0)  buildType = BuildingType.BARRACKS;
+    // Fallback: ensure at least 2 houses, 1 barracks, enough storehouses
+    if (!buildType && countOf(BuildingType.HOUSE) < 2)        buildType = BuildingType.HOUSE;
+    if (!buildType && countOf(BuildingType.BARRACKS) === 0)   buildType = BuildingType.BARRACKS;
     if (!buildType && countOf(BuildingType.STOREHOUSE) < storehouseTarget) buildType = BuildingType.STOREHOUSE;
     // Late-game wonder rush: once all other buildings are in place and resources are ample, build a wonder
     if (!buildType && countOf(BuildingType.WONDER) === 0 && game.gameTime > 300) {

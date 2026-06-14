@@ -8,26 +8,26 @@ export interface TrainCost {
 }
 
 export const TRAIN_COSTS: Partial<Record<UnitType, TrainCost>> = {
-  // Aztec
-  [UnitType.EAGLE_WARRIOR]: { food: 60,  gold: 20 },
-  [UnitType.JAGUAR_KNIGHT]: { food: 90,  gold: 40 },
-  [UnitType.ATLATL]:        { food: 50,  gold: 30 },
-  [UnitType.CUACHIC]:       { food: 120, gold: 60 },
+  // Aztec — reduced ~20% to encourage mass armies like American Conquest
+  [UnitType.EAGLE_WARRIOR]: { food: 45,  gold: 15 },
+  [UnitType.JAGUAR_KNIGHT]: { food: 70,  gold: 30 },
+  [UnitType.ATLATL]:        { food: 40,  gold: 22 },
+  [UnitType.CUACHIC]:       { food: 95,  gold: 50 },
   // Inca
-  [UnitType.QUECHUA]:       { food: 60,  gold: 15 },
-  [UnitType.SLINGER]:       { food: 45,  gold: 25 },
-  [UnitType.CHAKANA_GUARD]: { food: 100, gold: 45 },
-  [UnitType.ANTIS_WARRIOR]: { food: 55,  gold: 30 },
+  [UnitType.QUECHUA]:       { food: 45,  gold: 12 },
+  [UnitType.SLINGER]:       { food: 35,  gold: 18 },
+  [UnitType.CHAKANA_GUARD]: { food: 80,  gold: 35 },
+  [UnitType.ANTIS_WARRIOR]: { food: 42,  gold: 22 },
   // Maya
-  [UnitType.SPEARMAN]:      { food: 55,  gold: 15 },
-  [UnitType.ARCHER]:        { food: 50,  gold: 25 },
-  [UnitType.AHAU_WARRIOR]:  { food: 90,  gold: 40 },
-  [UnitType.BALAM_JAGUAR]:  { food: 75,  gold: 35 },
+  [UnitType.SPEARMAN]:      { food: 42,  gold: 12 },
+  [UnitType.ARCHER]:        { food: 38,  gold: 20 },
+  [UnitType.AHAU_WARRIOR]:  { food: 70,  gold: 30 },
+  [UnitType.BALAM_JAGUAR]:  { food: 58,  gold: 28 },
   // Conquistador
-  [UnitType.SOLDIER]:       { food: 70,  gold: 30 },
-  [UnitType.ARQUEBUSIER]:   { food: 60,  gold: 45 },
-  [UnitType.CAVALRY]:       { food: 80,  gold: 60 },
-  [UnitType.CANNON]:        { food: 50,  gold: 80, stone: 40 },
+  [UnitType.SOLDIER]:       { food: 55,  gold: 22 },
+  [UnitType.ARQUEBUSIER]:   { food: 48,  gold: 35 },
+  [UnitType.CAVALRY]:       { food: 65,  gold: 48 },
+  [UnitType.CANNON]:        { food: 40,  gold: 65, stone: 30 },
   // Naval — nativas
   [UnitType.CANOE]:         { food: 40,  gold: 20, wood: 60 },
   [UnitType.WAR_CANOE]:     { food: 60,  gold: 40, wood: 90 },
