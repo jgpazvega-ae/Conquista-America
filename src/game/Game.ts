@@ -2236,6 +2236,36 @@ export class Game {
     return 'rejected';
   }
 
+  /**
+   * Demand tribute from a target player.
+   * AI accepts if sufficiently weak; refused proposals may trigger a declaration of war.
+   * Returns 'accepted' | 'rejected'.
+   */
+  demandTribute(fromPlayerId: number, toPlayerId: number, goldAmt: number): 'accepted' | 'rejected' {
+    if (fromPlayerId === toPlayerId) return 'rejected';
+    const from   = this.players[fromPlayerId];
+    const target = this.players[toPlayerId];
+    if (!from || !target || target.isDefeated()) return 'rejected';
+
+    const avgUnits = this.players.reduce((s, p) => s + p.aliveUnits.length, 0) / this.players.length || 1;
+    const targetStrength = target.aliveUnits.length / avgUnits;
+
+    const bribeRatio = goldAmt / 100;
+    const acceptChance = targetStrength < 0.5 ? (0.55 + bribeRatio * 0.1) : (0.15 + bribeRatio * 0.05);
+    if (Math.random() < acceptChance) {
+      const actual = Math.min(goldAmt, target.resources.gold);
+      target.resources.gold = Math.max(0, target.resources.gold - actual);
+      from.resources.gold   = Math.min(2000, from.resources.gold + actual);
+      return 'accepted';
+    }
+    // Rejection can trigger war declaration
+    if (Math.random() < 0.6) {
+      this.diplomacy.setRelation(fromPlayerId, toPlayerId, AllianceType.ENEMY);
+      this.diplomacy.setRelation(toPlayerId, fromPlayerId, AllianceType.ENEMY);
+    }
+    return 'rejected';
+  }
+
   /** Accept or reject a pending AI diplomacy proposal from the human side. */
   respondToAIDiplomacy(accepted: boolean) {
     const p = this.pendingAIDiploProposal;

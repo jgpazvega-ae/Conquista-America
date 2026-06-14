@@ -365,6 +365,7 @@ class GameInstance {
         const wz = building.row * TILE_SIZE;
         this.renderer.showRangeRing(wx, wz, 5.5 * TILE_SIZE, 0xff4444);
       }
+      this.prodPanel.playerEra = this.game.getEra(this.game.humanPlayerId);
       this.prodPanel.show(building, this.game.humanPlayer);
       this.prodPanel.onTrain = (unitType) => {
         const cost = TRAIN_COSTS[unitType];
@@ -1423,6 +1424,7 @@ class GameInstance {
     }
 
     this.hud.update(selectedNow);
+    this.prodPanel.playerEra = this.game.getEra(this.game.humanPlayerId);
     this.renderer.render();
 
     // End game detection
@@ -1604,6 +1606,10 @@ class GameInstance {
         if (nameEl) nameEl.textContent = `${civDef.emoji} ${civDef.name}`;
         document.getElementById('diplo-result')!.textContent = '';
         document.getElementById('diplo-proposal-section')?.classList.remove('hidden');
+        const tributeNameEl = document.getElementById('diplo-tribute-target-name');
+        if (tributeNameEl) tributeNameEl.textContent = `${civDef.emoji} ${civDef.name}`;
+        document.getElementById('diplo-tribute-result')!.textContent = '';
+        document.getElementById('diplo-tribute-section')?.classList.remove('hidden');
       });
       list.appendChild(row);
     }
@@ -1628,6 +1634,22 @@ class GameInstance {
     document.getElementById('diplo-propose-neutral')?.addEventListener('click', () => propose(AllianceType.NEUTRAL));
     document.getElementById('diplo-propose-ally')?.addEventListener('click',    () => propose(AllianceType.ALLY));
     document.getElementById('diplo-propose-war')?.addEventListener('click',     () => propose(AllianceType.ENEMY));
+
+    document.getElementById('diplo-tribute-demand')?.addEventListener('click', () => {
+      const amt = parseInt((document.getElementById('diplo-tribute-amount') as HTMLInputElement)?.value ?? '100', 10) || 100;
+      const result = this.game.demandTribute(this.game.humanPlayerId, this._diploTargetId, amt);
+      const resEl = document.getElementById('diplo-tribute-result')!;
+      if (result === 'accepted') {
+        resEl.style.color = '#ffdd55';
+        resEl.textContent = `✅ ¡Tributo de ${amt}⚜️ entregado!`;
+        this.hud.notify(`💰 Tributo aceptado: +${amt}⚜️ oro`, 'success');
+        this.refreshDiplomacyPanel();
+      } else {
+        resEl.style.color = '#ff9999';
+        resEl.textContent = '❌ ¡Se niegan! Esto podría desencadenar guerra';
+        this.hud.notify('💢 ¡Exigencia rechazada! Pueden declarar la guerra', 'warning');
+      }
+    });
   }
 
   private _aiDiploShown = false;
@@ -2171,6 +2193,7 @@ class GameInstance {
         );
         if (settlement) {
           this._panelBuilding = settlement;
+          this.prodPanel.playerEra = this.game.getEra(this.game.humanPlayerId);
           this.prodPanel.show(settlement, this.game.humanPlayer);
         }
         return;

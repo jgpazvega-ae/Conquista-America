@@ -43,11 +43,26 @@ const BUILDABLE: BuildingType[] = [
   BuildingType.WONDER,
 ];
 
+/** Minimum era required to train certain units (1 = always available). */
+const UNIT_MIN_ERA: Partial<Record<UnitType, 2 | 3>> = {
+  [UnitType.JAGUAR_KNIGHT]: 2,
+  [UnitType.CUACHIC]:       3,
+  [UnitType.CHAKANA_GUARD]: 2,
+  [UnitType.ANTIS_WARRIOR]: 2,
+  [UnitType.AHAU_WARRIOR]:  2,
+  [UnitType.BALAM_JAGUAR]:  3,
+  [UnitType.ARQUEBUSIER]:   2,
+  [UnitType.CAVALRY]:       2,
+  [UnitType.CANNON]:        3,
+};
+
 export class ProductionPanel {
   private el:       HTMLElement;
   private building: Building | null = null;
   private player:   Player   | null = null;
   private tab:      'train' | 'build' | 'upgrade' | 'tech' = 'train';
+  /** Updated from main.ts each time the panel is shown. */
+  playerEra: 1 | 2 | 3 = 1;
 
   onTrain:   ((unitType: UnitType) => void)                    | null = null;
   onBuild:   ((type: BuildingType) => void)                    | null = null;
@@ -220,24 +235,32 @@ export class ProductionPanel {
         && (p.resources.stone ?? 0) >= (cost.stone ?? 0)
         && (p.resources.wood  ?? 0) >= (cost.wood  ?? 0);
 
+      const minEra  = UNIT_MIN_ERA[ut] ?? 1;
+      const eraLocked = this.playerEra < minEra;
+      const ERA_NAMES: Record<number, string> = { 1: 'Era I', 2: 'Era II', 3: 'Era III' };
+
       const isAutoTraining = b.autoTrainUnit === ut;
       const row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:stretch;gap:3px;margin:2px 0;';
 
       const btn = document.createElement('button');
-      btn.className = 'prod-unit-btn' + (canAfford ? '' : ' disabled');
+      btn.className = 'prod-unit-btn' + (eraLocked ? ' disabled' : canAfford ? '' : ' disabled');
       btn.style.cssText = 'flex:1;';
-      btn.title = `${unitDef.description}\n[Shift+clic = encolar ×5]`;
+      btn.title = eraLocked
+        ? `🏺 Requiere ${ERA_NAMES[minEra]} — investiga ${minEra === 2 ? 'Trabajo en Bronce' : 'Trabajo en Hierro'} para desbloquear`
+        : `${unitDef.description}\n[Shift+clic = encolar ×5]`;
       btn.innerHTML = `
         <span class="prod-unit-icon">${unitDef.emoji}</span>
         <div class="prod-unit-info">
-          <div class="prod-unit-name">${unitDef.name}</div>
+          <div class="prod-unit-name">${unitDef.name}${eraLocked ? ` <span style="color:#ffcc44;font-size:9px">🏺${ERA_NAMES[minEra]}</span>` : ''}</div>
           <div class="prod-unit-cost">
-            🌽${cost.food} ⚜️${cost.gold}${cost.stone ? ` 🪨${cost.stone}` : ''}${cost.wood ? ` 🪵${cost.wood}` : ''}
+            ${eraLocked
+              ? `<span style="color:#ffcc44">🔒 ${ERA_NAMES[minEra]} requerida</span>`
+              : `🌽${cost.food} ⚜️${cost.gold}${cost.stone ? ` 🪨${cost.stone}` : ''}${cost.wood ? ` 🪵${cost.wood}` : ''}`}
           </div>
         </div>
       `;
-      if (canAfford && b.productionQueue.length < b.MAX_QUEUE) {
+      if (!eraLocked && canAfford && b.productionQueue.length < b.MAX_QUEUE) {
         btn.addEventListener('click', (e) => {
           const count = (e as MouseEvent).shiftKey ? 5 : 1;
           for (let i = 0; i < count; i++) this.onTrain?.(ut);
