@@ -10,7 +10,7 @@ import { CombatSystem } from './CombatSystem';
 import { AISystem } from './AI';
 import { ResourceSystem } from './ResourceSystem';
 import { EconomyManager } from './EconomyManager';
-import { DiplomacyManager } from './Diplomacy';
+import { DiplomacyManager, AllianceType, type DiplomacyProposal } from './Diplomacy';
 import { FogOfWarManager } from './FogOfWar';
 import { ObjectiveSystem } from './Objectives';
 import { updateCivPowers } from './CivPowers';
@@ -1335,17 +1335,22 @@ export class Game {
       this._villageIncomeTimer = 30;
       const incomeByPlayer = new Map<number, { food: number; gold: number }>();
       for (const b of this.allBuildings) {
-        if (b.type !== BuildingType.VILLAGE || b.playerId < 0 || !b.isAlive()) continue;
+        if (b.playerId < 0 || !b.isAlive() || !b.isComplete()) continue;
         const curr = incomeByPlayer.get(b.playerId) ?? { food: 0, gold: 0 };
-        curr.food += 10; curr.gold += 6;
-        // MAYA trade network: adjacent friendly villages earn +2 bonus gold (trade routes)
-        const owner = this.players[b.playerId];
-        if (owner?.civType === CivilizationType.MAYA) {
-          const hasNeighbour = this.allBuildings.some(
-            v => v !== b && v.type === BuildingType.VILLAGE && v.playerId === b.playerId &&
-                 v.isAlive() && Math.hypot(v.col - b.col, v.row - b.row) <= 10,
-          );
-          if (hasNeighbour) curr.gold += 2;
+        if (b.type === BuildingType.VILLAGE) {
+          curr.food += 10; curr.gold += 6;
+          // MAYA trade network: adjacent friendly villages earn +2 bonus gold
+          const owner = this.players[b.playerId];
+          if (owner?.civType === CivilizationType.MAYA) {
+            const hasNeighbour = this.allBuildings.some(
+              v => v !== b && v.type === BuildingType.VILLAGE && v.playerId === b.playerId &&
+                   v.isAlive() && Math.hypot(v.col - b.col, v.row - b.row) <= 10,
+            );
+            if (hasNeighbour) curr.gold += 2;
+          }
+        } else if (b.type === BuildingType.MARKET) {
+          // Market generates passive gold income every 30s
+          curr.gold += 5;
         }
         incomeByPlayer.set(b.playerId, curr);
       }
@@ -1508,13 +1513,23 @@ export class Game {
     }
   }
 
+  private static readonly NAVAL_UNIT_TYPES = new Set<UnitType>([
+    UnitType.CANOE, UnitType.WAR_CANOE,
+    UnitType.BRIGANTINE, UnitType.GALLEON,
+  ]);
+
   private spawnProducedUnit(building: Building) {
     const unitType = building.finishedUnit!;
     building.finishedUnit = null;
     const player = this.players[building.playerId];
     if (!player) return;
     if (player.aliveUnits.length >= this.getPopCap(player.id)) return; // pop cap
-    const pos = this.map.findWalkableNear(building.col, building.row + 3, 6);
+
+    // Naval units spawn in adjacent water tiles
+    const isNaval = Game.NAVAL_UNIT_TYPES.has(unitType);
+    const pos = isNaval
+      ? this.map.findNavalNear(building.col, building.row, 8)
+      : this.map.findWalkableNear(building.col, building.row + 3, 6);
     if (!pos) return;
     const unit = new Unit(unitType, player.civType, player.id, pos[0], pos[1], CIV_COLORS[player.civType]);
     // Apply civ traits and player upgrades to new unit
@@ -2049,6 +2064,60 @@ export class Game {
     player.resources.gold -= goldCost;
     player.resources.food -= foodCost;
     player.techs.startResearch(techType);
+    return true;
+  }
+
+  /** Get current diplomatic relations for a player. */
+  getDiplomacyRelations(playerId: number): { targetId: number; relation: AllianceType; civType: string; name: string }[] {
+    return this.diplomacy.getAllRelations(playerId, this.players.length).map(r => {
+      const p = this.players[r.targetId];
+      return { ...r, civType: p?.civType ?? '', name: p?.civType ?? '' };
+    });
+  }
+
+  /**
+   * Propose a diplomatic change. Returns 'accepted' | 'rejected' | 'self'.
+   * Deducts the gold bribe from the proposing player on acceptance.
+   */
+  proposeDiplomacy(fromPlayerId: number, toPlayerId: number, relation: AllianceType, goldBribe: number): 'accepted' | 'rejected' | 'self' {
+    if (fromPlayerId === toPlayerId) return 'self';
+    const proposer = this.players[fromPlayerId];
+    const target   = this.players[toPlayerId];
+    if (!proposer || !target) return 'rejected';
+    if ((proposer.resources.gold ?? 0) < goldBribe) return 'rejected';
+
+    const proposal: DiplomacyProposal = { fromPlayerId, toPlayerId, proposedRelation: relation, goldBribe };
+
+    // Strength = target's alive units / average alive units across all players
+    const avgUnits = this.players.reduce((s, p) => s + p.aliveUnits.length, 0) / this.players.length || 1;
+    const aiStrength = target.aliveUnits.length / avgUnits;
+
+    const accepted = this.diplomacy.evaluateAIAcceptance(proposal, aiStrength, target.resources.gold);
+    if (accepted) {
+      proposer.resources.gold = Math.max(0, proposer.resources.gold - goldBribe);
+      this.diplomacy.setRelation(fromPlayerId, toPlayerId, relation);
+      // Ally relation is mutual — war can be declared unilaterally though
+      if (relation === AllianceType.ALLY || relation === AllianceType.NEUTRAL) {
+        this.diplomacy.setRelation(toPlayerId, fromPlayerId, relation);
+      }
+      return 'accepted';
+    }
+    return 'rejected';
+  }
+
+  /** Check whether two players are currently allies (for combat targeting). */
+  areAllies(a: number, b: number): boolean {
+    return this.diplomacy.isAlly(a, b);
+  }
+
+  /** Execute a market trade: sell resource for gold. Returns false if player can't afford. */
+  executeMarketTrade(playerId: number, resource: string, sellAmt: number, goldGain: number): boolean {
+    const player = this.players[playerId];
+    if (!player) return false;
+    const res = player.resources as any;
+    if ((res[resource] ?? 0) < sellAmt) return false;
+    res[resource] = (res[resource] ?? 0) - sellAmt;
+    player.resources.gold = Math.min(2000, player.resources.gold + goldGain);
     return true;
   }
 

@@ -644,7 +644,13 @@ export class AISystem {
         buildRow = Math.round(settlement.row + (dy / d) * 8);
       }
     }
-    const pos = game.map.findWalkableNear(buildCol, buildRow, 5);
+    // Harbor needs to be near water
+    let pos: [number, number] | null;
+    if (buildType === BuildingType.HARBOR) {
+      pos = game.map.findCoastalNear(settlement.col, settlement.row, 12);
+    } else {
+      pos = game.map.findWalkableNear(buildCol, buildRow, 5);
+    }
     if (!pos) return;
 
     const building = new Building(buildType, def, player.id, pos[0], pos[1], CIV_COLORS[player.civType], player.civType);

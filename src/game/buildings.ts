@@ -1,12 +1,15 @@
 export enum BuildingType {
   SETTLEMENT = 'SETTLEMENT',      // Centro urbano (produce trabajadores)
   BARRACKS = 'BARRACKS',          // Cuartel (produce guerreros)
-  TEMPLE = 'TEMPLE',              // Templo (investigación, poder especial)
+  TEMPLE = 'TEMPLE',              // Templo (produce chamanes/misioneros, investigación)
   WATCHTOWER = 'WATCHTOWER',      // Torre de vigilancia (defensa)
   STOREHOUSE = 'STOREHOUSE',      // Almacén (bonus recursos)
   FORGE = 'FORGE',                // Herrería (mejora armamentos)
   WONDER = 'WONDER',              // Maravilla (victoria por supervivencia)
   VILLAGE = 'VILLAGE',            // Aldea neutral — capturar para ingresos pasivos
+  HARBOR = 'HARBOR',              // Puerto — produce unidades navales (requiere agua adyacente)
+  MARKET = 'MARKET',              // Mercado — comercio de recursos por oro
+  WALL = 'WALL',                  // Muralla — barrera defensiva de alta resistencia
 }
 
 export interface BuildingDef {

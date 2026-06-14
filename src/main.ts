@@ -25,6 +25,8 @@ import { WorkerTask } from './game/Worker';
 import type { Difficulty } from './ui/CivSelect';
 import { TECH_DEFS } from './game/Tech';
 import { activateCivPower, CIV_POWER_DEFS } from './game/CivPowers';
+import { AllianceType } from './game/Diplomacy';
+import { CIVILIZATIONS } from './game/civilizations';
 
 // ── Kill gold rewards ──────────────────────────────────────────────────────────
 function killGoldReward(type: UnitType, isHero: boolean): number {
@@ -473,6 +475,17 @@ class GameInstance {
           this.hud.notify(`🔬 Investigando: ${def?.name ?? tech}`, 'info');
         } else {
           this.hud.notify('⚜️ Sin recursos suficientes o ya investigado', 'warning');
+        }
+      };
+
+      this.prodPanel.onMarketTrade = (resource, sellAmt, goldGain) => {
+        const ok = this.game.executeMarketTrade(this.game.humanPlayerId, resource, sellAmt, goldGain);
+        if (ok) {
+          this.prodPanel.refresh();
+          const emoji = resource === 'food' ? '🌽' : resource === 'wood' ? '🪵' : '🪨';
+          this.hud.notify(`🏪 Intercambio: -${sellAmt}${emoji} +${goldGain}⚜️`, 'info');
+        } else {
+          this.hud.notify('🏪 Recursos insuficientes para el intercambio', 'warning');
         }
       };
     };
@@ -1500,6 +1513,20 @@ class GameInstance {
       this.settings.show();
     });
 
+    // Diplomacy panel
+    const diploPanel = document.getElementById('diplomacy-panel');
+    document.getElementById('diplomacy-btn')?.addEventListener('click', () => {
+      if (diploPanel?.classList.contains('hidden')) {
+        this.refreshDiplomacyPanel();
+        diploPanel?.classList.remove('hidden');
+      } else {
+        diploPanel?.classList.add('hidden');
+      }
+    });
+    document.getElementById('diplo-close')?.addEventListener('click', () => {
+      diploPanel?.classList.add('hidden');
+    });
+
     this.settings.onLogout = () => {
       this.settings.hide();
       this.destroy();
@@ -1515,6 +1542,58 @@ class GameInstance {
     overlay?.addEventListener('click', (e) => {
       if (e.target === overlay) overlay.classList.add('hidden');
     });
+  }
+
+  private _diploTargetId: number = -1;
+
+  private refreshDiplomacyPanel() {
+    const list = document.getElementById('diplo-relations-list')!;
+    list.innerHTML = '';
+    const relations = this.game.getDiplomacyRelations(this.game.humanPlayerId);
+
+    for (const r of relations) {
+      const player = this.game.players[r.targetId];
+      if (!player) continue;
+      const civDef = CIVILIZATIONS[player.civType];
+      const row = document.createElement('div');
+      row.className = 'diplo-relation-row';
+      const badge = r.relation === 'ALLY' ? 'ally' : r.relation === 'NEUTRAL' ? 'neutral' : 'enemy';
+      const badgeLabel = r.relation === 'ALLY' ? '🤝 Aliado' : r.relation === 'NEUTRAL' ? '☮️ Paz' : '⚔️ Enemigo';
+      row.innerHTML = `
+        <span class="diplo-civ-emoji">${civDef.emoji}</span>
+        <span class="diplo-civ-name">${civDef.name}</span>
+        <span class="diplo-status-badge ${badge}">${badgeLabel}</span>
+      `;
+      row.addEventListener('click', () => {
+        this._diploTargetId = r.targetId;
+        const nameEl = document.getElementById('diplo-target-name');
+        if (nameEl) nameEl.textContent = `${civDef.emoji} ${civDef.name}`;
+        document.getElementById('diplo-result')!.textContent = '';
+        document.getElementById('diplo-proposal-section')?.classList.remove('hidden');
+      });
+      list.appendChild(row);
+    }
+
+    // Proposal buttons
+    const propose = (relation: AllianceType) => {
+      const bribe = parseInt((document.getElementById('diplo-bribe') as HTMLInputElement)?.value ?? '0', 10) || 0;
+      const result = this.game.proposeDiplomacy(this.game.humanPlayerId, this._diploTargetId, relation, bribe);
+      const resultEl = document.getElementById('diplo-result')!;
+      if (result === 'accepted') {
+        resultEl.style.color = '#88ffaa';
+        resultEl.textContent = '✅ ¡Propuesta aceptada!';
+        this.hud.notify('🤝 Propuesta diplomática aceptada', 'info');
+        this.refreshDiplomacyPanel();
+      } else if (result === 'rejected') {
+        resultEl.style.color = '#ff9999';
+        resultEl.textContent = '❌ Propuesta rechazada';
+        this.hud.notify('❌ Propuesta rechazada por el rival', 'warning');
+      }
+    };
+
+    document.getElementById('diplo-propose-neutral')?.addEventListener('click', () => propose(AllianceType.NEUTRAL));
+    document.getElementById('diplo-propose-ally')?.addEventListener('click',    () => propose(AllianceType.ALLY));
+    document.getElementById('diplo-propose-war')?.addEventListener('click',     () => propose(AllianceType.ENEMY));
   }
 
   private bindMobileButtons() {
@@ -1981,6 +2060,17 @@ class GameInstance {
         this._gameSpeed = Math.max(0.5, parseFloat((this._gameSpeed - 0.5).toFixed(1)));
         this.hud.notify(`⏪ Velocidad ${this._gameSpeed}x`, 'info');
         this.updateSpeedIndicator();
+        return;
+      }
+      // D: toggle diplomacy panel
+      if (e.code === 'KeyD' && !e.ctrlKey && !e.altKey) {
+        const diploPanel = document.getElementById('diplomacy-panel');
+        if (diploPanel?.classList.contains('hidden')) {
+          this.refreshDiplomacyPanel();
+          diploPanel?.classList.remove('hidden');
+        } else {
+          diploPanel?.classList.add('hidden');
+        }
         return;
       }
       // B: open build panel for human settlement

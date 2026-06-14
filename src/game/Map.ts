@@ -270,6 +270,25 @@ export class GameMap {
     return tile.terrain === 'WATER';
   }
 
+  /** Find a walkable land tile that is adjacent to at least one water tile (coastal). */
+  findCoastalNear(col: number, row: number, radius = 12): [number, number] | null {
+    for (let r = 1; r <= radius; r++) {
+      for (let dc = -r; dc <= r; dc++) {
+        for (let dr = -r; dr <= r; dr++) {
+          if (Math.abs(dc) !== r && Math.abs(dr) !== r) continue;
+          const nc = col + dc, nr = row + dr;
+          if (!this.isWalkable(nc, nr)) continue;
+          // Check if any neighbor is water
+          const neighbors = this.getNeighborCoords(nc, nr);
+          if (neighbors.some(([nnc, nnr]) => this.getTile(nnc, nnr)?.terrain === 'WATER')) {
+            return [nc, nr];
+          }
+        }
+      }
+    }
+    return null;
+  }
+
   findNavalNear(col: number, row: number, radius = 10): [number, number] | null {
     if (this.isNavalWalkable(col, row)) return [col, row];
     for (let r = 1; r <= radius; r++) {

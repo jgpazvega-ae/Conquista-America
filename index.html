@@ -236,6 +236,7 @@
             <span id="power-label">Listo</span>
             <div id="power-cooldown-fill"></div>
           </button>
+          <button id="diplomacy-btn" class="hud-icon-btn" title="Diplomacia (D)">🤝</button>
           <button id="settings-btn" class="hud-icon-btn" title="Configuración">⚙️</button>
         </div>
         <div id="game-status"></div>
@@ -330,7 +331,7 @@
       <!-- Controls hint -->
       <div id="controls-hint">
         📱 <b>Móvil:</b> Toca · Doble toque para mover/atacar · Pellizca zoom &nbsp;|&nbsp;
-        🖥️ <b>PC:</b> Clic izq. seleccionar · Doble-clic = mismo tipo · Arrastra selección · Clic der. mover/atacar · WASD cámara · <b>Q</b> trabajadores · <b>R</b> retirada · <b>E</b> poder civ · <b>H</b> posición defensa · <b>I</b> unidad inactiva · <b>Tab</b> héroe · <b>G</b> fuego concentrado · <b>C</b> reagrupar en héroe · <b>U</b> desalojar guarnición · <b>Ctrl+clic der.</b> capturar edificio · <b>+/-</b> velocidad · <b>P</b> pausar · <b>F</b> centrar · <b>Ctrl+A</b> todo · <b>A</b> attack-move · <b>B</b> construir · <b>?</b> ayuda
+        🖥️ <b>PC:</b> Clic izq. seleccionar · Doble-clic = mismo tipo · Arrastra selección · Clic der. mover/atacar · WASD cámara · <b>Q</b> trabajadores · <b>R</b> retirada · <b>E</b> poder civ · <b>H</b> posición defensa · <b>I</b> unidad inactiva · <b>Tab</b> héroe · <b>G</b> fuego concentrado · <b>C</b> reagrupar en héroe · <b>U</b> desalojar guarnición · <b>Ctrl+clic der.</b> capturar edificio · <b>+/-</b> velocidad · <b>P</b> pausar · <b>F</b> centrar · <b>Ctrl+A</b> todo · <b>A</b> attack-move · <b>B</b> construir · <b>D</b> diplomacia · <b>?</b> ayuda
       </div>
 
       <!-- Selection box overlay -->
@@ -381,6 +382,27 @@
             <div id="prod-tech-progress" class="prod-progress-bar" style="background:#4e9aff;"></div>
           </div>
           <div id="prod-tech-list" class="prod-unit-list"></div>
+        </div>
+      </div>
+
+      <!-- Diplomacy panel -->
+      <div id="diplomacy-panel" class="hidden">
+        <div class="prod-header">
+          <span id="diplo-title">🤝 Diplomacia</span>
+          <button id="diplo-close" class="prod-close-btn">✕</button>
+        </div>
+        <div id="diplo-relations-list"></div>
+        <div id="diplo-proposal-section" class="hidden" style="padding:8px;border-top:1px solid rgba(255,255,255,0.1);">
+          <div style="color:#ffd77a;font-size:11px;margin-bottom:6px;">Proponer a: <span id="diplo-target-name"></span></div>
+          <div style="font-size:11px;color:#ccc;margin-bottom:6px;">Soborno (oro):</div>
+          <input id="diplo-bribe" type="number" min="0" max="999" value="50"
+            style="width:70px;padding:4px;border-radius:4px;border:1px solid rgba(255,200,80,0.4);background:rgba(0,0,0,0.4);color:#fff;font-size:12px;" />
+          <div style="display:flex;gap:6px;margin-top:8px;">
+            <button id="diplo-propose-neutral" class="diplo-btn" style="background:rgba(100,140,80,0.4);">☮️ Paz</button>
+            <button id="diplo-propose-ally"    class="diplo-btn" style="background:rgba(60,100,180,0.4);">🤝 Alianza</button>
+            <button id="diplo-propose-war"     class="diplo-btn" style="background:rgba(180,40,40,0.4);">⚔️ Guerra</button>
+          </div>
+          <div id="diplo-result" style="margin-top:8px;font-size:11px;min-height:16px;"></div>
         </div>
       </div>
 
