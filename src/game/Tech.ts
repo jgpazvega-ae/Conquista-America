@@ -24,6 +24,7 @@ export interface TechDef {
   costGold: number; // research time in seconds
   effects: string[];
   availableTo?: CivilizationType[];
+  requires?: TechType[];
 }
 
 export const TECH_DEFS: Record<TechType, TechDef> = {
@@ -58,10 +59,11 @@ export const TECH_DEFS: Record<TechType, TechDef> = {
   [TechType.IRON_WORKING]: {
     type: TechType.IRON_WORKING,
     name: 'Trabajo del Hierro',
-    description: 'Aumenta ataque y defensa en +25% (requiere Bronce)',
+    description: 'Aumenta ataque y defensa en +25%',
     costGold: 250,
     effects: ['unit_attack +25%', 'unit_defense +25%'],
     availableTo: [CivilizationType.CONQUISTADOR, CivilizationType.MAYA],
+    requires: [TechType.BRONZE_WORKING],
   },
   [TechType.CAVALRY_TRAINING]: {
     type: TechType.CAVALRY_TRAINING,
@@ -76,6 +78,7 @@ export const TECH_DEFS: Record<TechType, TechDef> = {
     description: 'Mejora rango y daño de unidades de rango lejano +20%',
     costGold: 300,
     effects: ['ranged_damage +20%', 'ranged_range +15%'],
+    requires: [TechType.IRON_WORKING],
   },
   [TechType.AZTEC_JAGUAR_ELITE]: {
     type: TechType.AZTEC_JAGUAR_ELITE,
@@ -84,6 +87,7 @@ export const TECH_DEFS: Record<TechType, TechDef> = {
     costGold: 250,
     effects: ['jaguar_elite'],
     availableTo: [CivilizationType.AZTEC],
+    requires: [TechType.BRONZE_WORKING],
   },
   [TechType.INCA_ROAD_SYSTEM]: {
     type: TechType.INCA_ROAD_SYSTEM,
@@ -108,6 +112,7 @@ export const TECH_DEFS: Record<TechType, TechDef> = {
     costGold: 350,
     effects: ['gunpowder_elite'],
     availableTo: [CivilizationType.CONQUISTADOR],
+    requires: [TechType.IRON_WORKING],
   },
 };
 
@@ -125,6 +130,11 @@ export class PlayerTechs {
     if (this.researched.has(tech)) return false;
     const def = TECH_DEFS[tech];
     if (def.availableTo && !def.availableTo.includes(civ)) return false;
+    if (def.requires) {
+      for (const req of def.requires) {
+        if (!this.researched.has(req)) return false;
+      }
+    }
     return true;
   }
 
