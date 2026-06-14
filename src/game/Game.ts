@@ -22,6 +22,7 @@ import { BUILDING_DEFS } from './buildingDefs';
 import { WeatherSystem } from './WeatherSystem';
 import type { WeatherState } from './WeatherSystem';
 import { TechType, TECH_DEFS } from './Tech';
+import { TRAIN_COSTS } from './unitProduction';
 
 // Positions aligned to the real-geography map:
 // Mexico (top-center), Yucatan (top-right), Peru/Andes (mid-left), Caribbean (mid-right)
@@ -633,6 +634,24 @@ export class Game {
         // Garrison-assisted repair: each garrisoned unit heals building at 3 HP/s
         if (building.garrison.length > 0 && building.hp < building.maxHp) {
           building.repairBy(building.garrison.length * 3 * dt);
+        }
+        // Auto-train: continuously refill queue with the selected unit type
+        if (building.autoTrainUnit && building.productionQueue.length < building.MAX_QUEUE) {
+          const autoPlayer = this.players[building.playerId];
+          const autoCost   = TRAIN_COSTS[building.autoTrainUnit];
+          if (autoPlayer && autoCost &&
+              autoPlayer.aliveUnits.length < this.getPopCap(autoPlayer.id) &&
+              autoPlayer.resources.food  >= autoCost.food  &&
+              autoPlayer.resources.gold  >= autoCost.gold  &&
+              (autoPlayer.resources.stone ?? 0) >= (autoCost.stone ?? 0) &&
+              (autoPlayer.resources.wood  ?? 0) >= (autoCost.wood  ?? 0)) {
+            if (building.trainUnit(building.autoTrainUnit)) {
+              autoPlayer.resources.food  -= autoCost.food;
+              autoPlayer.resources.gold  -= autoCost.gold;
+              autoPlayer.resources.stone -= autoCost.stone ?? 0;
+              autoPlayer.resources.wood  -= autoCost.wood  ?? 0;
+            }
+          }
         }
         if (building.finishedUnit !== null) {
           this.spawnProducedUnit(building);
