@@ -75,6 +75,35 @@ export const UNIT_COUNTERS: Record<UnitType, CounterMatrix> = {
   [UnitType.CANNON]: {
     [UnitType.CHAKANA_GUARD]: { multiplier: 2.5, reason: 'Artillería imbatible' },
     [UnitType.SPEARMAN]: { multiplier: 2.0, reason: 'Artillería vs infantería' },
+    [UnitType.CANOE]: { multiplier: 2.0, reason: 'Cañón destruye canoas' },
+    [UnitType.WAR_CANOE]: { multiplier: 1.8, reason: 'Artillería vs embarcación' },
+  },
+  [UnitType.CANOE]: {
+    [UnitType.SOLDIER]: { multiplier: 0.7, reason: 'Poco impacto contra infantería' },
+    [UnitType.BRIGANTINE]: { multiplier: 0.5, reason: 'Superado por bergantín' },
+  },
+  [UnitType.WAR_CANOE]: {
+    [UnitType.CANOE]: { multiplier: 1.5, reason: 'Canoa de guerra más potente' },
+    [UnitType.BRIGANTINE]: { multiplier: 0.6, reason: 'Bergantín con cañones' },
+    [UnitType.SOLDIER]: { multiplier: 0.8, reason: 'Difícil atacar tierra' },
+  },
+  [UnitType.BRIGANTINE]: {
+    [UnitType.CANOE]: { multiplier: 2.0, reason: 'Bergantín aplasta canoas' },
+    [UnitType.WAR_CANOE]: { multiplier: 1.5, reason: 'Superior en artillería' },
+    [UnitType.GALLEON]: { multiplier: 0.5, reason: 'Galeón dominante' },
+  },
+  [UnitType.GALLEON]: {
+    [UnitType.BRIGANTINE]: { multiplier: 2.0, reason: 'Galeón aplasta bergantín' },
+    [UnitType.WAR_CANOE]: { multiplier: 3.0, reason: 'Galeón destroza canoas' },
+    [UnitType.CANNON]: { multiplier: 0.9, reason: 'Artillería terrestre eficaz' },
+  },
+  [UnitType.SHAMAN]: {
+    [UnitType.MISSIONARY]: { multiplier: 1.3, reason: 'Contrarresta conversión' },
+    [UnitType.CANNON]: { multiplier: 0.5, reason: 'Indefenso contra artillería' },
+  },
+  [UnitType.MISSIONARY]: {
+    [UnitType.SHAMAN]: { multiplier: 0.8, reason: 'Chamán resiste conversión' },
+    [UnitType.SOLDIER]: { multiplier: 0.6, reason: 'No es combatiente' },
   },
 };
 

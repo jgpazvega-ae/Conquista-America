@@ -161,3 +161,74 @@ function reconstructPath(node: Node): GridPos[] {
   }
   return path;
 }
+
+/** A* pathfinding restricted to water tiles only (for naval units). */
+export function findNavalPath(
+  map:     GameMap,
+  start:   GridPos,
+  goal:    GridPos,
+  maxIter = 400,
+): GridPos[] {
+  if (!map.isNavalWalkable(goal.col, goal.row)) {
+    const near = map.findNavalNear(goal.col, goal.row);
+    if (!near) return [];
+    goal = { col: near[0], row: near[1] };
+  }
+  if (start.col === goal.col && start.row === goal.row) return [];
+
+  const cols = map.cols;
+  const nodeGrid = new Map<number, Node>();
+  const key = (c: number, r: number) => r * cols + c;
+
+  const startNode: Node = {
+    col: start.col, row: start.row,
+    g: 0, h: heuristic(start.col, start.row, goal.col, goal.row),
+    f: 0, parent: null, inOpen: true,
+  };
+  startNode.f = startNode.h;
+  nodeGrid.set(key(start.col, start.row), startNode);
+
+  const heap = new MinHeap();
+  heap.push(startNode, key(start.col, start.row));
+
+  const closed = new Uint8Array(cols * map.rows);
+  let iters = 0;
+
+  while (heap.size > 0 && iters++ < maxIter) {
+    const current = heap.pop()!;
+    const ck = key(current.col, current.row);
+    if (closed[ck]) continue;
+    closed[ck] = 1;
+
+    if (current.col === goal.col && current.row === goal.row) {
+      return reconstructPath(current);
+    }
+
+    for (const [nc, nr] of map.getNeighborCoords(current.col, current.row)) {
+      if (!map.isNavalWalkable(nc, nr)) continue;
+      const nk = key(nc, nr);
+      if (closed[nk]) continue;
+
+      const diag = nc !== current.col && nr !== current.row;
+      const g = current.g + (diag ? 1.414 : 1.0);
+      let node = nodeGrid.get(nk);
+
+      if (!node) {
+        node = {
+          col: nc, row: nr,
+          g, h: heuristic(nc, nr, goal.col, goal.row),
+          f: g + heuristic(nc, nr, goal.col, goal.row),
+          parent: current, inOpen: true,
+        };
+        nodeGrid.set(nk, node);
+        heap.push(node, nk);
+      } else if (g < node.g) {
+        node.g = g;
+        node.f = g + node.h;
+        node.parent = current;
+        if (!node.inOpen) { node.inOpen = true; heap.push(node, nk); }
+      }
+    }
+  }
+  return [];
+}

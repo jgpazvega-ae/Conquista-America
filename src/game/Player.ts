@@ -2,11 +2,13 @@ import { CivilizationType } from './types';
 import { CIVILIZATIONS } from './civilizations';
 import { STARTING_RESOURCES, CIV_COLORS } from './constants';
 import type { Unit } from './Unit';
+import { PlayerTechs } from './Tech';
 
 export interface Resources {
   food:  number;
   gold:  number;
   stone: number;
+  wood:  number;
 }
 
 export interface PlayerUpgrades {
@@ -25,6 +27,7 @@ export class Player {
   resources: Resources;
   units: Unit[] = [];
   upgrades: PlayerUpgrades = { metallurgy: false, logistics: false, fortification: false, civTech: false };
+  techs = new PlayerTechs();
 
   // Civilization power state
   powerCooldown   = 0;      // seconds remaining until next use

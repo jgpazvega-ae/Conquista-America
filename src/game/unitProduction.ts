@@ -4,6 +4,7 @@ export interface TrainCost {
   food:   number;
   gold:   number;
   stone?: number;
+  wood?:  number;
 }
 
 export const TRAIN_COSTS: Partial<Record<UnitType, TrainCost>> = {
@@ -27,6 +28,15 @@ export const TRAIN_COSTS: Partial<Record<UnitType, TrainCost>> = {
   [UnitType.ARQUEBUSIER]:   { food: 60,  gold: 45 },
   [UnitType.CAVALRY]:       { food: 80,  gold: 60 },
   [UnitType.CANNON]:        { food: 50,  gold: 80, stone: 40 },
+  // Naval — nativas
+  [UnitType.CANOE]:         { food: 40,  gold: 20, wood: 60 },
+  [UnitType.WAR_CANOE]:     { food: 60,  gold: 40, wood: 90 },
+  // Naval — Conquistador
+  [UnitType.BRIGANTINE]:    { food: 80,  gold: 120, wood: 150 },
+  [UnitType.GALLEON]:       { food: 100, gold: 250, wood: 250, stone: 50 },
+  // Espiritual
+  [UnitType.SHAMAN]:        { food: 80,  gold: 60 },
+  [UnitType.MISSIONARY]:    { food: 60,  gold: 80 },
 };
 
 export const TRAIN_TIMES: Partial<Record<UnitType, number>> = {
@@ -46,4 +56,10 @@ export const TRAIN_TIMES: Partial<Record<UnitType, number>> = {
   [UnitType.ARQUEBUSIER]:   20,
   [UnitType.CAVALRY]:       24,
   [UnitType.CANNON]:        40,
+  [UnitType.CANOE]:         18,
+  [UnitType.WAR_CANOE]:     28,
+  [UnitType.BRIGANTINE]:    40,
+  [UnitType.GALLEON]:       70,
+  [UnitType.SHAMAN]:        22,
+  [UnitType.MISSIONARY]:    25,
 };
