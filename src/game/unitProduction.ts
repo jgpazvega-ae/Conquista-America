@@ -39,6 +39,14 @@ export const TRAIN_COSTS: Partial<Record<UnitType, TrainCost>> = {
   [UnitType.MISSIONARY]:    { food: 60,  gold: 80 },
 };
 
+// Units that require a Barracks building to train (not available in Settlement)
+export const ELITE_UNITS = new Set<UnitType>([
+  UnitType.JAGUAR_KNIGHT, UnitType.CUACHIC,     // Aztec elite
+  UnitType.CHAKANA_GUARD, UnitType.ANTIS_WARRIOR, // Inca elite
+  UnitType.AHAU_WARRIOR, UnitType.BALAM_JAGUAR,  // Maya elite
+  UnitType.CAVALRY, UnitType.CANNON,             // Conquistador elite
+]);
+
 export const TRAIN_TIMES: Partial<Record<UnitType, number>> = {
   [UnitType.EAGLE_WARRIOR]: 14,
   [UnitType.JAGUAR_KNIGHT]: 22,
