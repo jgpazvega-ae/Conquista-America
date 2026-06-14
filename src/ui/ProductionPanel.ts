@@ -30,6 +30,7 @@ const UPGRADE_DEFS: UpgradeDef[] = [
 
 const BUILDABLE: BuildingType[] = [
   BuildingType.HOUSE,
+  BuildingType.FARM,
   BuildingType.BARRACKS,
   BuildingType.SETTLEMENT,
   BuildingType.HARBOR,

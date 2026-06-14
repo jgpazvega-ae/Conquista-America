@@ -22,6 +22,16 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     buildRadius: 4,
     description: 'Funda un nuevo asentamiento lejos de tu base. Permite expandir tu territorio y entrenar trabajadores allí.',
   },
+  [BuildingType.FARM]: {
+    type: BuildingType.FARM,
+    name: 'Granja / Milpa',
+    emoji: '🌾',
+    cost: { food: 50, gold: 20, stone: 0 },
+    buildTime: 10,
+    maxHp: 90,
+    buildRadius: 2,
+    description: 'Cultiva milpa o chacra. Genera +50🌽 de producción pasiva en cada ciclo económico. Construye varias para sostener un gran ejército.',
+  },
   [BuildingType.BARRACKS]: {
     type: BuildingType.BARRACKS,
     name: 'Cuartel',

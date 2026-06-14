@@ -2093,6 +2093,18 @@ export class Game {
     }
   }
 
+  /** Returns the current era (1-3) for a player based on tech research progress. */
+  getEra(playerId: number): 1 | 2 | 3 {
+    const player = this.players[playerId];
+    if (!player) return 1;
+    const t = player.techs;
+    const hasIron   = t.isResearched(TechType.IRON_WORKING);
+    const hasBronze = t.isResearched(TechType.BRONZE_WORKING);
+    if (hasIron) return 3;
+    if (hasBronze) return 2;
+    return 1;
+  }
+
   getPopCap(playerId: number): number {
     const houses = this.allBuildings.filter(
       b => b.playerId === playerId && b.type === BuildingType.HOUSE && b.isComplete(),

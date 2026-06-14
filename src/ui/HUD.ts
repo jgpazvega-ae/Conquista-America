@@ -66,6 +66,7 @@ export class HUD {
   private elTreasuryFill    = document.getElementById('treasury-bar-fill') as HTMLDivElement | null;
   static readonly ECON_GOAL = 800;
   private elScoreboard = document.getElementById('scoreboard')!
+  private elEraLabel   = document.getElementById('era-label')
 
   onMinimapClick: ((worldX: number, worldZ: number) => void) | null = null;
   onPowerActivate: (() => void) | null = null;
@@ -292,6 +293,14 @@ export class HUD {
     this.updateWonderPanel();
     this.updateProductionQueueHUD();
     this.updateDayNightIndicator();
+    this.updateEraLabel();
+  }
+
+  private updateEraLabel() {
+    if (!this.elEraLabel) return;
+    const era = this.game.getEra(this.game.humanPlayerId);
+    const names: Record<1 | 2 | 3, string> = { 1: 'Era I', 2: 'Era II — Colonial', 3: 'Era III — Imperial' };
+    this.elEraLabel.textContent = names[era];
   }
 
   private _wasNightHUD = false;
