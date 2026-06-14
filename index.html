@@ -413,6 +413,16 @@
         </div>
       </div>
 
+      <!-- AI diplomacy proposal popup -->
+      <div id="ai-diplo-proposal" class="hidden" style="position:fixed;bottom:140px;left:50%;transform:translateX(-50%);z-index:700;background:rgba(20,18,14,0.96);border:1px solid rgba(255,200,80,0.5);border-radius:10px;padding:12px 18px;min-width:260px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.7);">
+        <div style="font-size:13px;color:#ffd77a;margin-bottom:6px;">🕊️ Propuesta de Tregua</div>
+        <div style="font-size:12px;color:#ddd;margin-bottom:10px;"><span id="ai-diplo-civ-emoji"></span> <b id="ai-diplo-civ-name"></b> solicita el cese de hostilidades</div>
+        <div style="display:flex;gap:10px;justify-content:center;">
+          <button id="ai-diplo-accept" style="padding:6px 16px;border-radius:6px;border:none;background:rgba(80,160,80,0.8);color:#fff;font-size:12px;cursor:pointer;">☮️ Aceptar</button>
+          <button id="ai-diplo-reject" style="padding:6px 16px;border-radius:6px;border:none;background:rgba(160,60,60,0.8);color:#fff;font-size:12px;cursor:pointer;">⚔️ Rechazar</button>
+        </div>
+      </div>
+
       <!-- Controls overlay (? key) -->
       <div id="controls-overlay" class="hidden">
         <div class="controls-card">

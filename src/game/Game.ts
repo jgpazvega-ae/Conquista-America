@@ -126,6 +126,8 @@ export class Game {
   private _emergencyConscriptionFired = false; // one-time free militia spawn when human drops to < 3 units
   private _navalBattleNotified = false; // throttle naval battle notification (1/min)
   villageIncomeEvents: { playerId: number; food: number; gold: number }[] = [];
+  pendingAIDiploProposal: { fromId: number; civType: CivilizationType } | null = null;
+  private _aiDiploCheckTimer = 60;
 
   constructor(
     humanCiv: CivilizationType = CivilizationType.AZTEC,
@@ -1381,6 +1383,15 @@ export class Game {
       this.fireRandomEvent();
     }
 
+    // AI diplomacy proposals to human
+    if (!this.pendingAIDiploProposal && this.status === 'PLAYING') {
+      this._aiDiploCheckTimer -= dt;
+      if (this._aiDiploCheckTimer <= 0) {
+        this._aiDiploCheckTimer = 60;
+        this._checkAIDiploProposals();
+      }
+    }
+
     // Capital-loss morale shock: when a settlement falls, its owner's surviving
     // troops are demoralized by the loss of their capital (American Conquest mechanic)
     for (const b of this.newlyDestroyedBuildings) {
@@ -2225,6 +2236,17 @@ export class Game {
     return 'rejected';
   }
 
+  /** Accept or reject a pending AI diplomacy proposal from the human side. */
+  respondToAIDiplomacy(accepted: boolean) {
+    const p = this.pendingAIDiploProposal;
+    if (!p) return;
+    this.pendingAIDiploProposal = null;
+    if (accepted) {
+      this.diplomacy.setRelation(this.humanPlayerId, p.fromId, AllianceType.NEUTRAL);
+      this.diplomacy.setRelation(p.fromId, this.humanPlayerId, AllianceType.NEUTRAL);
+    }
+  }
+
   /** Check whether two players are currently allies (for combat targeting). */
   areAllies(a: number, b: number): boolean {
     return this.diplomacy.isAlly(a, b);
@@ -2238,6 +2260,17 @@ export class Game {
     if ((res[resource] ?? 0) < sellAmt) return false;
     res[resource] = (res[resource] ?? 0) - sellAmt;
     player.resources.gold = Math.min(2000, player.resources.gold + goldGain);
+    return true;
+  }
+
+  /** Buy resources with gold at a Market. Returns false if player can't afford. */
+  executeMarketBuy(playerId: number, resource: string, goldCost: number, buyAmt: number): boolean {
+    const player = this.players[playerId];
+    if (!player) return false;
+    if (player.resources.gold < goldCost) return false;
+    player.resources.gold -= goldCost;
+    const res = player.resources as any;
+    res[resource] = Math.min(2000, (res[resource] ?? 0) + buyAmt);
     return true;
   }
 
@@ -2391,6 +2424,21 @@ export class Game {
     for (const fn of shuffled) {
       const msg = fn();
       if (msg) { this.pendingEventMessages.push(msg); return; }
+    }
+  }
+
+  private _checkAIDiploProposals() {
+    const humanUnits = this.players[this.humanPlayerId]?.aliveUnits.length ?? 0;
+    if (humanUnits === 0) return;
+    for (const p of this.players) {
+      if (p.id === this.humanPlayerId || p.isDefeated()) continue;
+      const rel = this.diplomacy.getRelation(this.humanPlayerId, p.id);
+      if (rel !== AllianceType.ENEMY) continue;
+      // Propose ceasefire when outgunned 2:1 or more
+      if (p.aliveUnits.length / humanUnits < 0.45 && Math.random() < 0.40) {
+        this.pendingAIDiploProposal = { fromId: p.id, civType: p.civType };
+        return;
+      }
     }
   }
 

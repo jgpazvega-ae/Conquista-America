@@ -54,6 +54,7 @@ export class ProductionPanel {
   onUpgrade: ((key: keyof PlayerUpgrades) => void)             | null = null;
   onResearchTech: ((tech: TechType) => void)                   | null = null;
   onMarketTrade: ((resource: string, sellAmt: number, goldGain: number) => void) | null = null;
+  onMarketBuy:   ((resource: string, goldCost: number, buyAmt: number) => void)   | null = null;
   onTrainWorker: (() => void)                                  | null = null;
   onCancel:  (() => void)                                      | null = null;
   onCancelProduction: (() => void)                             | null = null;
@@ -306,6 +307,11 @@ export class ProductionPanel {
   }
 
   private _renderMarketTrade(container: HTMLElement, p: Player) {
+    const sellHeader = document.createElement('div');
+    sellHeader.style.cssText = 'color:#ffd77a;font-size:11px;padding:6px 8px 4px;border-bottom:1px solid rgba(255,200,80,0.2);';
+    sellHeader.textContent = '🏪 Mercado — vende o compra recursos';
+    container.appendChild(sellHeader);
+
     const trades: { label: string; emoji: string; sell: keyof typeof p.resources; sellAmt: number; goldGain: number }[] = [
       { label: 'Vender Comida',  emoji: '🌽', sell: 'food',  sellAmt: 50,  goldGain: 30 },
       { label: 'Vender Madera',  emoji: '🪵', sell: 'wood',  sellAmt: 50,  goldGain: 35 },
@@ -313,11 +319,6 @@ export class ProductionPanel {
       { label: 'Gran Venta Comida', emoji: '🌽', sell: 'food', sellAmt: 150, goldGain: 100 },
       { label: 'Gran Venta Piedra', emoji: '🪨', sell: 'stone', sellAmt: 150, goldGain: 130 },
     ];
-
-    const header = document.createElement('div');
-    header.style.cssText = 'color:#ffd77a;font-size:11px;padding:6px 8px 4px;border-bottom:1px solid rgba(255,200,80,0.2);';
-    header.textContent = '🏪 Mercado — intercambia recursos por oro';
-    container.appendChild(header);
 
     for (const t of trades) {
       const canAfford = (p.resources[t.sell] ?? 0) >= t.sellAmt;
@@ -334,6 +335,38 @@ export class ProductionPanel {
       if (canAfford) {
         btn.addEventListener('click', () => {
           this.onMarketTrade?.(t.sell, t.sellAmt, t.goldGain);
+          this.render();
+        });
+      }
+      container.appendChild(btn);
+    }
+
+    const buyHeader = document.createElement('div');
+    buyHeader.style.cssText = 'color:#88ddff;font-size:11px;padding:6px 8px 4px;border-top:1px solid rgba(100,180,255,0.15);border-bottom:1px solid rgba(100,180,255,0.15);margin-top:4px;';
+    buyHeader.textContent = '🪙 Comprar con oro';
+    container.appendChild(buyHeader);
+
+    const buys: { label: string; emoji: string; res: string; goldCost: number; buyAmt: number }[] = [
+      { label: 'Comprar Comida',  emoji: '🌽', res: 'food',  goldCost: 50, buyAmt: 70 },
+      { label: 'Comprar Madera',  emoji: '🪵', res: 'wood',  goldCost: 45, buyAmt: 70 },
+      { label: 'Comprar Piedra',  emoji: '🪨', res: 'stone', goldCost: 55, buyAmt: 70 },
+    ];
+
+    for (const b of buys) {
+      const canAfford = p.resources.gold >= b.goldCost;
+      const btn = document.createElement('button');
+      btn.className = 'prod-unit-btn' + (canAfford ? '' : ' disabled');
+      btn.title = `Gasta ${b.goldCost}⚜️ y recibe ${b.buyAmt} ${b.label.split(' ')[1]}`;
+      btn.innerHTML = `
+        <span class="prod-unit-icon">${b.emoji}</span>
+        <div class="prod-unit-info">
+          <div class="prod-unit-name">${b.label}</div>
+          <div class="prod-unit-cost" style="color:#88ddff">-${b.goldCost}⚜️ → +${b.buyAmt}${b.emoji}</div>
+        </div>
+      `;
+      if (canAfford) {
+        btn.addEventListener('click', () => {
+          this.onMarketBuy?.(b.res, b.goldCost, b.buyAmt);
           this.render();
         });
       }
