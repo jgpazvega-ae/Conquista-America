@@ -48,6 +48,9 @@ export class Building {
   finishedUnit: UnitType | null = null;
   readonly MAX_QUEUE = 5;
 
+  // Auto-train: continuously queue this unit type when queue has space (American Conquest style)
+  autoTrainUnit: UnitType | null = null;
+
   // Worker training (Settlement only): separate from unit queue
   workerTrainTimer = 0;   // elapsed seconds; 0 = idle
   workerTrainTotal = 0;   // total seconds for current worker

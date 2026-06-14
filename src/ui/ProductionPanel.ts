@@ -217,8 +217,13 @@ export class ProductionPanel {
         && (p.resources.stone ?? 0) >= (cost.stone ?? 0)
         && (p.resources.wood  ?? 0) >= (cost.wood  ?? 0);
 
+      const isAutoTraining = b.autoTrainUnit === ut;
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:stretch;gap:3px;margin:2px 0;';
+
       const btn = document.createElement('button');
       btn.className = 'prod-unit-btn' + (canAfford ? '' : ' disabled');
+      btn.style.cssText = 'flex:1;';
       btn.title = unitDef.description;
       btn.innerHTML = `
         <span class="prod-unit-icon">${unitDef.emoji}</span>
@@ -232,7 +237,27 @@ export class ProductionPanel {
       if (canAfford && b.productionQueue.length < b.MAX_QUEUE) {
         btn.addEventListener('click', () => this.onTrain?.(ut));
       }
-      listEl.appendChild(btn);
+
+      // Auto-train toggle button (🔄 when off, 🔄 pulsing when on)
+      const autoBtn = document.createElement('button');
+      autoBtn.title = isAutoTraining
+        ? `Auto-entrenamiento ACTIVO — clic para detener`
+        : `Auto-entrenar: produce ${unitDef.name} automáticamente`;
+      autoBtn.style.cssText = `
+        width:28px;padding:2px 3px;font-size:13px;border-radius:5px;cursor:pointer;border:1px solid;
+        background:${isAutoTraining ? 'rgba(0,200,80,0.35)' : 'rgba(60,60,60,0.5)'};
+        border-color:${isAutoTraining ? 'rgba(0,220,80,0.7)' : 'rgba(120,120,120,0.4)'};
+        color:${isAutoTraining ? '#00ee88' : '#888'};
+      `;
+      autoBtn.textContent = '🔄';
+      autoBtn.addEventListener('click', () => {
+        b.autoTrainUnit = isAutoTraining ? null : ut;
+        this.render();
+      });
+
+      row.appendChild(btn);
+      row.appendChild(autoBtn);
+      listEl.appendChild(row);
     }
 
     if (listEl.children.length === 0) {
