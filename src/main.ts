@@ -333,6 +333,68 @@ class GameInstance {
       }
     };
 
+    // Unit action-bar callbacks (mirror keyboard shortcuts)
+    this.hud.onUnitHold = () => {
+      const sel = this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId);
+      if (sel.length === 0) return;
+      const allHold = sel.every(u => u.state === UnitState.HOLD);
+      for (const u of sel) { u.path = []; u.attackTarget = null; u.state = allHold ? UnitState.IDLE : UnitState.HOLD; }
+      this.hud.notify(allHold ? '🏃 Posición liberada' : '🛡️ ¡Posición de defensa! (+2 defensa)', 'info');
+    };
+    this.hud.onUnitEntrench = () => {
+      const sel = this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId && u.isAlive());
+      if (sel.length === 0) return;
+      const willEntrench = !sel.every(u => u.entrenched);
+      for (const u of sel) { if (willEntrench && u.entrenched) continue; u.entrench(); }
+      this.hud.notify(willEntrench ? `🏕️ ${sel.length} unidad${sel.length > 1 ? 'es' : ''} atrincherada${sel.length > 1 ? 's' : ''} — +7 def total` : '🏕️ Posición abandonada', 'info');
+    };
+    this.hud.onUnitVolley = () => {
+      const ranged = this.input.getSelectedUnits().filter(u => u.ammo > 0 && u.attackTarget?.isAlive());
+      if (ranged.length > 0) {
+        for (const u of ranged) u.volleyReady = true;
+        this.hud.notify(`🔫 ¡DESCARGA! ${ranged.length} unidad${ranged.length > 1 ? 'es' : ''} — daño ×2.5`, 'warning');
+        this.audio.playShot();
+      } else {
+        this.hud.notify('🔫 Selecciona un objetivo enemigo primero para la descarga', 'info');
+      }
+    };
+    this.hud.onUnitWarCry = () => {
+      const hero = this.input.getSelectedUnits().find(u => u.isHero && u.isAlive())
+                ?? this.game.humanPlayer.aliveUnits.find(u => u.isHero && u.isAlive());
+      if (!hero) return;
+      if (hero.warCryCooldown > 0) {
+        this.hud.notify(`📯 Recarga: ${Math.ceil(hero.warCryCooldown)}s`, 'info');
+      } else {
+        const count = hero.triggerWarCry(this.game.humanPlayer.aliveUnits);
+        if (count > 0) {
+          this.hud.notify(`📯 ¡GRITO DE GUERRA! ${count} unidad${count > 1 ? 'es' : ''} +25% atk 12s`, 'success');
+          this.audio.playLevelUp();
+        }
+      }
+    };
+    this.hud.onUnitHeroPower = () => {
+      const hero = this.input.getSelectedUnits().find(u => u.isHero && u.isAlive())
+                ?? this.game.humanPlayer.aliveUnits.find(u => u.isHero && u.isAlive());
+      if (!hero) return;
+      if (hero.heroCooldown2 > 0) {
+        this.hud.notify(`🦅 Habilidad del héroe — recarga: ${Math.ceil(hero.heroCooldown2)}s`, 'info');
+        return;
+      }
+      // Simulate pressing H — reuse existing H-key handler by dispatching a synthetic event
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyH', bubbles: true }));
+    };
+    this.hud.onFormation = (type) => {
+      const sel = this.input.getSelectedUnits().filter(u => u.isAlive());
+      if (sel.length === 0) return;
+      for (const u of sel) u.setFormation(type as any);
+      const labels: Record<string, string> = {
+        LOOSE: '💨 Formación suelta — veloz, frágil',
+        PHALANX: '🛡️ Falange — máxima defensa',
+        WEDGE: '⚔️ Cuña — máximo ataque',
+      };
+      this.hud.notify(type ? labels[type] ?? '' : 'Formación libre', 'info');
+    };
+
     this.input.onAttackMove = (units, col, row) => {
       const map = this.game.map;
       for (const [i, unit] of units.entries()) {

@@ -257,17 +257,32 @@
 
       <!-- Unit info panel -->
       <div id="unit-panel" class="hidden">
-        <div id="unit-portrait"></div>
-        <div id="unit-info">
-          <div id="unit-name"></div>
-          <div id="unit-civ"></div>
-          <div class="stat-row">
-            <span class="stat-label">❤️</span>
-            <div class="hp-bar-wrap"><div id="hp-bar"></div></div>
-            <span id="hp-text"></span>
+        <div class="unit-top-row">
+          <div id="unit-portrait"></div>
+          <div id="unit-info">
+            <div id="unit-name"></div>
+            <div id="unit-civ"></div>
+            <div class="stat-row">
+              <span class="stat-label">❤️</span>
+              <div class="hp-bar-wrap"><div id="hp-bar"></div></div>
+              <span id="hp-text"></span>
+            </div>
+            <div id="unit-stats"></div>
+            <div id="unit-xp-row" class="hidden"></div>
           </div>
-          <div id="unit-stats"></div>
-          <div id="unit-xp-row" class="hidden"></div>
+        </div>
+        <!-- Contextual action buttons (shown when own unit selected) -->
+        <div id="unit-action-bar" class="hidden">
+          <button class="act-btn" id="act-hold"      title="Posición defensiva +2def (H)">🛡️ Defender</button>
+          <button class="act-btn" id="act-entrench"  title="Atrincherarse +7def total (X)">🏕️ Fortín</button>
+          <button class="act-btn" id="act-volley"    title="Descarga sincronizada ×2.5 (V)">🔫 Descarga</button>
+          <button class="act-btn" id="act-warcry"    title="Grito de guerra +30moral +25%atk (Y)">📯 Grito</button>
+          <button class="act-btn" id="act-heropower" title="Habilidad especial del héroe (H)">🦅 Poder</button>
+          <span class="act-sep"></span>
+          <button class="form-btn" id="form-loose"   title="Formación suelta +veloc. −def. (F1)">💨</button>
+          <button class="form-btn" id="form-phalanx" title="Falange −veloc. +def. (F2)">🛡</button>
+          <button class="form-btn" id="form-wedge"   title="Cuña +atk. (F3)">⚔️</button>
+          <button class="form-btn" id="form-free"    title="Sin formación (F4)">✕</button>
         </div>
       </div>
 
@@ -277,6 +292,11 @@
         <button class="grp-btn" id="grp-stop"    title="Detener todas (Espacio)">⏹ Detener</button>
         <button class="grp-btn" id="grp-hold"    title="Posición de defensa (H)">🛡️ Posición</button>
         <button class="grp-btn" id="grp-retreat" title="Retirada al asentamiento (R)">🏃 Retirada</button>
+        <span class="grp-sep"></span>
+        <button class="form-btn" id="grp-form-loose"   title="Formación suelta (F1)">💨</button>
+        <button class="form-btn" id="grp-form-phalanx" title="Falange (F2)">🛡</button>
+        <button class="form-btn" id="grp-form-wedge"   title="Cuña (F3)">⚔️</button>
+        <button class="form-btn" id="grp-form-free"    title="Sin formación (F4)">✕</button>
       </div>
 
       <!-- Mobile action bar -->
