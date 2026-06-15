@@ -1586,6 +1586,15 @@ class GameInstance {
       if (isRaid) this.hintOnce('cavalryRaid', '💡 Raída de caballería: tus jinetes saquean ⚜️ oro al destruir edificios enemigos. ¡Úsalos para cortar el suministro enemigo!');
     }
 
+    // Treasure cache discoveries
+    for (const cache of this.game.newlyClaimedCaches) {
+      const parts = [`+${cache.gold}⚜️`, `+${cache.food}🌽`];
+      if (cache.stone > 0) parts.push(`+${cache.stone}🪨`);
+      this.hud.notify(`💰 ¡Tesoro descubierto! ${parts.join('  ')}`, 'success');
+      this.hud.addKillFeedEntry(`💰 Tesoro encontrado — ${parts.join(' ')}`);
+      this.renderer.effects.createLevelUpBurst(cache.col * TILE_SIZE, 0.5, cache.row * TILE_SIZE);
+    }
+
     // Historical events chain — show as prominent overlay
     for (const msg of this.game.histEventMessages) {
       this._showHistoricalEventOverlay(msg);
