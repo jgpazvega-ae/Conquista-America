@@ -28,6 +28,15 @@ import { activateCivPower, CIV_POWER_DEFS } from './game/CivPowers';
 import { AllianceType } from './game/Diplomacy';
 import { CIVILIZATIONS } from './game/civilizations';
 
+// ── Choice event type ──────────────────────────────────────────────────────────
+type ChoiceEventDef = {
+  emoji: string;
+  title: string;
+  description: string;
+  condition?: () => boolean;
+  options: Array<{ label: string; detail: string; apply: () => void }>;
+};
+
 // ── Kill gold rewards ──────────────────────────────────────────────────────────
 function killGoldReward(type: UnitType, isHero: boolean): number {
   if (isHero) return 30;
@@ -195,6 +204,8 @@ class GameInstance {
   private _spottedEnemyIds      = new Set<number>(); // unit IDs already seen once (first-sight tracking)
   private _enemyArmySpottedAt   = -999; // gameTime when last "enemy army spotted" fired
   private _cheatBuffer           = ''; // accumulates typed chars for cheat-code detection
+  private _nextChoiceEventTime   = 240; // first interactive choice event at 4 min game-time
+  private _choiceEventActive     = false;
 
   /** Show a tutorial hint at most once per match. */
   private hintOnce(key: string, msg: string) {
@@ -894,6 +905,12 @@ class GameInstance {
     if (this.game.gameTime >= this._nextEventTime) {
       this._nextEventTime = this.game.gameTime + 120 + Math.random() * 120;
       this.triggerRandomEvent();
+    }
+
+    // Interactive choice events every 4–6 minutes of game time
+    if (!this._choiceEventActive && this.game.gameTime >= this._nextChoiceEventTime && this.game.status === 'PLAYING') {
+      this._nextChoiceEventTime = this.game.gameTime + 240 + Math.random() * 120;
+      this.triggerChoiceEvent();
     }
 
     // Auto-checkpoint every 3 minutes: save current stats to profile
@@ -2676,6 +2693,385 @@ class GameInstance {
     this.hud.notify(`${evt.emoji} ${evt.name}: ${evt.desc}`, evt.type);
     // Camera shake for dramatic events
     if (evt.type === 'warning') this.camera.shake(0.18, 0.3);
+  }
+
+  private showChoiceEvent(evt: ChoiceEventDef) {
+    const wasPaused = this.game.paused;
+    this.game.paused = true;
+    this._choiceEventActive = true;
+
+    const overlay = document.getElementById('choice-event-overlay')!;
+    document.getElementById('choice-event-emoji')!.textContent  = evt.emoji;
+    document.getElementById('choice-event-title')!.textContent  = evt.title;
+    document.getElementById('choice-event-desc')!.textContent   = evt.description;
+
+    const container = document.getElementById('choice-options')!;
+    container.innerHTML = '';
+
+    const dismiss = () => {
+      overlay.classList.add('hidden');
+      if (!wasPaused) this.game.paused = false;
+      this._choiceEventActive = false;
+    };
+
+    for (const opt of evt.options) {
+      const btn = document.createElement('button');
+      btn.className = 'choice-option-btn';
+      btn.innerHTML =
+        `<div class="choice-option-label">${opt.label}</div>` +
+        `<div class="choice-option-detail">${opt.detail}</div>`;
+      btn.addEventListener('click', () => { opt.apply(); dismiss(); });
+      container.appendChild(btn);
+    }
+
+    overlay.classList.remove('hidden');
+  }
+
+  private triggerChoiceEvent() {
+    const player  = this.game.humanPlayer;
+    const enemies = this.game.players.filter(p => p.id !== this.game.humanPlayerId && !p.isDefeated());
+
+    const settle = () =>
+      this.game.allBuildings.find(
+        b => b.playerId === this.game.humanPlayerId && b.type === BuildingType.SETTLEMENT && b.isAlive(),
+      );
+
+    const spawnWarrior = (count: number) => {
+      const base = settle();
+      if (!base) return 0;
+      const civDef  = player.civDef;
+      const uType   = (civDef.units[0]?.type ?? UnitType.EAGLE_WARRIOR) as UnitType;
+      let spawned = 0;
+      for (let i = 0; i < count; i++) {
+        const pos = this.game.map.findWalkableNear(base.col, base.row + 3, 6);
+        if (!pos) continue;
+        const u = new Unit(uType, player.civType, player.id, pos[0], pos[1], CIV_COLORS[player.civType]);
+        player.addUnit(u);
+        this.game.allUnits.push(u);
+        this.game.newlySpawnedUnits.push(u);
+        spawned++;
+      }
+      return spawned;
+    };
+
+    const boostTroops = (fn: (u: import('./game/Unit').Unit) => void) => {
+      for (const u of player.aliveUnits) fn(u);
+    };
+
+    const events: ChoiceEventDef[] = [
+      // ── 1. Merchant caravan ──────────────────────────────────────────────────
+      {
+        emoji: '🛶', title: 'Mercader Ambulante',
+        description: 'Una caravana de comerciantes llega a tus fronteras cargada de mercancías. ¿Cómo la recibes?',
+        options: [
+          {
+            label: '💰 Comprar provisiones',
+            detail: 'Paga 60⚜️ — recibe 200🌽 de comida fresca para las tropas',
+            apply: () => {
+              if (player.resources.gold < 60) { this.hud.notify('⚠️ No tienes suficiente oro', 'warning'); return; }
+              player.resources.gold -= 60;
+              player.resources.food  = Math.min(2000, player.resources.food + 200);
+              this.hud.notify('🛶 ¡Intercambio exitoso! −60⚜️  +200🌽', 'success');
+            },
+          },
+          {
+            label: '⚔️ Contratar mercenarios',
+            detail: 'Paga 50🌽 — 3 guerreros expertos se unen a tu causa de inmediato',
+            apply: () => {
+              if (player.resources.food < 50) { this.hud.notify('⚠️ No tienes comida suficiente', 'warning'); return; }
+              player.resources.food -= 50;
+              const n = spawnWarrior(3);
+              this.hud.notify(`⚔️ ${n} mercenarios reclutados! −50🌽`, 'success');
+            },
+          },
+          {
+            label: '✕ Ignorar la caravana',
+            detail: 'La caravana sigue su camino. Sin efectos.',
+            apply: () => { this.hud.notify('🛶 La caravana parte sin intercambio', 'info'); },
+          },
+        ],
+      },
+      // ── 2. War prisoners ─────────────────────────────────────────────────────
+      {
+        emoji: '⛓️', title: 'Prisioneros de Guerra',
+        description: 'Tus guerreros capturaron un grupo de soldados enemigos. ¿Qué ordenas?',
+        condition: () => (this.game.killsByPlayer.get(player.id) ?? 0) > 0,
+        options: [
+          {
+            label: '⚔️ Ejecución pública',
+            detail: '+30 moral a todas tus unidades — el ejemplo aterra al enemigo',
+            apply: () => {
+              boostTroops(u => { u.morale = Math.min(100, u.morale + 30); });
+              this.hud.notify('⚔️ ¡Ejecución pública! +30 moral al ejército', 'success');
+              this.camera.shake(0.2, 0.4);
+            },
+          },
+          {
+            label: '💰 Exigir rescate',
+            detail: '+120⚜️ de las familias rivales — buena ganancia, poca gloria',
+            apply: () => {
+              player.resources.gold = Math.min(2000, player.resources.gold + 120);
+              this.hud.notify('💰 Rescate cobrado +120⚜️', 'success');
+            },
+          },
+          {
+            label: '🤝 Integrar a las filas',
+            detail: '2 guerreros enemigos juran lealtad — bajos en moral pero combatientes',
+            apply: () => {
+              const n = spawnWarrior(2);
+              for (const u of player.aliveUnits.slice(-n)) u.morale = 35;
+              this.hud.notify(`🤝 ${n} prisioneros integrados al ejército`, 'info');
+            },
+          },
+        ],
+      },
+      // ── 3. Divine omen ────────────────────────────────────────────────────────
+      {
+        emoji: '🌟', title: 'Presagio Divino',
+        description: 'Un cometa cruza el cielo nocturno. Tus sacerdotes piden instrucciones al respecto.',
+        options: [
+          {
+            label: '🌟 Proclamar victoria divina',
+            detail: '+35 moral a todo el ejército — las tropas combaten inspiradas',
+            apply: () => {
+              boostTroops(u => { u.morale = Math.min(100, u.morale + 35); });
+              this.hud.notify('🌟 ¡Presagio de victoria! +35 moral al ejército', 'success');
+            },
+          },
+          {
+            label: '🩸 Realizar sacrificio ritual',
+            detail: 'Ofrece 60🌽 — tu héroe gana experiencia y tu ejército ataca +8 durante 60s',
+            apply: () => {
+              if (player.resources.food < 60) { this.hud.notify('⚠️ No tienes comida para el sacrificio', 'warning'); return; }
+              player.resources.food -= 60;
+              const hero = player.aliveUnits.find(u => u.isHero);
+              if (hero) hero.gainXP(120);
+              boostTroops(u => { u.attack += 8; });
+              setTimeout(() => { boostTroops(u => { u.attack = Math.max(1, u.attack - 8); }); }, 60_000);
+              this.hud.notify('🩸 ¡Sacrificio realizado! Héroe +XP, ejército +8⚔️ 60s', 'success');
+            },
+          },
+          {
+            label: '🙈 Ignorar la señal',
+            detail: 'Los sacerdotes quedan en silencio. No ocurre nada.',
+            apply: () => { this.hud.notify('🌟 El presagio se desvanece sin ser interpretado', 'info'); },
+          },
+        ],
+      },
+      // ── 4. Enemy camp opportunity ─────────────────────────────────────────────
+      {
+        emoji: '🗡️', title: 'Campamento Enemigo Detectado',
+        description: 'Espías reportan un campamento enemigo mal guarnecido. Tienes la oportunidad de actuar.',
+        condition: () => enemies.some(e => e.aliveUnits.length > 0),
+        options: [
+          {
+            label: '🗡️ Lanzar raid relámpago',
+            detail: 'Tus tropas causan daño (-25 HP a 4 unidades enemigas) y reggresan con moral alta',
+            apply: () => {
+              const hostile = enemies.flatMap(e => e.aliveUnits.filter(u => !u.isHero));
+              const targets = hostile.sort(() => Math.random() - 0.5).slice(0, 4);
+              for (const t of targets) t.takeDamage(25);
+              boostTroops(u => { u.morale = Math.min(100, u.morale + 15); });
+              this.hud.notify(`🗡️ ¡Raid exitoso! ${targets.length} enemigos dañados, +15 moral`, 'success');
+            },
+          },
+          {
+            label: '🔥 Quemar suministros',
+            detail: 'Sin bajas propias — el enemigo más fuerte pierde 100🌽 y 80⚜️',
+            apply: () => {
+              const strongest = enemies.reduce((a, b) => a.aliveUnits.length >= b.aliveUnits.length ? a : b);
+              strongest.resources.food  = Math.max(0, strongest.resources.food  - 100);
+              strongest.resources.gold  = Math.max(0, strongest.resources.gold  - 80);
+              this.hud.notify('🔥 ¡Suministros enemigos quemados! Rival debilitado', 'success');
+            },
+          },
+          {
+            label: '👁️ Solo observar',
+            detail: 'Consigues información pero no actúas. El campamento se refuerza.',
+            apply: () => { this.hud.notify('👁️ El campamento enemigo fue observado — sin acción', 'info'); },
+          },
+        ],
+      },
+      // ── 5. Storm approaching ──────────────────────────────────────────────────
+      {
+        emoji: '🌩️', title: 'Tormenta en el Horizonte',
+        description: 'Nubes oscuras se acercan. La batalla se avecina bajo condiciones extremas. ¿Cómo preparas a tus tropas?',
+        options: [
+          {
+            label: '🛡️ Posición defensiva',
+            detail: 'Todas las unidades ganan +20 defensa durante 60s — aguanta el temporal',
+            apply: () => {
+              boostTroops(u => { u.defense += 20; });
+              setTimeout(() => { boostTroops(u => { u.defense = Math.max(0, u.defense - 20); }); }, 60_000);
+              this.hud.notify('🛡️ Posición defensiva: +20 def 60s', 'info');
+            },
+          },
+          {
+            label: '⚡ Atacar antes de la tormenta',
+            detail: 'Todas las unidades +30% velocidad 40s — golpea primero',
+            apply: () => {
+              boostTroops(u => { u.speed *= 1.3; });
+              setTimeout(() => { boostTroops(u => { u.speed /= 1.3; }); }, 40_000);
+              this.hud.notify('⚡ ¡Carga antes de la tormenta! +30% velocidad 40s', 'success');
+              this.camera.shake(0.15, 0.3);
+            },
+          },
+          {
+            label: '🌧️ Resistir la tormenta',
+            detail: 'Ningún bonificador, pero conservas todas las opciones abiertas',
+            apply: () => { this.hud.notify('🌧️ Tus tropas aguantan la tormenta', 'info'); },
+          },
+        ],
+      },
+      // ── 6. Ancient ruins ─────────────────────────────────────────────────────
+      {
+        emoji: '🏛️', title: 'Ruinas Antiguas',
+        description: 'Tus exploradores descubren un antiguo templo oculto en la selva. Pleno de riquezas y conocimiento.',
+        options: [
+          {
+            label: '💰 Saquear el templo',
+            detail: '+200⚜️ en tesoros, pero la profanación hunde la moral (−25)',
+            apply: () => {
+              player.resources.gold = Math.min(2000, player.resources.gold + 200);
+              boostTroops(u => { u.morale = Math.max(0, u.morale - 25); });
+              this.hud.notify('💰 ¡Templo saqueado! +200⚜️ pero −25 moral al ejército', 'warning');
+            },
+          },
+          {
+            label: '🔬 Estudiar los artefactos',
+            detail: 'El conocimiento fortalece el ataque de todas tus unidades en +5 permanentemente',
+            apply: () => {
+              boostTroops(u => { u.attack += 5; });
+              this.hud.notify('🔬 ¡Conocimiento ancestral! Todas las unidades +5⚔️ permanente', 'success');
+            },
+          },
+          {
+            label: '🛡️ Proteger el sitio sagrado',
+            detail: 'Un gesto noble: +25 moral al ejército y aliados te respetan más',
+            apply: () => {
+              boostTroops(u => { u.morale = Math.min(100, u.morale + 25); });
+              player.resources.gold = Math.min(2000, player.resources.gold + 40);
+              this.hud.notify('🛡️ ¡Acto noble! +25 moral, +40⚜️ de admiración aliada', 'success');
+            },
+          },
+        ],
+      },
+      // ── 7. War festival ───────────────────────────────────────────────────────
+      {
+        emoji: '🥁', title: 'Festival de Guerra',
+        description: 'Tambores y cantos de guerra resuenan en el campamento. Tus guerreros piden órdenes para honrar a los dioses del combate.',
+        options: [
+          {
+            label: '🔥 Inspira al ejército',
+            detail: '+12 ataque a todas las unidades durante 60s — el frenesí se apodera de los guerreros',
+            apply: () => {
+              boostTroops(u => { u.attack += 12; });
+              setTimeout(() => { boostTroops(u => { u.attack = Math.max(1, u.attack - 12); }); }, 60_000);
+              this.hud.notify('🔥 ¡Festival de guerra! +12⚔️ 60s a todo el ejército', 'success');
+              this.camera.shake(0.12, 0.25);
+            },
+          },
+          {
+            label: '🙏 Realizar ceremonias',
+            detail: '+50 moral a todo el ejército — el espíritu guerrero se renueva',
+            apply: () => {
+              boostTroops(u => { u.morale = Math.min(100, u.morale + 50); });
+              this.hud.notify('🙏 ¡Ceremonias de guerra! +50 moral al ejército', 'success');
+            },
+          },
+          {
+            label: '⚔️ Movilizar reclutas',
+            detail: 'Se incorporan 4 milicianos sin coste — refuerzo inmediato',
+            apply: () => {
+              const n = spawnWarrior(4);
+              this.hud.notify(`⚔️ ${n} reclutas del festival se unen a la batalla`, 'success');
+            },
+          },
+        ],
+      },
+      // ── 8. Enemy deserter ─────────────────────────────────────────────────────
+      {
+        emoji: '🏃', title: 'Desertor Enemigo',
+        description: 'Un guerrero enemigo abandona sus filas y viene a rendirse ante ti. ¿Qué haces con él?',
+        condition: () => enemies.some(e => e.aliveUnits.length > 0),
+        options: [
+          {
+            label: '🤝 Reclutar al desertor',
+            detail: 'El enemigo pierde un guerrero — tú ganas uno de reemplazo inmediatamente',
+            apply: () => {
+              const enemy = enemies.find(e => e.aliveUnits.filter(u => !u.isHero).length > 0);
+              if (!enemy) { this.hud.notify('🏃 El desertor huyó antes de que pudieras actuar', 'info'); return; }
+              const defector = enemy.aliveUnits.filter(u => !u.isHero)[0];
+              const name = defector?.def?.name ?? 'guerrero';
+              defector?.takeDamage(99999);
+              const n = spawnWarrior(1);
+              if (n > 0) this.hud.notify(`🤝 ¡${name} desertor se une a tus filas!`, 'success');
+            },
+          },
+          {
+            label: '🔍 Extraer información',
+            detail: 'El desertor revela dónde se oculta la fuerza enemiga más grande',
+            apply: () => {
+              const strongest = enemies.reduce((a, b) => a.aliveUnits.length >= b.aliveUnits.length ? a : b);
+              if (strongest.aliveUnits.length > 0) {
+                const u = strongest.aliveUnits[0];
+                this.camera.panTo(u.worldX, u.worldZ);
+                this.hud.notify(`🔍 ¡Información valiosa! Fuerza enemiga detectada (${strongest.aliveUnits.length} unidades)`, 'info');
+              }
+              player.resources.gold = Math.min(2000, player.resources.gold + 40);
+            },
+          },
+          {
+            label: '💰 Exigir pago por silencio',
+            detail: 'El desertor paga 70⚜️ para que no lo entregues a sus jefes',
+            apply: () => {
+              player.resources.gold = Math.min(2000, player.resources.gold + 70);
+              this.hud.notify('💰 Pago de silencio recibido +70⚜️', 'success');
+            },
+          },
+        ],
+      },
+      // ── 9. Allied messenger ───────────────────────────────────────────────────
+      {
+        emoji: '📜', title: 'Mensajero Aliado',
+        description: 'Un mensajero trae noticias de una región aliada lejana. Vienen con ofertas de colaboración.',
+        options: [
+          {
+            label: '🌽 Aceptar suministros',
+            detail: 'Recibes una remesa de +150🌽 y +80⚜️ a cambio de apoyo futuro',
+            apply: () => {
+              player.resources.food = Math.min(2000, player.resources.food + 150);
+              player.resources.gold = Math.min(2000, player.resources.gold + 80);
+              this.hud.notify('📜 ¡Suministros aliados! +150🌽 +80⚜️', 'success');
+            },
+          },
+          {
+            label: '⚔️ Pedir refuerzos',
+            detail: 'La región aliada envía 3 guerreros de élite — coste: 80🌽',
+            apply: () => {
+              if (player.resources.food < 80) { this.hud.notify('⚠️ No tienes comida para alojar los refuerzos', 'warning'); return; }
+              player.resources.food -= 80;
+              const n = spawnWarrior(3);
+              for (const u of player.aliveUnits.slice(-n)) u.gainXP(60); // spawn at level 2
+              this.hud.notify(`⚔️ ${n} refuerzos aliados de élite se unen (nv.2) −80🌽`, 'success');
+            },
+          },
+          {
+            label: '🔬 Compartir conocimiento',
+            detail: 'Intercambio técnico — todas las unidades ganan +10 HP máximo permanente',
+            apply: () => {
+              boostTroops(u => { u.maxHp += 10; u.hp = Math.min(u.hp + 10, u.maxHp); });
+              this.hud.notify('🔬 ¡Conocimiento compartido! Todas las unidades +10 HP max', 'success');
+            },
+          },
+        ],
+      },
+    ];
+
+    const available = events.filter(e => !e.condition || e.condition());
+    if (available.length === 0) return;
+    const evt = available[Math.floor(Math.random() * available.length)];
+    this.showChoiceEvent(evt);
   }
 
   private autoAssignWorkers() {
