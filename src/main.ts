@@ -1187,7 +1187,10 @@ class GameInstance {
           }
         } else {
           this.audio.playHit(evt.damage / 30);
-          if (evt.target.playerId === this.game.humanPlayerId) humanUnderAttack = true;
+          if (evt.target.playerId === this.game.humanPlayerId) {
+            humanUnderAttack = true;
+            this.hud.showOffScreenAttack(evt.worldX, evt.worldZ);
+          }
         }
       }
       if (humanUnderAttack && Math.random() < 0.05) {
@@ -2277,10 +2280,55 @@ class GameInstance {
         this.hud.notify(`🔍 Unidad inactiva seleccionada (${this._idleUnitIdx}/${idle.length})`, 'info');
         return;
       }
-      // H: toggle Hold Position for selected units
+      // H: hero secondary ability (when hero selected) or hold position (otherwise)
       if (e.code === 'KeyH' && !e.ctrlKey && !e.altKey) {
-        const sel = this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId);
-        if (sel.length > 0) {
+        const sel  = this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId);
+        const hero = sel.find(u => u.isHero && u.isAlive());
+        if (hero) {
+          if (hero.heroCooldown2 > 0) {
+            this.hud.notify(`🦅 Habilidad del héroe — recarga: ${Math.ceil(hero.heroCooldown2)}s`, 'info');
+          } else {
+            const allies = this.game.humanPlayer.aliveUnits;
+            const civ    = this.game.humanPlayer.civType;
+            hero.heroCooldown2 = 60;
+            if (civ === CivilizationType.AZTEC) {
+              const warriors = allies.filter(
+                u => u.isAlive() && !u.isHero &&
+                     (u.type === UnitType.EAGLE_WARRIOR || u.type === UnitType.JAGUAR_KNIGHT) &&
+                     hero.distanceTo(u) <= 8,
+              );
+              warriors.forEach(u => { u.berserkTimer = 12; });
+              this.hud.notify(`🦅 ¡FRENESÍ DE JAGUAR! ${warriors.length} guerrero${warriors.length !== 1 ? 's' : ''} entran en frenesí +25% daño 12s`, 'warning');
+              this.hintOnce('heroH_aztec', '💡 Habilidad de héroe (H): Tlacaelel desata el frenesí de los Guerreros Águila y Jaguar cercanos. Recarga 60s.');
+            } else if (civ === CivilizationType.MAYA) {
+              let healed = 0;
+              allies.filter(u => u.isAlive() && hero.distanceTo(u) <= 8).forEach(u => {
+                const target = Math.round(u.maxHp * 0.60);
+                if (target > u.hp) { u.heal(target - u.hp); healed++; }
+              });
+              this.hud.notify(`✨ ¡CURACIÓN ASTRAL! ${healed} unidad${healed !== 1 ? 'es' : ''} restauradas al 60% HP`, 'success');
+              this.hintOnce('heroH_maya', '💡 Habilidad de héroe (H): Lady Xoc restaura al 60% HP a todos los aliados cercanos. Recarga 60s.');
+            } else if (civ === CivilizationType.INCA) {
+              const boosted = allies.filter(u => u.isAlive() && !u.isHero && hero.distanceTo(u) <= 10);
+              boosted.forEach(u => {
+                if (u.heroSpeedBuff <= 0 && !u.incaBuff) u._preBuffSpeed = u.speed;
+                u.speed = Math.min(u.speed * 1.5, u.def.stats.speed * 3.5);
+                u.heroSpeedBuff = 15;
+              });
+              this.hud.notify(`🏔️ ¡CAMINO DEL INCA! ${boosted.length} unidades a velocidad de montaña (+50%) 15s`, 'success');
+              this.hintOnce('heroH_inca', '💡 Habilidad de héroe (H): Pachacuti concede velocidad andina a todos los aliados cercanos. Recarga 60s.');
+            } else {
+              const cavalry = allies.filter(
+                u => u.isAlive() && u.type === UnitType.CAVALRY && hero.distanceTo(u) <= 6,
+              );
+              cavalry.forEach(u => { u.chargeReady = true; });
+              this.hud.notify(`⚔️ ¡SANTIAGO Y CIERRA ESPAÑA! ${cavalry.length} caballero${cavalry.length !== 1 ? 's' : ''} listos para cargar`, 'warning');
+              this.hintOnce('heroH_conq', '💡 Habilidad de héroe (H): Hernán Cortés lanza la carga de caballería — todos los caballos cercanos cargan de inmediato. Recarga 60s.');
+            }
+            this.renderer.effects.createExplosion(hero.worldX, 0.8, hero.worldZ, 0.8);
+            this.audio.playLevelUp();
+          }
+        } else if (sel.length > 0) {
           const allHold = sel.every(u => u.state === UnitState.HOLD);
           for (const u of sel) {
             u.path = [];
@@ -2436,61 +2484,6 @@ class GameInstance {
           }
         } else {
           this.hud.notify('📯 Selecciona al héroe para usar el grito de guerra (Y)', 'info');
-        }
-        return;
-      }
-      // H: hero secondary ability — civ-flavored power (60s cooldown)
-      if (e.code === 'KeyH' && !e.ctrlKey && !e.altKey) {
-        const hero = this.input.getSelectedUnits().find(u => u.isHero && u.isAlive())
-                  ?? this.game.humanPlayer.aliveUnits.find(u => u.isHero && u.isAlive());
-        if (!hero) {
-          this.hud.notify('🦅 Tu héroe debe estar vivo para usar su habilidad (H)', 'info');
-        } else if (hero.heroCooldown2 > 0) {
-          this.hud.notify(`🦅 Habilidad del héroe — recarga: ${Math.ceil(hero.heroCooldown2)}s`, 'info');
-        } else {
-          const allies = this.game.humanPlayer.aliveUnits;
-          const civ    = this.game.humanPlayer.civType;
-          hero.heroCooldown2 = 60;
-          if (civ === CivilizationType.AZTEC) {
-            // Frenesí de jaguar: Eagle Warriors and Jaguar Knights within 8 tiles enter berserk
-            const warriors = allies.filter(
-              u => u.isAlive() && !u.isHero &&
-                   (u.type === UnitType.EAGLE_WARRIOR || u.type === UnitType.JAGUAR_KNIGHT) &&
-                   hero.distanceTo(u) <= 8,
-            );
-            warriors.forEach(u => { u.berserkTimer = 12; });
-            this.hud.notify(`🦅 ¡FRENESÍ DE JAGUAR! ${warriors.length} guerrero${warriors.length !== 1 ? 's' : ''} entran en frenesí +25% daño 12s`, 'warning');
-            this.hintOnce('heroH_aztec', '💡 Habilidad de héroe (H): Tlacaelel desata el frenesí de los Guerreros Águila y Jaguar cercanos. Recarga 60s.');
-          } else if (civ === CivilizationType.MAYA) {
-            // Curación astral: Lady Xoc heals all allies within 8 tiles to at least 60% HP
-            let healed = 0;
-            allies.filter(u => u.isAlive() && hero.distanceTo(u) <= 8).forEach(u => {
-              const target = Math.round(u.maxHp * 0.60);
-              if (target > u.hp) { u.heal(target - u.hp); healed++; }
-            });
-            this.hud.notify(`✨ ¡CURACIÓN ASTRAL! ${healed} unidad${healed !== 1 ? 'es' : ''} restauradas al 60% HP`, 'success');
-            this.hintOnce('heroH_maya', '💡 Habilidad de héroe (H): Lady Xoc restaura al 60% HP a todos los aliados cercanos. Recarga 60s.');
-          } else if (civ === CivilizationType.INCA) {
-            // Camino del Inca: all allies within 10 tiles get +50% speed for 15s
-            const boosted = allies.filter(u => u.isAlive() && !u.isHero && hero.distanceTo(u) <= 10);
-            boosted.forEach(u => {
-              if (u.heroSpeedBuff <= 0 && !u.incaBuff) u._preBuffSpeed = u.speed;
-              u.speed = Math.min(u.speed * 1.5, u.def.stats.speed * 3.5);
-              u.heroSpeedBuff = 15;
-            });
-            this.hud.notify(`🏔️ ¡CAMINO DEL INCA! ${boosted.length} unidades a velocidad de montaña (+50%) 15s`, 'success');
-            this.hintOnce('heroH_inca', '💡 Habilidad de héroe (H): Pachacuti concede velocidad andina a todos los aliados cercanos. Recarga 60s.');
-          } else {
-            // ¡Santiago!: all cavalry within 6 tiles get chargeReady = true
-            const cavalry = allies.filter(
-              u => u.isAlive() && u.type === UnitType.CAVALRY && hero.distanceTo(u) <= 6,
-            );
-            cavalry.forEach(u => { u.chargeReady = true; });
-            this.hud.notify(`⚔️ ¡SANTIAGO Y CIERRA ESPAÑA! ${cavalry.length} caballero${cavalry.length !== 1 ? 's' : ''} listos para cargar`, 'warning');
-            this.hintOnce('heroH_conq', '💡 Habilidad de héroe (H): Hernán Cortés lanza la carga de caballería — todos los caballos cercanos cargan de inmediato. Recarga 60s.');
-          }
-          this.renderer.effects.createExplosion(hero.worldX, 0.8, hero.worldZ, 0.8);
-          this.audio.playLevelUp();
         }
         return;
       }

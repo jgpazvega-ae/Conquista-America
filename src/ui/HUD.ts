@@ -91,6 +91,8 @@ export class HUD {
   private _killFeedEntries: { el: HTMLElement; ts: number }[] = [];
   private _notifHistory:   Array<{ msg: string; type: string; time: string }> = [];
   private _logOpen         = false;
+  private _attackArrows:   { angle: number; ts: number }[] = [];
+  private _arrowCanvas:    HTMLCanvasElement | null = null;
 
   private camera: import('../engine/Camera').RTSCamera | null = null;
   setCamera(cam: import('../engine/Camera').RTSCamera) { this.camera = cam; }
@@ -362,6 +364,7 @@ export class HUD {
     this.updateProductionQueueHUD();
     this.updateDayNightIndicator();
     this.updateEraLabel();
+    this.updateOffScreenArrows();
   }
 
   private updateEraLabel() {
@@ -1684,5 +1687,90 @@ export class HUD {
     void el.offsetWidth;
     el.classList.add('autosave-fade');
     setTimeout(() => el.classList.add('hidden'), 2500);
+  }
+
+  showOffScreenAttack(worldX: number, worldZ: number) {
+    if (!this.renderer) return;
+    const pos = this.renderer.worldToScreen(worldX, 1.0, worldZ);
+    const margin = 100;
+    const onScreen = pos.x >= margin && pos.x <= window.innerWidth - margin
+                  && pos.y >= margin && pos.y <= window.innerHeight - margin;
+    if (onScreen) return;
+
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
+    const angle = Math.atan2(pos.y - cy, pos.x - cx);
+
+    const now = Date.now();
+    const thresh = Math.PI / 5;
+    const dup = this._attackArrows.find(a => {
+      let d = Math.abs(a.angle - angle);
+      if (d > Math.PI) d = 2 * Math.PI - d;
+      return d < thresh && now - a.ts < 2000;
+    });
+    if (!dup) this._attackArrows.push({ angle, ts: now });
+  }
+
+  private updateOffScreenArrows() {
+    const now = Date.now();
+    this._attackArrows = this._attackArrows.filter(a => now - a.ts < 2500);
+
+    if (!this._arrowCanvas) {
+      const cv = document.createElement('canvas');
+      cv.id = 'attack-arrows-canvas';
+      cv.style.cssText = 'position:fixed;top:0;left:0;pointer-events:none;z-index:510;';
+      document.body.appendChild(cv);
+      this._arrowCanvas = cv;
+    }
+    const cv = this._arrowCanvas;
+    cv.width = window.innerWidth;
+    cv.height = window.innerHeight;
+    const ctx = cv.getContext('2d')!;
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    if (this._attackArrows.length === 0) return;
+
+    const cx = cv.width / 2;
+    const cy = cv.height / 2;
+    const margin = 52;
+
+    for (const a of this._attackArrows) {
+      const age = (now - a.ts) / 2500;
+      const pulse = 0.55 + 0.45 * Math.abs(Math.sin(now / 220));
+      const alpha = (1 - age * 0.6) * pulse;
+
+      const cos = Math.cos(a.angle);
+      const sin = Math.sin(a.angle);
+      const tX = Math.abs(cos) > 0.001 ? (cx - margin) / Math.abs(cos) : Infinity;
+      const tY = Math.abs(sin) > 0.001 ? (cy - margin) / Math.abs(sin) : Infinity;
+      const t = Math.min(tX, tY);
+      const ax = cx + cos * t;
+      const ay = cy + sin * t;
+
+      ctx.save();
+      ctx.translate(ax, ay);
+      ctx.rotate(a.angle);
+      ctx.globalAlpha = alpha;
+
+      // Outer glow ring
+      ctx.beginPath();
+      ctx.arc(0, 0, 20, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,40,0,0.18)';
+      ctx.fill();
+
+      // Arrow body
+      ctx.beginPath();
+      ctx.moveTo(18, 0);
+      ctx.lineTo(-10, -9);
+      ctx.lineTo(-4, 0);
+      ctx.lineTo(-10, 9);
+      ctx.closePath();
+      ctx.fillStyle = '#ff3300';
+      ctx.fill();
+      ctx.strokeStyle = '#ffcc00';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.restore();
+    }
   }
 }

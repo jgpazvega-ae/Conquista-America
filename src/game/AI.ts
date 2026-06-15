@@ -241,7 +241,16 @@ export class AISystem {
         state.tauntTimer -= dt;
         if (state.tauntTimer <= 0) {
           state.tauntTimer = 60 + Math.random() * 30;
-          const taunts: Record<CivilizationType, string[]> = {
+          const humanCount = game.humanPlayer.aliveUnits.length;
+          const myCount    = player.aliveUnits.length;
+          // Winning taunts when human is clearly losing
+          const winning = myCount >= humanCount * 2 && humanCount <= 6;
+          const taunts: Record<CivilizationType, string[]> = winning ? {
+            [CivilizationType.AZTEC]:        ['☀️ ¡Vuestras almas alimentarán al dios sol!', '🐆 ¡Rendiréis tributo o moriréis!', '⚔️ ¡La Triple Alianza aplastará vuestro último bastión!'],
+            [CivilizationType.MAYA]:         ['🌟 Las estrellas ya escribieron vuestro destino final.', '🐍 ¡Kukulkán os reclama!', '🔭 El calendario predijo exactamente este momento.'],
+            [CivilizationType.INCA]:         ['🏔️ ¡El Tahuantinsuyu os absorberá!', '🦅 ¡No hay escape al poder del Sol!', '🛤️ ¡Cuzco será vuestro nuevo amo!'],
+            [CivilizationType.CONQUISTADOR]: ['🔥 ¡En nombre del Rey, rendíos!', '💰 ¡Vuestro oro pasará a la corona!', '🏳️ ¿Aún resistís? Admirable… e inútil.'],
+          } : {
             [CivilizationType.AZTEC]:        ['⚔️ ¡Los guerreros Jaguar no conocen la derrota!', '🐆 ¡Tláloc demanda tu sangre!', '☀️ ¡El sol exige tu sacrificio!'],
             [CivilizationType.MAYA]:         ['🔭 Las estrellas ya profetizaron tu fin.', '🏛️ ¡Chichen Itzá jamás caerá!', '🐍 ¡La serpiente emplumada despertó!'],
             [CivilizationType.INCA]:         ['🦅 ¡Los hijos del Sol marchan!', '🛤️ ¡Todos los caminos llevan a Cuzco!', '🏔️ ¡El Sapa Inca nos guía!'],
@@ -253,8 +262,44 @@ export class AISystem {
             game.newTaunts.push({ playerId: player.id, message: msg });
           }
         }
+      } else if (state.phase === 'defending') {
+        // Desperate defense taunts (once per ~90s)
+        state.tauntTimer -= dt;
+        if (state.tauntTimer <= 0) {
+          state.tauntTimer = 80 + Math.random() * 40;
+          const defenseTaunts: Record<CivilizationType, string[]> = {
+            [CivilizationType.AZTEC]:        ['🛡️ ¡No pasaréis! ¡Estos muros son sagrados!', '⚔️ ¡Cada guerrero muerto se convierte en dios!', '🐆 ¡Defenderemos cada piedra hasta el final!'],
+            [CivilizationType.MAYA]:         ['🏛️ ¡La ciudad resistirá como siempre lo ha hecho!', '🔭 ¡El oráculo prometió nuestra supervivencia!', '🛡️ ¡Nuestros ancestros guían nuestras manos!'],
+            [CivilizationType.INCA]:         ['🏔️ ¡Como el Ande resiste, resistimos!', '🦅 ¡La montaña no cede y tampoco nosotros!', '🛤️ ¡Nunca habéis encontrado murallas así!'],
+            [CivilizationType.CONQUISTADOR]: ['🏰 ¡Resistid por el honor de España!', '💣 ¡Cada centímetro se defenderá con cañones!', '⚔️ ¡Dios está con nosotros, no tembléis!'],
+          };
+          const msgs = defenseTaunts[player.civType] ?? [];
+          if (msgs.length > 0) {
+            const msg = msgs[Math.floor(Math.random() * msgs.length)];
+            game.newTaunts.push({ playerId: player.id, message: msg });
+          }
+        }
       } else {
         state.tauntTimer = Math.max(state.tauntTimer, 20); // reset minimum when not attacking
+        // Rare gathering-phase diplomatic comment when human is strong (~120s cooldown)
+        if (state.tauntTimer <= 0 && Math.random() < 0.3) {
+          state.tauntTimer = 90 + Math.random() * 60;
+          const humanCount  = game.humanPlayer.aliveUnits.length;
+          const myCount     = player.aliveUnits.length;
+          if (humanCount > myCount * 1.5 && myCount >= 2) {
+            const respectTaunts: Record<CivilizationType, string[]> = {
+              [CivilizationType.AZTEC]:        ['⏳ Aguardamos el momento propicio para atacar…', '🏹 Reunimos fuerzas. Pronto os enfrentaremos con honor.'],
+              [CivilizationType.MAYA]:         ['🌙 Las estrellas no dan aún señal de guerra…', '🕰️ El tiempo es nuestro mayor aliado.'],
+              [CivilizationType.INCA]:         ['🏔️ Los Andes nos dan paciencia y fortaleza…', '🦅 Observamos y aprendemos vuestras tácticas.'],
+              [CivilizationType.CONQUISTADOR]: ['📜 Por ahora observamos… pero no olvidamos.', '🗺️ Cartografiamos vuestra posición con precisión.'],
+            };
+            const msgs = respectTaunts[player.civType] ?? [];
+            if (msgs.length > 0) {
+              const msg = msgs[Math.floor(Math.random() * msgs.length)];
+              game.newTaunts.push({ playerId: player.id, message: msg });
+            }
+          }
+        }
       }
 
       if (state.buildTimer >= AI_BUILD_INTERVAL * scale && player.resources.stone >= 50) {
