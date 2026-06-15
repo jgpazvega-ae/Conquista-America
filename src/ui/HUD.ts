@@ -1145,6 +1145,15 @@ export class HUD {
       ctx.beginPath();
       ctx.rect(building.col * tw - buildSize / 2, building.row * th - buildSize / 2, buildSize, buildSize);
       ctx.fill();
+      // Capture pulse: overlay orange when building is being captured
+      if (building.captureProgress > 0) {
+        const pulse = 0.4 + 0.35 * Math.abs(Math.sin(Date.now() / 250));
+        ctx.fillStyle = '#ff8822';
+        ctx.globalAlpha = pulse * (building.captureProgress / 100);
+        ctx.beginPath();
+        ctx.rect(building.col * tw - buildSize / 2, building.row * th - buildSize / 2, buildSize, buildSize);
+        ctx.fill();
+      }
     }
     ctx.globalAlpha = 1.0;
 
