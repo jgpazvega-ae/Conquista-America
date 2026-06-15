@@ -330,6 +330,7 @@ export class HUD {
     this.updateMomentum();
     this.updateDominanceBar();
     this.updateResearchChip();
+    this.updateVillageChip();
     this.updateObjectives();
     this.updatePowerButton();
     this.updateBuildingHpBars();
@@ -577,6 +578,24 @@ export class HUD {
         `<span class="rc-name">${def.name}</span>` +
         `<div class="rc-track"><div class="rc-fill" style="width:${barW}%"></div></div>` +
         `<span class="rc-eta">${secsLeft}s restantes</span>` +
+      `</div>`;
+  }
+
+  private updateVillageChip() {
+    const el = document.getElementById('village-chip');
+    if (!el) return;
+    const count = this.game.allianceVillages.size;
+    if (count === 0) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    const timer   = this.game.allianceRewardTimer;
+    const pct     = Math.round((1 - timer / 90) * 100);
+    const label   = count === 1 ? '1 aldea aliada' : `${count} aldeas aliadas`;
+    el.innerHTML =
+      `<span class="vc-icon">🏡</span>` +
+      `<div class="vc-info">` +
+        `<span class="vc-name">${label}</span>` +
+        `<div class="vc-track"><div class="vc-fill" style="width:${pct}%"></div></div>` +
+        `<span class="vc-eta">guerrero en ${Math.ceil(timer)}s</span>` +
       `</div>`;
   }
 
