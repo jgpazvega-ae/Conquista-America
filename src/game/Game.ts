@@ -851,6 +851,24 @@ export class Game {
         if (!evt.attacker.isHero && evt.attacker.morale < nightKillCap) {
           evt.attacker.morale = Math.min(nightKillCap, evt.attacker.morale + nightKillBoost);
         }
+        // Kill streak fury: 3 consecutive kills without taking damage → 12s berserk (+25% atk)
+        if (!evt.attacker.isHero) {
+          evt.attacker.killStreak++;
+          if (evt.attacker.killStreak >= 3) {
+            evt.attacker.berserkTimer = 12;
+            evt.attacker.killStreak   = 0;
+            evt.attacker.morale       = Math.min(100, evt.attacker.morale + 30);
+            if (evt.attacker.playerId === this.humanPlayerId) {
+              this.pendingEventMessages.push(
+                `⚔️ ¡${evt.attacker.def.name} en FURIA! 3 bajas consecutivas — +25% ataque 12s`,
+              );
+            }
+          }
+        }
+        // Cavalry pursuit: after killing a panicked/fleeing unit, charge is immediately refreshed
+        if (evt.attacker.type === UnitType.CAVALRY && evt.target.panicked) {
+          evt.attacker.chargeReady = true;
+        }
         // First blood: player's first kill in the match — all their units surge with confidence (+25 morale)
         if (!this._firstBloodPlayers.has(evt.attacker.playerId)) {
           this._firstBloodPlayers.add(evt.attacker.playerId);
