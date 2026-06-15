@@ -185,6 +185,7 @@ class GameInstance {
   private builtCount  = 0;
   private endHandled  = false;
   private unitGroups    = new Map<number, number[]>();
+  private _camBookmarks = new Map<number, { x: number; z: number }>(); // Shift+Ctrl+1-5 saves, Shift+1-5 recalls
   private _tradeCooldown = 0; // seconds until next manual trade
   private _placingType: BuildingType | null = null;
   private _panelBuilding: import('./game/Building').Building | null = null;
@@ -2647,6 +2648,28 @@ class GameInstance {
         const idx = parseInt(e.code.replace('Digit', '')) - 1;
         const units = this.prodPanel.getTrainableUnits();
         if (idx < units.length) this.prodPanel.onTrain?.(units[idx]);
+        return;
+      }
+      // Ctrl+Shift+1-5: save camera bookmark
+      if (e.ctrlKey && e.shiftKey && /^Digit[1-5]$/.test(e.code)) {
+        e.preventDefault();
+        const n = parseInt(e.code.replace('Digit', ''));
+        const { x, z } = this.camera.getPosition();
+        this._camBookmarks.set(n, { x, z });
+        this.hud.notify(`📍 Posición ${n} guardada`, 'info');
+        return;
+      }
+      // Shift+1-5 (no ctrl): jump to camera bookmark
+      if (!e.ctrlKey && e.shiftKey && /^Digit[1-5]$/.test(e.code) && !this.prodPanel.isVisible) {
+        e.preventDefault();
+        const n = parseInt(e.code.replace('Digit', ''));
+        const bm = this._camBookmarks.get(n);
+        if (bm) {
+          this.camera.panTo(bm.x, bm.z);
+          this.hud.notify(`📍 Posición ${n}`, 'info');
+        } else {
+          this.hud.notify(`📍 Posición ${n} vacía — usa Ctrl+Shift+${n} para guardar`, 'info');
+        }
         return;
       }
       // Ctrl+1-5: save unit group
