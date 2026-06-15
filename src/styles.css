@@ -1570,6 +1570,36 @@ kbd {
 .choice-option-label  { font-weight: 700; font-size: 13.5px; margin-bottom: 2px; color: #fff; }
 .choice-option-detail { font-size: 11px; color: #999; line-height: 1.4; }
 
+/* ═══════════════════════════════════════ MAP PING ══ */
+#ping-container { position: fixed; inset: 0; pointer-events: none; z-index: 600; }
+.map-ping {
+  position: absolute;
+  width: 36px; height: 36px;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  transition: opacity 0.2s;
+}
+.map-ping::before {
+  content: '';
+  position: absolute; inset: 0;
+  border: 2.5px solid #ffd700;
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(255,215,0,0.7);
+  animation: ping-expand 0.9s ease-out infinite;
+}
+.map-ping::after {
+  content: '📍';
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 14px;
+  filter: drop-shadow(0 0 4px rgba(255,200,0,0.9));
+}
+@keyframes ping-expand {
+  0%   { transform: scale(0.5); opacity: 1; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
 /* ═══════════════════════════════════════ DOMINANCE BAR ══ */
 #dominance-bar {
   position: absolute; top: 258px; right: 8px; z-index: 110;

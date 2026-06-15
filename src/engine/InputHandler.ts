@@ -33,6 +33,7 @@ export class InputHandler {
   onGarrisonOrder:    ((count: number, buildingId: number) => void) | null = null;
   onCaptureOrder:     ((count: number, buildingId: number) => void) | null = null;
   onHover:            ((unitId: number | null, buildingId: number | null, screenX: number, screenY: number, tileCol?: number, tileRow?: number) => void) | null = null;
+  onMapPing:          ((worldX: number, worldZ: number) => void) | null = null;
 
   private _placingMode     = false;
   private _attackMoveMode  = false;
@@ -117,6 +118,14 @@ export class InputHandler {
   // Right-click fires AFTER Camera has had a chance to accumulate drag distance
   private onRightUp(e: MouseEvent) {
     e.preventDefault();
+    // Alt+right-click → drop a tactical map ping
+    if (e.altKey) {
+      const hit = this.renderer.pickFromScreen(e.clientX, e.clientY);
+      if (hit?.type === 'tile') {
+        this.onMapPing?.(hit.col * TILE_SIZE + TILE_SIZE / 2, hit.row * TILE_SIZE + TILE_SIZE / 2);
+      }
+      return;
+    }
     // Cancel placement mode on right-click
     if (this._placingMode) {
       this._placingMode = false;
