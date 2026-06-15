@@ -2331,6 +2331,42 @@ class GameInstance {
         this.hud.notify(msg, 'info');
         return;
       }
+      // J: retreat — move selected units to nearest friendly building and break off combat
+      if (e.code === 'KeyJ' && !e.ctrlKey && !e.altKey) {
+        const sel = this.input.getSelectedUnits().filter(
+          u => u.playerId === this.game.humanPlayerId && u.isAlive() && !u.isHero && u.garrisonedIn === null,
+        );
+        if (sel.length === 0) return;
+        const friendlyBuildings = this.game.allBuildings.filter(
+          b => b.playerId === this.game.humanPlayerId && b.isAlive() && b.isComplete(),
+        );
+        if (friendlyBuildings.length === 0) {
+          this.hud.notify('Sin edificios amigos hacia donde retroceder', 'info');
+          return;
+        }
+        let retreated = 0;
+        for (const u of sel) {
+          let best = friendlyBuildings[0];
+          let bestD = Math.hypot(u.col - best.col, u.row - best.row);
+          for (const b of friendlyBuildings) {
+            const d = Math.hypot(u.col - b.col, u.row - b.row);
+            if (d < bestD) { bestD = d; best = b; }
+          }
+          const near = this.game.map.findWalkableNear(best.col, best.row, 3);
+          if (!near) continue;
+          const path = findPath(this.game.map, u.gridPos(), { col: near[0], row: near[1] }, 400);
+          if (path.length > 0) {
+            u.attackTarget = null;
+            u.attackBuildingTarget = null;
+            u.moveTo(path);
+            retreated++;
+          }
+        }
+        if (retreated > 0) {
+          this.hud.notify(`🏃 ${retreated} unidad${retreated !== 1 ? 'es' : ''} en retirada`, 'info');
+        }
+        return;
+      }
       // H: hero secondary ability (when hero selected) or hold position (otherwise)
       if (e.code === 'KeyH' && !e.ctrlKey && !e.altKey) {
         const sel  = this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId);
