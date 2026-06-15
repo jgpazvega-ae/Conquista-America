@@ -337,6 +337,7 @@ export class HUD {
     this.updateGarrisonChip();
     this.updateResourceDepletionChip();
     this.updateEnemyRadarChip();
+    this.updateIdleMilChip();
     this.updateObjectives();
     this.updatePowerButton();
     this.updateBuildingHpBars();
@@ -813,6 +814,37 @@ export class HUD {
       `<div class="er-info">` +
         `<span class="er-main">${visible} enem. visible${visible > 1 ? 's' : ''}${heroStr}</span>` +
         `<span class="er-detail">${threat}</span>` +
+      `</div>`;
+  }
+
+  private _imTick = 0;
+  private updateIdleMilChip() {
+    this._imTick++;
+    if (this._imTick % 60 !== 0) return;
+    const el = document.getElementById('idle-mil-chip');
+    if (!el) return;
+    if (this.game.status !== 'PLAYING') { el.classList.add('hidden'); return; }
+    // Only check if player has enough resources to train at least something
+    const res = this.game.humanPlayer.resources;
+    if (res.food < 40 && res.gold < 40) { el.classList.add('hidden'); return; }
+
+    const MILITARY_TYPES = new Set([BuildingType.BARRACKS, BuildingType.HARBOR]);
+    const idleBlds = this.game.allBuildings.filter(
+      b => b.playerId === this.game.humanPlayerId &&
+           b.isAlive() && b.isComplete() &&
+           MILITARY_TYPES.has(b.type) &&
+           b.productionQueue.length === 0,
+    );
+    if (idleBlds.length === 0) { el.classList.add('hidden'); return; }
+
+    const summary = idleBlds.slice(0, 3).map(b => BUILDING_DEFS[b.type]?.emoji ?? '🏛️').join(' ');
+    const extra   = idleBlds.length > 3 ? ` +${idleBlds.length - 3}` : '';
+    el.classList.remove('hidden');
+    el.innerHTML =
+      `<span class="im-icon">⚔️</span>` +
+      `<div class="im-info">` +
+        `<span class="im-main">${idleBlds.length} cuartel${idleBlds.length > 1 ? 'es' : ''} sin entrenar</span>` +
+        `<span class="im-hint">${summary}${extra} — selecciona y entrena</span>` +
       `</div>`;
   }
 
