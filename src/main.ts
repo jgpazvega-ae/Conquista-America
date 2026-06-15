@@ -313,6 +313,29 @@ class GameInstance {
       }, 80);
     };
     this.hud.onMinimapClick = (wx, wz) => this.camera.panTo(wx, wz);
+    this.hud.onMinimapRightClick = (wx: number, wz: number) => {
+      const myUnits = this.input.getSelectedUnits().filter((u: import('./game/Unit').Unit) => u.playerId === this.game.humanPlayerId && u.isAlive());
+      if (myUnits.length === 0) { this.camera.panTo(wx, wz); return; }
+      const tCol = Math.round(wx / TILE_SIZE);
+      const tRow = Math.round(wz / TILE_SIZE);
+      const near = this.game.map.findWalkableNear(tCol, tRow, 4);
+      if (!near) return;
+      const cx = myUnits.reduce((s: number, u: import('./game/Unit').Unit) => s + u.col, 0) / myUnits.length;
+      const cz = myUnits.reduce((s: number, u: import('./game/Unit').Unit) => s + u.row, 0) / myUnits.length;
+      let moved = 0;
+      myUnits.forEach((unit: import('./game/Unit').Unit, idx: number) => {
+        const spread = myUnits.length > 1 ? [Math.round(unit.col - cx), Math.round(unit.row - cz)] : [0, 0];
+        const destCol = Math.max(0, Math.min(this.game.map.cols - 1, near[0] + spread[0]));
+        const destRow = Math.max(0, Math.min(this.game.map.rows - 1, near[1] + spread[1]));
+        const dest = this.game.map.findWalkableNear(destCol, destRow, 3) ?? near;
+        const path = findPath(this.game.map, unit.gridPos(), { col: dest[0], row: dest[1] }, 400);
+        if (path.length > 0) { unit.moveTo(path); moved++; }
+      });
+      if (moved > 0) {
+        this.audio.playMove();
+        this.camera.panTo(wx, wz);
+      }
+    };
 
     this.input.onRallySet = (col, row) => {
       if (this._panelBuilding?.isComplete()) {
