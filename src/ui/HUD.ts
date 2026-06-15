@@ -323,6 +323,7 @@ export class HUD {
     this.updateMinimap();
     this.updateScoreboard();
     this.updateMomentum();
+    this.updateDominanceBar();
     this.updateObjectives();
     this.updatePowerButton();
     this.updateBuildingHpBars();
@@ -521,6 +522,28 @@ export class HUD {
     else if (advantage < -12) label.textContent = `🛡️ Desventaja ${advantage}%`;
     else                      label.textContent = '⚖️ Equilibrio militar';
     label.style.color = color;
+  }
+
+  private updateDominanceBar() {
+    const el = document.getElementById('dominance-bar');
+    if (!el) return;
+    if (this.game.status !== 'PLAYING') { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+
+    const total = this.game.players.reduce((s, p) => s + this.game.getConquestScore(p.id), 0) || 1;
+    const rows = this.game.players.map(p => {
+      const score   = this.game.getConquestScore(p.id);
+      const pct     = Math.round((score / total) * 100);
+      const color   = hex(CIV_COLORS[p.civType]);
+      const defeated = p.isDefeated();
+      return `<div class="db-row${defeated ? ' db-defeated' : ''}" title="${CIV_NAMES[p.civType]}: ${score}pts · ${pct}%">
+        <span class="db-civ">${CIV_EMOJIS[p.civType]}</span>
+        <div class="db-track"><div class="db-fill" style="width:${defeated ? 0 : pct}%;background:${color}"></div></div>
+        <span class="db-pct" style="color:${defeated ? '#555' : color}">${defeated ? '☠' : pct + '%'}</span>
+      </div>`;
+    }).join('');
+
+    el.innerHTML = `<div class="db-header">⚔️ DOMINIO</div>${rows}`;
   }
 
   private updateHeroPanel() {
