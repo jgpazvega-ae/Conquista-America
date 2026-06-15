@@ -236,6 +236,7 @@ class GameInstance {
   private _battleWindowTimer     = 0;   // > 0 while an analysis window is open
   private _battleReportCooldown  = 0;   // prevents consecutive reports (90s cooldown)
   private _mapPings: { worldX: number; worldZ: number; el: HTMLDivElement; expires: number }[] = [];
+  private _killMilestonesReached = new Set<string>(); // `${unitId}-${milestone}` to fire once
 
   /** Show a tutorial hint at most once per match. */
   private hintOnce(key: string, msg: string) {
@@ -1120,6 +1121,32 @@ class GameInstance {
                        (evt.attacker.type === UnitType.ARCHER || evt.attacker.type === UnitType.ATLATL ||
                         evt.attacker.type === UnitType.ARQUEBUSIER)) {
               this.hud.addKillFeedEntry('🌀 ¡COMBO! Ranged remata a tropa aturdida por la honda');
+            }
+          }
+          // Kill milestone celebrations (human attacker, non-hero units)
+          if (evt.attacker && evt.attacker.playerId === this.game.humanPlayerId && !evt.attacker.isHero) {
+            const kt = evt.attacker.killsTotal;
+            for (const milestone of [5, 10, 20, 30, 50]) {
+              if (kt >= milestone) {
+                const mkey = `${evt.attacker.id}-${milestone}`;
+                if (!this._killMilestonesReached.has(mkey)) {
+                  this._killMilestonesReached.add(mkey);
+                  const mname = evt.attacker.veteranName ?? evt.attacker.def.name;
+                  const micon = milestone >= 20 ? '🔱' : milestone >= 10 ? '⚡' : '🌟';
+                  const mtitle = milestone >= 30 ? 'LEYENDA DE BATALLA' : milestone >= 20 ? 'Campeón implacable' : milestone >= 10 ? 'Asesino veterano' : 'Primera hazaña';
+                  this.hud.notify(`${micon} ${mname}: ¡${kt} bajas! ${mtitle}`, 'success');
+                  this.renderer.effects.createLevelUpBurst(evt.attacker.worldX, 1.0, evt.attacker.worldZ);
+                  if (milestone >= 10) this.hud.addKillFeedEntry(`${micon} ${mname} — ¡${kt} BAJAS!`);
+                }
+              }
+            }
+          }
+          // Honorable defeat: human unit with 5+ kills dies
+          if (evt.target.playerId === this.game.humanPlayerId && evt.target.killsTotal >= 5 && !evt.target.isHero) {
+            const dname = evt.target.veteranName ?? evt.target.def.name;
+            this.hud.addKillFeedEntry(`🕊️ ${dname} ha caído — ${evt.target.killsTotal} bajas en batalla`);
+            if (evt.target.killsTotal >= 10) {
+              this.hud.notify(`🕊️ ¡${dname} ha caído! Recordado como leyenda — ${evt.target.killsTotal} bajas`, 'warning');
             }
           }
           // Hero death notification + dramatic slow-motion
