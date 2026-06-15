@@ -12,6 +12,7 @@ import { UnitState, TerrainType } from '../game/types';
 import { CIVILIZATIONS } from '../game/civilizations';
 import { WEATHER_ICONS, WEATHER_NAMES, WEATHER_TIPS } from '../game/WeatherSystem';
 import { AllianceType } from '../game/Diplomacy';
+import { TECH_DEFS, TechType } from '../game/Tech';
 
 function hex(n: number): string {
   return '#' + n.toString(16).padStart(6, '0');
@@ -325,6 +326,7 @@ export class HUD {
     this.updateScoreboard();
     this.updateMomentum();
     this.updateDominanceBar();
+    this.updateResearchChip();
     this.updateObjectives();
     this.updatePowerButton();
     this.updateBuildingHpBars();
@@ -554,6 +556,25 @@ export class HUD {
     }).join('');
 
     el.innerHTML = `<div class="db-header">⚔️ DOMINIO</div>${rows}`;
+  }
+
+  private updateResearchChip() {
+    const el = document.getElementById('research-chip');
+    if (!el) return;
+    const tech = this.game.humanPlayer.techs.getResearchingTech();
+    if (!tech) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    const pct      = this.game.humanPlayer.techs.getResearchProgress();
+    const def      = TECH_DEFS[tech];
+    const secsLeft = Math.ceil((1 - pct) * def.costGold);
+    const barW     = Math.round(pct * 100);
+    el.innerHTML =
+      `<span class="rc-icon">🔬</span>` +
+      `<div class="rc-info">` +
+        `<span class="rc-name">${def.name}</span>` +
+        `<div class="rc-track"><div class="rc-fill" style="width:${barW}%"></div></div>` +
+        `<span class="rc-eta">${secsLeft}s restantes</span>` +
+      `</div>`;
   }
 
   private updateHeroPanel() {

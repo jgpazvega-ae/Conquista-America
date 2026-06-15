@@ -1624,3 +1624,23 @@ kbd {
 .db-fill  { height: 100%; border-radius: 3px; transition: width 0.8s ease-out; }
 .db-pct   { font-size: 9px; font-weight: 700; min-width: 26px; text-align: right; }
 .db-defeated { opacity: 0.3; }
+
+/* Research chip */
+#research-chip {
+  background: rgba(10,20,40,0.82);
+  border: 1px solid #2255aa;
+  border-radius: 6px;
+  padding: 5px 7px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  width: 160px;
+}
+#research-chip.hidden { display: none; }
+.rc-icon { font-size: 13px; flex-shrink: 0; }
+.rc-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.rc-name { font-size: 9px; font-weight: 700; color: #88ccff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rc-track { height: 4px; background: #1a2a44; border-radius: 2px; overflow: hidden; }
+.rc-fill  { height: 100%; background: linear-gradient(90deg,#2266cc,#44aaff); border-radius: 2px; transition: width 1s linear; }
+.rc-eta   { font-size: 8px; color: #6699bb; }
