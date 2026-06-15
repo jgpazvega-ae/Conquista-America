@@ -73,7 +73,8 @@ export class HUD {
   private elScoreboard = document.getElementById('scoreboard')!
   private elEraLabel   = document.getElementById('era-label')
 
-  onMinimapClick: ((worldX: number, worldZ: number) => void) | null = null;
+  onMinimapClick:      ((worldX: number, worldZ: number) => void) | null = null;
+  onMinimapRightClick: ((worldX: number, worldZ: number) => void) | null = null;
   onPowerActivate: (() => void) | null = null;
   onGroupStop:    (() => void) | null = null;
   onGroupHold:    (() => void) | null = null;
@@ -146,6 +147,16 @@ export class HUD {
       const worldX = nx * game.map.cols * TILE_SIZE;
       const worldZ = nz * game.map.rows * TILE_SIZE;
       this.onMinimapClick?.(worldX, worldZ);
+    });
+    this.minimapCanvas.addEventListener('contextmenu', (e) => {
+      if (!this.minimapBuilt) return;
+      e.preventDefault();
+      const rect = this.minimapCanvas.getBoundingClientRect();
+      const nx = (e.clientX - rect.left) / rect.width;
+      const nz = (e.clientY - rect.top)  / rect.height;
+      const worldX = nx * game.map.cols * TILE_SIZE;
+      const worldZ = nz * game.map.rows * TILE_SIZE;
+      this.onMinimapRightClick?.(worldX, worldZ);
     });
   }
 
