@@ -1665,3 +1665,27 @@ kbd {
 .vc-track { height: 4px; background: #0a1f0a; border-radius: 2px; overflow: hidden; }
 .vc-fill  { height: 100%; background: linear-gradient(90deg,#226622,#44cc44); border-radius: 2px; transition: width 1s linear; }
 .vc-eta   { font-size: 8px; color: #66aa66; }
+
+/* Army composition panel */
+#army-panel {
+  background: rgba(20,15,10,0.82);
+  border: 1px solid rgba(180,140,60,0.4);
+  border-radius: 6px;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+  flex-wrap: wrap;
+  width: 160px;
+}
+#army-panel.hidden { display: none; }
+.ap-cat {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 10px;
+}
+.ap-icon { font-size: 11px; line-height: 1; }
+.ap-count { color: #e8d898; font-weight: 700; font-size: 10px; }
+.ap-total { font-size: 8px; color: #887755; margin-left: auto; white-space: nowrap; }
