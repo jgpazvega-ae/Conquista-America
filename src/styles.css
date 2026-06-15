@@ -1709,3 +1709,27 @@ kbd {
 .ex-track { height: 4px; background: #0f0f22; border-radius: 2px; overflow: hidden; }
 .ex-fill  { height: 100%; background: linear-gradient(90deg,#3333aa,#6666ff); border-radius: 2px; transition: width 2s linear; }
 .ex-pct   { font-size: 8px; color: #7777bb; }
+
+/* Damaged buildings chip */
+#dmg-bld-chip {
+  background: rgba(40,15,10,0.88);
+  border: 1px solid rgba(200,80,30,0.55);
+  border-radius: 6px;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  width: 160px;
+  cursor: default;
+}
+#dmg-bld-chip.hidden { display: none; }
+#dmg-bld-chip.pulse { animation: dmgPulse 1.5s ease-in-out infinite; }
+@keyframes dmgPulse {
+  0%, 100% { border-color: rgba(200,80,30,0.55); }
+  50%       { border-color: rgba(255,120,50,0.9); }
+}
+.db-icon  { font-size: 13px; flex-shrink: 0; }
+.db-info  { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.db-main  { font-size: 9px; font-weight: 700; color: #ff9966; white-space: nowrap; }
+.db-hint  { font-size: 8px; color: #886655; }

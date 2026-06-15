@@ -333,6 +333,7 @@ export class HUD {
     this.updateVillageChip();
     this.updateArmyPanel();
     this.updateExplorationChip();
+    this.updateDamagedBuildingsChip();
     this.updateObjectives();
     this.updatePowerButton();
     this.updateBuildingHpBars();
@@ -653,6 +654,35 @@ export class HUD {
         `<span class="ex-label">Explorado</span>` +
         `<div class="ex-track"><div class="ex-fill" style="width:${pct}%"></div></div>` +
         `<span class="ex-pct">${pct}% del mapa</span>` +
+      `</div>`;
+  }
+
+  private _dmgBldTick = 0;
+  private updateDamagedBuildingsChip() {
+    this._dmgBldTick++;
+    if (this._dmgBldTick % 30 !== 0) return; // ~0.5s
+    const el = document.getElementById('dmg-bld-chip');
+    if (!el) return;
+    if (this.game.status !== 'PLAYING') { el.classList.add('hidden'); return; }
+    const damaged = this.game.allBuildings.filter(
+      b => b.playerId === this.game.humanPlayerId && b.isAlive() && b.isComplete() && b.hp < b.maxHp,
+    );
+    if (damaged.length === 0) { el.classList.add('hidden'); el.classList.remove('pulse'); return; }
+
+    const critical = damaged.filter(b => b.hp / b.maxHp < 0.4);
+    el.classList.remove('hidden');
+    if (critical.length > 0) el.classList.add('pulse'); else el.classList.remove('pulse');
+
+    const worst = damaged.reduce((a, b) => (a.hp / a.maxHp < b.hp / b.maxHp ? a : b));
+    const worstPct = Math.round((worst.hp / worst.maxHp) * 100);
+    const label = damaged.length === 1
+      ? `1 edificio dañado (${worstPct}%)`
+      : `${damaged.length} edificios dañados`;
+    el.innerHTML =
+      `<span class="db-icon">🔨</span>` +
+      `<div class="db-info">` +
+        `<span class="db-main">${label}</span>` +
+        `<span class="db-hint">W → reparar</span>` +
       `</div>`;
   }
 
