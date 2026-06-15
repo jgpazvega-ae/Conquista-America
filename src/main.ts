@@ -2308,6 +2308,29 @@ class GameInstance {
         this.hud.notify(`🔍 Unidad inactiva seleccionada (${this._idleUnitIdx}/${idle.length})`, 'info');
         return;
       }
+      // N: select all units of same type as current selection; no selection → select all idle units
+      if (e.code === 'KeyN' && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        const sel = this.input.getSelectedUnits().filter(
+          u => u.playerId === this.game.humanPlayerId && u.isAlive() && !u.isHero,
+        );
+        let target: Unit[];
+        let msg: string;
+        if (sel.length > 0) {
+          const types = new Set(sel.map(u => u.type));
+          target = this.game.humanPlayer.aliveUnits.filter(u => !u.isHero && types.has(u.type));
+          msg = `🎯 ${target.length} unidad${target.length !== 1 ? 'es del mismo tipo' : ' del mismo tipo'} seleccionada${target.length !== 1 ? 's' : ''}`;
+        } else {
+          target = this.game.humanPlayer.aliveUnits.filter(u => !u.isHero && u.state === UnitState.IDLE);
+          if (target.length === 0) { this.hud.notify('No hay unidades ociosas', 'info'); return; }
+          msg = `🗡️ ${target.length} unidad${target.length !== 1 ? 'es ociosas' : ' ociosa'} seleccionada${target.length !== 1 ? 's' : ''}`;
+        }
+        for (const u of this.game.getAllUnits()) u.setSelected(false);
+        for (const u of target) u.setSelected(true);
+        this.input.onSelectionChange?.();
+        this.hud.notify(msg, 'info');
+        return;
+      }
       // H: hero secondary ability (when hero selected) or hold position (otherwise)
       if (e.code === 'KeyH' && !e.ctrlKey && !e.altKey) {
         const sel  = this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId);
