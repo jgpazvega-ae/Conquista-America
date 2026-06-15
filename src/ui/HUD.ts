@@ -921,6 +921,26 @@ export class HUD {
     }
     ctx.globalAlpha = 1.0;
 
+    // Patrol path lines: dotted line between patrol waypoints for human units
+    {
+      const civColor = CIV_COLORS[this.game.humanPlayer.civType];
+      ctx.strokeStyle = hex(civColor);
+      ctx.globalAlpha = 0.45;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 3]);
+      for (const unit of this.game.humanPlayer.aliveUnits) {
+        if (!unit.patrolA || !unit.patrolB) continue;
+        const ax = unit.patrolA.col * tw + tw / 2, az = unit.patrolA.row * th + th / 2;
+        const bx = unit.patrolB.col * tw + tw / 2, bz = unit.patrolB.row * th + th / 2;
+        ctx.beginPath(); ctx.moveTo(ax, az); ctx.lineTo(bx, bz); ctx.stroke();
+        ctx.fillStyle = hex(civColor);
+        ctx.beginPath(); ctx.arc(ax, az, 1.5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(bx, bz, 1.5, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1.0;
+    }
+
     // Draw workers — idle workers pulse brightly to signal underutilized labor
     const idlePulse = 0.5 + 0.5 * Math.sin(Date.now() / 350);
     for (const worker of this.game.allWorkers) {
