@@ -1689,3 +1689,23 @@ kbd {
 .ap-icon { font-size: 11px; line-height: 1; }
 .ap-count { color: #e8d898; font-weight: 700; font-size: 10px; }
 .ap-total { font-size: 8px; color: #887755; margin-left: auto; white-space: nowrap; }
+
+/* Map exploration chip */
+#exploration-chip {
+  background: rgba(15,15,30,0.82);
+  border: 1px solid rgba(80,80,160,0.5);
+  border-radius: 6px;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  width: 160px;
+}
+#exploration-chip.hidden { display: none; }
+.ex-icon  { font-size: 11px; flex-shrink: 0; }
+.ex-info  { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.ex-label { font-size: 9px; font-weight: 700; color: #aaaaee; }
+.ex-track { height: 4px; background: #0f0f22; border-radius: 2px; overflow: hidden; }
+.ex-fill  { height: 100%; background: linear-gradient(90deg,#3333aa,#6666ff); border-radius: 2px; transition: width 2s linear; }
+.ex-pct   { font-size: 8px; color: #7777bb; }

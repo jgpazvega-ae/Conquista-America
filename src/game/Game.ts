@@ -420,6 +420,7 @@ export class Game {
   get dayT(): number { return (this.gameTime % 480) / 480; }
   get isNight(): boolean { const d = this.dayT; return d > 0.75 || d < 0.15; }
   get allianceRewardTimer(): number { return this._allianceRewardTimer; }
+  get explorationPercent(): number { return this.fog.explorationPercent(this.humanPlayerId); }
 
   getHeroRespawnTimer(playerId: number): number | undefined {
     return this._heroRespawnTimers.get(playerId);

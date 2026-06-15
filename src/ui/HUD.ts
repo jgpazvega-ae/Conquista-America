@@ -332,6 +332,7 @@ export class HUD {
     this.updateResearchChip();
     this.updateVillageChip();
     this.updateArmyPanel();
+    this.updateExplorationChip();
     this.updateObjectives();
     this.updatePowerButton();
     this.updateBuildingHpBars();
@@ -634,6 +635,24 @@ export class HUD {
         `<span class="vc-name">${label}</span>` +
         `<div class="vc-track"><div class="vc-fill" style="width:${pct}%"></div></div>` +
         `<span class="vc-eta">guerrero en ${Math.ceil(timer)}s</span>` +
+      `</div>`;
+  }
+
+  private _explorationTick = 0;
+  private updateExplorationChip() {
+    this._explorationTick++;
+    if (this._explorationTick % 60 !== 0) return; // update ~once per second
+    const el = document.getElementById('exploration-chip');
+    if (!el) return;
+    if (this.game.status !== 'PLAYING') { el.classList.add('hidden'); return; }
+    const pct = this.game.explorationPercent;
+    el.classList.remove('hidden');
+    el.innerHTML =
+      `<span class="ex-icon">🗺️</span>` +
+      `<div class="ex-info">` +
+        `<span class="ex-label">Explorado</span>` +
+        `<div class="ex-track"><div class="ex-fill" style="width:${pct}%"></div></div>` +
+        `<span class="ex-pct">${pct}% del mapa</span>` +
       `</div>`;
   }
 
