@@ -230,6 +230,7 @@ class GameInstance {
   private _cheatBuffer           = ''; // accumulates typed chars for cheat-code detection
   private _nextChoiceEventTime   = 240; // first interactive choice event at 4 min game-time
   private _choiceEventActive     = false;
+  private _groupBarTimer         = 0;   // throttle live group-bar updates (0.5s interval)
   private _battleWindowKills     = 0;   // enemy kills in the current 30s analysis window
   private _battleWindowLosses    = 0;   // allied losses in the current 30s analysis window
   private _battleWindowTimer     = 0;   // > 0 while an analysis window is open
@@ -939,6 +940,13 @@ class GameInstance {
     if (!this._choiceEventActive && this.game.gameTime >= this._nextChoiceEventTime && this.game.status === 'PLAYING') {
       this._nextChoiceEventTime = this.game.gameTime + 240 + Math.random() * 120;
       this.triggerChoiceEvent();
+    }
+
+    // Control group bar live update (unit deaths reduce count)
+    this._groupBarTimer -= dt;
+    if (this._groupBarTimer <= 0) {
+      this._groupBarTimer = 0.5;
+      this.updateCtrlGroupsBar();
     }
 
     // Battle report cooldown & window tracking
@@ -2516,6 +2524,7 @@ class GameInstance {
         const sel = this.input.getSelectedUnits();
         this.unitGroups.set(n, sel.map(u => u.id));
         this.hud.notify(`Grupo ${n} guardado — ${sel.length} unidades`, 'info');
+        this.updateCtrlGroupsBar();
         return;
       }
       // 1-5 (no ctrl): recall unit group + center camera (skip when production panel is focused)
@@ -2534,10 +2543,33 @@ class GameInstance {
           for (const u of recalled) { sx += u.worldX; sz += u.worldZ; }
           this.camera.panTo(sx / recalled.length, sz / recalled.length);
         }
+        this.flashCtrlGroupSlot(n);
         this.hud.update(this.input.getSelectedUnits());
         return;
       }
     });
+
+    // Click on control group slots to recall
+    for (let n = 1; n <= 5; n++) {
+      const slot = document.getElementById(`cg-slot-${n}`);
+      slot?.addEventListener('click', () => {
+        const ids = this.unitGroups.get(n);
+        if (!ids?.length) return;
+        for (const u of this.game.getAllUnits()) u.setSelected(false);
+        const recalled: import('./game/Unit').Unit[] = [];
+        for (const id of ids) {
+          const u = this.game.getUnitById(id);
+          if (u?.isAlive()) { u.setSelected(true); recalled.push(u); }
+        }
+        if (recalled.length > 0) {
+          let sx = 0, sz = 0;
+          for (const u of recalled) { sx += u.worldX; sz += u.worldZ; }
+          this.camera.panTo(sx / recalled.length, sz / recalled.length);
+        }
+        this.flashCtrlGroupSlot(n);
+        this.hud.update(this.input.getSelectedUnits());
+      });
+    }
   }
 
   private _checkCheatCodes() {
@@ -2756,6 +2788,38 @@ class GameInstance {
     this.hud.notify(`${evt.emoji} ${evt.name}: ${evt.desc}`, evt.type);
     // Camera shake for dramatic events
     if (evt.type === 'warning') this.camera.shake(0.18, 0.3);
+  }
+
+  private updateCtrlGroupsBar() {
+    for (let n = 1; n <= 5; n++) {
+      const slot = document.getElementById(`cg-slot-${n}`);
+      if (!slot) continue;
+      const ids = this.unitGroups.get(n);
+      const alive = ids?.length
+        ? ids.map(id => this.game.getUnitById(id)).filter(u => u?.isAlive())
+        : [];
+      const empty = alive.length === 0;
+      slot.classList.toggle('cg-empty', empty);
+      const emojiEl = slot.querySelector('.cg-emoji') as HTMLElement;
+      const countEl = slot.querySelector('.cg-count') as HTMLElement;
+      if (empty) {
+        emojiEl.textContent = '—';
+        countEl.textContent = '';
+      } else {
+        emojiEl.textContent = alive[0]?.def.emoji ?? '⚔️';
+        countEl.textContent = String(alive.length);
+      }
+    }
+  }
+
+  private flashCtrlGroupSlot(n: number) {
+    const slot = document.getElementById(`cg-slot-${n}`);
+    if (!slot) return;
+    slot.classList.remove('cg-flash');
+    // force reflow so re-adding the class triggers the animation
+    void slot.offsetWidth;
+    slot.classList.add('cg-flash');
+    setTimeout(() => slot.classList.remove('cg-flash'), 400);
   }
 
   private showBattleReport(kills: number, losses: number) {
