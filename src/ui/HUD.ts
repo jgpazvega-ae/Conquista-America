@@ -206,8 +206,13 @@ export class HUD {
           : (0.15 - dayT) * 480)  // night before dawn
         : Math.ceil((0.75 - dayT) * 480); // day before dusk
       const transitionLabel = isNight ? `☀️${secsToTransition}s` : `🌙${secsToTransition}s`;
-      this.elWeather.textContent = `${WEATHER_ICONS[w.state]} ${WEATHER_NAMES[w.state]}  ${transitionLabel}`;
+      const forecast = w.forecastFired && w.nextState !== w.state
+        ? ` → ${WEATHER_ICONS[w.nextState]}` : '';
+      this.elWeather.textContent = `${WEATHER_ICONS[w.state]} ${WEATHER_NAMES[w.state]}${forecast}  ${transitionLabel}`;
+      const nextTip = w.nextState !== w.state
+        ? ` | Próximo: ${WEATHER_NAMES[w.nextState]}` : '';
       this.elWeather.title = (WEATHER_TIPS[w.state] || WEATHER_NAMES[w.state]) +
+        nextTip +
         (isNight ? ' · Anochecer activo' : ` · Anochecer en ${secsToTransition}s`);
     }
 
@@ -352,7 +357,14 @@ export class HUD {
     if (!this.elEraLabel) return;
     const era = this.game.getEra(this.game.humanPlayerId);
     const names: Record<1 | 2 | 3, string> = { 1: 'Era I', 2: 'Era II — Colonial', 3: 'Era III — Imperial' };
+    const tips: Record<1 | 2 | 3, string> = {
+      1: 'Era I — Investiga Trabajo del Bronce (200⚜️) para avanzar a Era II: +15% atk/def',
+      2: 'Era II — Investiga Trabajo del Hierro (300⚜️) para avanzar a Era III: +15% atk/def adicional',
+      3: 'Era III — Era máxima: todas las mejoras de ataque y defensa activas',
+    };
     this.elEraLabel.textContent = names[era];
+    const hudEra = document.getElementById('hud-era');
+    if (hudEra) hudEra.title = tips[era];
   }
 
   private _wasNightHUD = false;
@@ -367,20 +379,24 @@ export class HUD {
     const secsPerCycle = 480;
     let icon: string;
     let tip:  string;
+    const civType = this.game.humanPlayer.civType;
     if (isNight) {
-      // Seconds remaining in night: night ends at dayT=0.15 (wrapping from 0.75)
       const nightEnd = dayT < 0.15 ? (0.15 - dayT) : (1.0 - dayT + 0.15);
       const secs = Math.ceil(nightEnd * secsPerCycle);
       icon = '🌙';
-      tip  = `Noche — visión −40% · ${secs}s hasta el amanecer`;
+      const civBonus = civType === 'AZTEC'
+        ? '🦅 Guerreros Águila +40% atk'
+        : '⚔️ Melé +15% atk';
+      tip  = `Noche — visión −40% · ${civBonus} · Arcabuceros/Cañón −10% atk · ${secs}s hasta amanecer`;
       el.style.color = '#88bbff';
     } else {
-      // Seconds remaining until night: night starts at dayT=0.75
       const toNight = dayT < 0.75 ? (0.75 - dayT) : (1.0 - dayT + 0.75);
       const secs = Math.ceil(toNight * secsPerCycle);
       const nearNight = secs <= 30;
       icon = nearNight ? '🌅' : '☀️';
-      tip  = nearNight ? `Anocheciendo en ${secs}s — visión −40%` : `Día · ${secs}s hasta la noche`;
+      tip  = nearNight
+        ? `Anocheciendo en ${secs}s — se activan bonos nocturnos (melé +15%, visión −40%)`
+        : `Día — visión normal · ${secs}s hasta la noche`;
       el.style.color = nearNight ? '#ffaa44' : '#ffe080';
     }
     el.textContent = icon;
