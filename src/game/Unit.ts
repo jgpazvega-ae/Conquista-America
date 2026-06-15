@@ -158,6 +158,9 @@ export class Unit {
   // Inspired fury: landing a killing blow at ≥80 morale grants +15% damage for 5s.
   inspiredTimer = 0;
 
+  // Historically-themed name earned when the unit reaches level 3.
+  veteranName: string | null = null;
+
   // Veteran teaching: level-3 same-type unit within 3 tiles — this unit gains XP 30% faster.
   _nearVeteranTeacher = false;
   // Counter-charge: spear unit that absorbs a cavalry charge deals +20% on their next attack.

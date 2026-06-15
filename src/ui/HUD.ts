@@ -612,9 +612,17 @@ export class HUD {
     this.elPortrait.style.background = `rgba(${(civColor >> 16) & 0xff}, ${(civColor >> 8) & 0xff}, ${civColor & 0xff}, 0.25)`;
     this.elPortrait.style.borderColor = hex(civColor);
 
-    const champSuffix = !unit.isHero && unit.level >= 3 ? ' ★★' : '';
-    this.elUnitName.textContent = unit.isHero ? `${unit.heroName} ★` : `${unit.def.name}${champSuffix}`;
-    this.elUnitCiv.textContent  = unit.isHero ? `Héroe — ${CIV_NAMES[unit.civType]}` : CIV_NAMES[unit.civType];
+    const champSuffix = !unit.isHero && unit.level >= 3 && !unit.veteranName ? ' ★★' : '';
+    this.elUnitName.textContent = unit.isHero
+      ? `${unit.heroName} ★`
+      : unit.veteranName
+        ? `${unit.veteranName} ★★`
+        : `${unit.def.name}${champSuffix}`;
+    this.elUnitCiv.textContent = unit.isHero
+      ? `Héroe — ${CIV_NAMES[unit.civType]}`
+      : unit.veteranName
+        ? `${unit.def.name} — ${CIV_NAMES[unit.civType]}`
+        : CIV_NAMES[unit.civType];
 
     const pct = unit.hp / unit.maxHp;
     this.elHpBar.style.width      = `${pct * 100}%`;
@@ -708,7 +716,7 @@ export class HUD {
           `<span class="xp-num">${unit.xp}/${needed}</span>` + killsLabel;
         xpEl.classList.remove('hidden');
       } else {
-        xpEl.innerHTML = `<span class="xp-label" style="color:#ff9933">★★ Campeón</span>` + killsLabel;
+        xpEl.innerHTML = `<span class="xp-label" style="color:#ff9933">${unit.veteranName ? `👑 ${unit.veteranName}` : '★★ Campeón'}</span>` + killsLabel;
         xpEl.classList.remove('hidden');
       }
     }
