@@ -1558,3 +1558,28 @@ kbd {
 .choice-option-btn:active { transform: translateX(1px); }
 .choice-option-label  { font-weight: 700; font-size: 13.5px; margin-bottom: 2px; color: #fff; }
 .choice-option-detail { font-size: 11px; color: #999; line-height: 1.4; }
+
+/* ═══════════════════════════════════════ DOMINANCE BAR ══ */
+#dominance-bar {
+  position: absolute; top: 258px; right: 8px; z-index: 110;
+  width: 132px; pointer-events: none;
+  background: rgba(8,4,1,0.85); border: 1px solid rgba(200,160,80,0.18);
+  border-radius: 6px; padding: 5px 8px 6px; backdrop-filter: blur(4px);
+}
+#dominance-bar.hidden { display: none; }
+.db-header {
+  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+  color: rgba(200,160,80,0.65); margin-bottom: 5px;
+}
+.db-row {
+  display: flex; align-items: center; gap: 4px; margin-bottom: 3px;
+}
+.db-row:last-child { margin-bottom: 0; }
+.db-civ  { font-size: 11px; line-height: 1; flex-shrink: 0; width: 14px; }
+.db-track {
+  flex: 1; height: 5px; background: rgba(255,255,255,0.10);
+  border-radius: 3px; overflow: hidden;
+}
+.db-fill  { height: 100%; border-radius: 3px; transition: width 0.8s ease-out; }
+.db-pct   { font-size: 9px; font-weight: 700; min-width: 26px; text-align: right; }
+.db-defeated { opacity: 0.3; }
