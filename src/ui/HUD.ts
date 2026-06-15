@@ -83,6 +83,8 @@ export class HUD {
   private _lastSeenUnits:  Map<number, { col: number; row: number }> = new Map();
   private _killFeedEl      = document.getElementById('kill-feed');
   private _killFeedEntries: { el: HTMLElement; ts: number }[] = [];
+  private _notifHistory:   Array<{ msg: string; type: string; time: string }> = [];
+  private _logOpen         = false;
 
   private camera: import('../engine/Camera').RTSCamera | null = null;
   setCamera(cam: import('../engine/Camera').RTSCamera) { this.camera = cam; }
@@ -1219,6 +1221,40 @@ export class HUD {
       el.classList.remove('visible');
       setTimeout(() => el.remove(), 300);
     }, 3000);
+
+    // Store in notification history (newest first, max 20)
+    const now = new Date();
+    const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    this._notifHistory.unshift({ msg, type, time });
+    if (this._notifHistory.length > 20) this._notifHistory.pop();
+    if (this._logOpen) this._renderLog();
+  }
+
+  toggleLog() {
+    const panel = document.getElementById('notif-log-panel');
+    if (!panel) return;
+    this._logOpen = !this._logOpen;
+    if (this._logOpen) {
+      this._renderLog();
+      panel.classList.remove('hidden');
+    } else {
+      panel.classList.add('hidden');
+    }
+  }
+
+  private _renderLog() {
+    const list = document.getElementById('nl-list');
+    if (!list) return;
+    if (this._notifHistory.length === 0) {
+      list.innerHTML = '<div class="nl-empty">Sin eventos recientes</div>';
+      return;
+    }
+    list.innerHTML = this._notifHistory.map(e =>
+      `<div class="nl-entry nt-${e.type}">` +
+      `<span class="nl-msg">${e.msg}</span>` +
+      `<span class="nl-time">${e.time}</span>` +
+      `</div>`,
+    ).join('');
   }
 
   flashAutoSave() {

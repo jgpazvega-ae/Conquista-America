@@ -244,6 +244,7 @@
             <div id="power-cooldown-fill"></div>
           </button>
           <button id="diplomacy-btn" class="hud-icon-btn" title="Diplomacia (D)">🤝</button>
+          <button id="log-btn" class="hud-icon-btn" title="Registro de eventos (L)">📋</button>
           <button id="settings-btn" class="hud-icon-btn" title="Configuración">⚙️</button>
         </div>
         <div id="game-status"></div>
@@ -542,6 +543,15 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Notification log panel (L key / log button) -->
+      <div id="notif-log-panel" class="hidden">
+        <div id="nl-header">
+          <span>📋 REGISTRO DE EVENTOS</span>
+          <button id="nl-close">✕</button>
+        </div>
+        <div id="nl-list"></div>
       </div>
 
       <!-- Control group bar (Ctrl+1–5 to save, 1–5 to recall) -->
