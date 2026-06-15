@@ -1520,6 +1520,38 @@ kbd {
 .cg-count { font-size: 9px; color: #ccc; font-weight: 700; line-height: 1; margin-top: 1px; }
 
 /* ═══════════════════════════════════════ BATTLE REPORT ══ */
+/* Multi-kill rapid-kill announcer */
+#multikill-announcer {
+  position: fixed;
+  top: 38%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 900;
+  text-align: center;
+  pointer-events: none;
+  font-family: 'Georgia', serif;
+  text-shadow: 0 0 24px currentColor, 0 2px 6px rgba(0,0,0,0.9);
+  animation: mk-pop 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+#multikill-announcer.hidden { display: none; }
+#multikill-announcer .mk-title {
+  font-size: 36px; font-weight: 900; letter-spacing: 3px;
+  text-transform: uppercase; line-height: 1;
+}
+#multikill-announcer .mk-sub {
+  font-size: 14px; font-weight: 600; letter-spacing: 2px;
+  opacity: 0.85; margin-top: 4px;
+}
+@keyframes mk-pop {
+  from { opacity: 0; transform: translateX(-50%) scale(0.5); }
+  to   { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+@keyframes mk-fade-out {
+  from { opacity: 1; transform: translateX(-50%) scale(1); }
+  to   { opacity: 0; transform: translateX(-50%) scale(1.15) translateY(-20px); }
+}
+#multikill-announcer.mk-exit { animation: mk-fade-out 0.5s ease-in both; }
+
 #battle-report-overlay {
   position: fixed; top: 80px; right: 20px; z-index: 820;
   width: 230px;
