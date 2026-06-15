@@ -1771,6 +1771,10 @@ class GameInstance {
       this.settings.show();
     });
 
+    // Notification log toggle
+    document.getElementById('log-btn')?.addEventListener('click', () => this.hud.toggleLog());
+    document.getElementById('nl-close')?.addEventListener('click', () => this.hud.toggleLog());
+
     // Diplomacy panel
     const diploPanel = document.getElementById('diplomacy-panel');
     document.getElementById('diplomacy-btn')?.addEventListener('click', () => {
@@ -2483,6 +2487,12 @@ class GameInstance {
         this.updateSpeedIndicator();
         return;
       }
+      // L: toggle notification log
+      if (e.code === 'KeyL' && !e.ctrlKey && !e.altKey) {
+        this.hud.toggleLog();
+        return;
+      }
+
       // D: toggle diplomacy panel
       if (e.code === 'KeyD' && !e.ctrlKey && !e.altKey) {
         const diploPanel = document.getElementById('diplomacy-panel');

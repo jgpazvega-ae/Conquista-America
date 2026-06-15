@@ -117,6 +117,16 @@ export class ObjectiveSystem {
       completed: false,
       reward: { stone: 150, wood: 150 },
     });
+
+    this.objectives.push({
+      type: ObjectiveType.SURVIVE_TIME,
+      title: 'Resistencia histórica',
+      description: 'Sobrevive 10 minutos con al menos un asentamiento en pie',
+      target: 600,
+      progress: 0,
+      completed: false,
+      reward: { food: 200, stone: 100 },
+    });
   }
 
   update(game: Game) {
@@ -154,6 +164,12 @@ export class ObjectiveSystem {
           break;
         case ObjectiveType.TRAIN_ARMY:
           obj.progress = Math.min(obj.target, player.aliveUnits.filter(u => !u.isHero).length);
+          break;
+        case ObjectiveType.SURVIVE_TIME:
+          // Only count time while the human player still has a settlement standing
+          if (game.allBuildings.some(b => b.playerId === player.id && b.type === BuildingType.SETTLEMENT && b.isAlive())) {
+            obj.progress = Math.min(obj.target, Math.floor(game.gameTime));
+          }
           break;
       }
 
