@@ -11,6 +11,7 @@ import { CIV_POWER_DEFS } from '../game/CivPowers';
 import { UnitState, TerrainType } from '../game/types';
 import { CIVILIZATIONS } from '../game/civilizations';
 import { WEATHER_ICONS, WEATHER_NAMES, WEATHER_TIPS } from '../game/WeatherSystem';
+import { AllianceType } from '../game/Diplomacy';
 
 function hex(n: number): string {
   return '#' + n.toString(16).padStart(6, '0');
@@ -445,6 +446,9 @@ export class HUD {
   private updateScoreboard() {
     const scores = this.game.players.map(p => ({ id: p.id, score: this.game.getConquestScore(p.id) }));
     const maxScore = Math.max(...scores.map(s => s.score), 1);
+    const diploMap = new Map<number, AllianceType>(
+      this.game.getDiplomacyRelations(this.game.humanPlayerId).map(r => [r.targetId, r.relation]),
+    );
     const html = this.game.players.map(p => {
       const settle = this.game.allBuildings.find(
         b => b.playerId === p.id && b.type === BuildingType.SETTLEMENT,
@@ -459,6 +463,11 @@ export class HUD {
       const scorePct = Math.round((score / maxScore) * 100);
       const isLeading = score === maxScore && score > 0;
       const label  = p.isHuman ? '(Tú)' : CIV_NAMES[p.civType].slice(0, 6);
+      const rel    = diploMap.get(p.id) ?? AllianceType.ENEMY;
+      const diploBadge = p.isHuman ? '' :
+        rel === AllianceType.ALLY    ? `<span class="sb-diplo sb-ally"    title="Aliado">🤝</span>` :
+        rel === AllianceType.NEUTRAL ? `<span class="sb-diplo sb-neutral" title="Paz">☮️</span>` :
+                                       `<span class="sb-diplo sb-enemy"   title="En guerra">⚔️</span>`;
       if (defeated) {
         return `<div class="sb-row sb-defeated">
           <span class="sb-emoji" style="opacity:0.5">${CIV_EMOJIS[p.civType]}</span>
@@ -469,6 +478,7 @@ export class HUD {
       }
       return `<div class="sb-row">
         <span class="sb-emoji">${CIV_EMOJIS[p.civType]}</span>
+        ${diploBadge}
         <span class="sb-name" style="color:${hex(CIV_COLORS[p.civType])}">${label}</span>
         <span class="sb-pop" title="Unidades vivas">👥${pop}</span>
         <span class="sb-kills" title="Bajas enemigas">⚔️${kills}</span>
