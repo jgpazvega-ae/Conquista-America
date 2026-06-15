@@ -613,12 +613,23 @@ export class HUD {
     ].filter(([, n]) => (n as number) > 0) as [string, number][];
 
     const total = units.length;
+    const avgMorale  = Math.round(units.reduce((s, u) => s + u.morale, 0) / total);
+    const moraleColor = avgMorale < 40 ? '#dd4422' : avgMorale < 65 ? '#ddaa00' : '#66dd66';
+    const veterans   = units.filter(u => u.level >= 2).length;
+    const vetStr     = veterans > 0 ? ` · ★${veterans}` : '';
+
     el.classList.remove('hidden');
     el.innerHTML =
+      `<div class="ap-row">` +
       cats.map(([icon, n]) =>
         `<span class="ap-cat"><span class="ap-icon">${icon}</span><span class="ap-count">${n}</span></span>`
       ).join('') +
-      `<span class="ap-total">${total} total</span>`;
+      `<span class="ap-total">${total} total</span>` +
+      `</div>` +
+      `<div class="ap-row2">` +
+      `<span style="font-size:8px;color:${moraleColor}">❤ ${avgMorale}%</span>` +
+      `<span style="font-size:8px;color:#ccaa44">${vetStr}</span>` +
+      `</div>`;
   }
 
   private updateVillageChip() {

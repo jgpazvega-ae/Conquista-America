@@ -1673,12 +1673,13 @@ kbd {
   border-radius: 6px;
   padding: 4px 8px;
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 3px;
   margin-top: 5px;
-  flex-wrap: wrap;
   width: 160px;
 }
+.ap-row  { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ap-row2 { display: flex; align-items: center; gap: 8px; }
 #army-panel.hidden { display: none; }
 .ap-cat {
   display: flex;
