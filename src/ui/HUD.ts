@@ -8,7 +8,7 @@ import { ResourceType } from '../game/ResourceNode';
 import { BuildingType } from '../game/buildings';
 import type { Renderer } from '../engine/Renderer';
 import { CIV_POWER_DEFS } from '../game/CivPowers';
-import { UnitState, TerrainType } from '../game/types';
+import { UnitState, TerrainType, UnitType } from '../game/types';
 import { CIVILIZATIONS } from '../game/civilizations';
 import { WEATHER_ICONS, WEATHER_NAMES, WEATHER_TIPS } from '../game/WeatherSystem';
 import { AllianceType } from '../game/Diplomacy';
@@ -330,6 +330,8 @@ export class HUD {
     this.updateMomentum();
     this.updateDominanceBar();
     this.updateResearchChip();
+    this.updateVillageChip();
+    this.updateArmyPanel();
     this.updateObjectives();
     this.updatePowerButton();
     this.updateBuildingHpBars();
@@ -577,6 +579,61 @@ export class HUD {
         `<span class="rc-name">${def.name}</span>` +
         `<div class="rc-track"><div class="rc-fill" style="width:${barW}%"></div></div>` +
         `<span class="rc-eta">${secsLeft}s restantes</span>` +
+      `</div>`;
+  }
+
+  private _armyPanelTick = 0;
+  private updateArmyPanel() {
+    this._armyPanelTick++;
+    if (this._armyPanelTick % 30 !== 0) return; // update every ~0.5s
+    const el = document.getElementById('army-panel');
+    if (!el) return;
+    const units = this.game.humanPlayer.aliveUnits;
+    if (units.length === 0) { el.classList.add('hidden'); return; }
+
+    const NAVAL  = new Set<UnitType>([UnitType.CANOE, UnitType.WAR_CANOE, UnitType.BRIGANTINE, UnitType.GALLEON]);
+    const SUPPORT = new Set<UnitType>([UnitType.SHAMAN, UnitType.MISSIONARY]);
+
+    let melee = 0, ranged = 0, cavalry = 0, siege = 0, naval = 0, support = 0, hero = 0;
+    for (const u of units) {
+      if (u.isHero)                    { hero++;    continue; }
+      if (NAVAL.has(u.type))           { naval++;   continue; }
+      if (SUPPORT.has(u.type))         { support++; continue; }
+      if (u.type === UnitType.CANNON)  { siege++;   continue; }
+      if (u.def.isCavalry)             { cavalry++; continue; }
+      if (u.def.isRanged)              { ranged++;  continue; }
+      melee++;
+    }
+
+    const cats: [string, number][] = [
+      ['⚔️', melee], ['🏹', ranged], ['🐎', cavalry],
+      ['💣', siege], ['⛵', naval],  ['✝️', support], ['🌟', hero],
+    ].filter(([, n]) => (n as number) > 0) as [string, number][];
+
+    const total = units.length;
+    el.classList.remove('hidden');
+    el.innerHTML =
+      cats.map(([icon, n]) =>
+        `<span class="ap-cat"><span class="ap-icon">${icon}</span><span class="ap-count">${n}</span></span>`
+      ).join('') +
+      `<span class="ap-total">${total} total</span>`;
+  }
+
+  private updateVillageChip() {
+    const el = document.getElementById('village-chip');
+    if (!el) return;
+    const count = this.game.allianceVillages.size;
+    if (count === 0) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    const timer   = this.game.allianceRewardTimer;
+    const pct     = Math.round((1 - timer / 90) * 100);
+    const label   = count === 1 ? '1 aldea aliada' : `${count} aldeas aliadas`;
+    el.innerHTML =
+      `<span class="vc-icon">🏡</span>` +
+      `<div class="vc-info">` +
+        `<span class="vc-name">${label}</span>` +
+        `<div class="vc-track"><div class="vc-fill" style="width:${pct}%"></div></div>` +
+        `<span class="vc-eta">guerrero en ${Math.ceil(timer)}s</span>` +
       `</div>`;
   }
 
