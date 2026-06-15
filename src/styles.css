@@ -1420,6 +1420,40 @@ kbd {
   #minimap-container { display: none; }
 }
 
+/* ═══════════════════════════════════════ BATTLE REPORT ══ */
+#battle-report-overlay {
+  position: fixed; top: 80px; right: 20px; z-index: 820;
+  width: 230px;
+  background: rgba(14, 10, 4, 0.95);
+  border: 1.5px solid rgba(180, 130, 20, 0.7);
+  border-radius: 11px; padding: 13px 15px 11px;
+  box-shadow: 0 4px 28px rgba(200, 130, 0, 0.3);
+  animation: br-slide-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+#battle-report-overlay.br-exit {
+  animation: br-slide-out 0.4s ease-in both;
+}
+@keyframes br-slide-in {
+  from { transform: translateX(260px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+@keyframes br-slide-out {
+  from { transform: translateX(0);     opacity: 1; }
+  to   { transform: translateX(260px); opacity: 0; }
+}
+#br-header {
+  font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+  color: rgba(200, 160, 50, 0.8); margin-bottom: 9px; font-weight: 700;
+}
+#br-stats { display: flex; gap: 10px; margin-bottom: 8px; }
+.br-stat { flex: 1; text-align: center; }
+.br-stat-label { display: block; font-size: 9px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+.br-stat-val   { display: block; font-size: 20px; font-weight: 800; color: #fff; line-height: 1.1; }
+#br-grade-row  { display: flex; align-items: baseline; gap: 7px; margin-bottom: 6px; }
+#br-grade      { font-size: 28px; font-weight: 900; line-height: 1; }
+#br-grade-label{ font-size: 11px; font-weight: 700; color: #ddd; }
+#br-advice     { font-size: 10.5px; color: #aaa; line-height: 1.45; border-top: 1px solid rgba(255,255,255,0.07); padding-top: 7px; }
+
 /* ═══════════════════════════════════════ CHOICE EVENTS ══ */
 #choice-event-overlay {
   position: fixed; inset: 0; z-index: 950;
