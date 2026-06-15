@@ -98,6 +98,9 @@ export class HUD {
   private _arrowCanvas:    HTMLCanvasElement | null = null;
   private _weatherCanvas:  HTMLCanvasElement | null = null;
   private _rainDrops:      { x: number; y: number; len: number; speed: number; opacity: number }[] = [];
+  // Territory control cache: Int8Array indexed [row * MAP_COLS + col], value = playerId+1 (0=unclaimed)
+  private _territoryCache: Int8Array = new Int8Array(0);
+  private _territoryTick  = 999; // force first compute immediately
 
   private camera: import('../engine/Camera').RTSCamera | null = null;
   setCamera(cam: import('../engine/Camera').RTSCamera) { this.camera = cam; }
@@ -1172,6 +1175,50 @@ export class HUD {
     const th    = H / map.rows;
     const unitSize  = Math.max(1.5, Math.min(tw, th) * 1.2);
     const buildSize = Math.max(2.5, Math.min(tw, th) * 1.8);
+
+    // Territory control overlay (recompute every ~5 game seconds ≈ 300 ticks)
+    this._territoryTick++;
+    if (this._territoryTick >= 300 || this._territoryCache.length !== map.cols * map.rows) {
+      this._territoryTick = 0;
+      this._territoryCache = new Int8Array(map.cols * map.rows);
+      const RADIUS = 11;
+      for (const player of this.game.players) {
+        const pid1 = player.id + 1; // 1-indexed so 0 means unclaimed
+        // Mark tiles within radius of each alive settlement
+        for (const bldg of this.game.allBuildings) {
+          if (bldg.playerId !== player.id || !bldg.isAlive()) continue;
+          const r2 = RADIUS * RADIUS;
+          for (let dr = -RADIUS; dr <= RADIUS; dr++) {
+            for (let dc = -RADIUS; dc <= RADIUS; dc++) {
+              if (dr * dr + dc * dc > r2) continue;
+              const c2 = bldg.col + dc, r2c = bldg.row + dr;
+              if (c2 < 0 || c2 >= map.cols || r2c < 0 || r2c >= map.rows) continue;
+              const idx = r2c * map.cols + c2;
+              // Only claim if unclaimed or this player is closer (overwrite equally)
+              this._territoryCache[idx] = pid1;
+            }
+          }
+        }
+      }
+    }
+    // Draw territory tint (only in explored tiles)
+    const humanFogT = this.game.fog.getFog(this.game.humanPlayerId);
+    for (let r = 0; r < map.rows; r++) {
+      for (let c = 0; c < map.cols; c++) {
+        const owner = this._territoryCache[r * map.cols + c];
+        if (!owner) continue;
+        if (humanFogT) {
+          const vis = humanFogT.getVisibility(c, r);
+          if (vis === 0 /* UNEXPLORED */) continue;
+        }
+        const player = this.game.players[owner - 1];
+        if (!player) continue;
+        const col = CIV_COLORS[player.civType];
+        const rr = (col >> 16) & 0xff, gg = (col >> 8) & 0xff, bb = col & 0xff;
+        ctx.fillStyle = `rgba(${rr},${gg},${bb},0.10)`;
+        ctx.fillRect(c * tw, r * th, Math.ceil(tw), Math.ceil(th));
+      }
+    }
 
     // Draw buildings
     for (const building of this.game.allBuildings) {
