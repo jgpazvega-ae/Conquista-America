@@ -84,7 +84,7 @@ export class HUD {
   onUnitHeroPower: (() => void) | null = null;
   onFormation:     ((type: string | null) => void) | null = null;
   private _combatPings:    { col: number; row: number; ts: number }[] = [];
-  private _lastSeenUnits:  Map<number, { col: number; row: number }> = new Map();
+  private _lastSeenUnits:  Map<number, { col: number; row: number; ts: number }> = new Map();
   private _killFeedEl      = document.getElementById('kill-feed');
   private _killFeedEntries: { el: HTMLElement; ts: number }[] = [];
   private _notifHistory:   Array<{ msg: string; type: string; time: string }> = [];
@@ -889,7 +889,7 @@ export class HUD {
         if (player.id !== this.game.humanPlayerId && humanFog) {
           const canSee = humanFog.canSeeUnit(unit, this.game.humanPlayerId);
           if (canSee) {
-            this._lastSeenUnits.set(unit.id, { col: unit.col, row: unit.row });
+            this._lastSeenUnits.set(unit.id, { col: unit.col, row: unit.row, ts: Date.now() });
           } else {
             continue; // don't draw in real position
           }
@@ -900,22 +900,25 @@ export class HUD {
       }
     }
 
-    // Draw last-seen ghost dots for enemy units now in fog
+    // Draw last-seen ghost dots for enemy units now in fog (time-decayed opacity)
+    const nowMs = Date.now();
     for (const player of this.game.players) {
       if (player.id === this.game.humanPlayerId) continue;
-      const col = CIV_COLORS[player.civType];
-      ctx.globalAlpha = 0.3;
-      ctx.fillStyle = hex(col);
+      ctx.fillStyle = hex(CIV_COLORS[player.civType]);
       for (const unit of player.aliveUnits) {
         if (!humanFog || humanFog.canSeeUnit(unit, this.game.humanPlayerId)) continue;
         const last = this._lastSeenUnits.get(unit.id);
         if (!last) continue;
+        // Fade from 0.45 (just seen) to 0.05 (90+ seconds ago)
+        const ageSec = (nowMs - last.ts) / 1000;
+        const alpha = Math.max(0.05, 0.45 - (ageSec / 90) * 0.40);
+        ctx.globalAlpha = alpha;
         ctx.beginPath();
         ctx.arc(last.col * tw + tw / 2, last.row * th + th / 2, unitSize / 2, 0, Math.PI * 2);
         ctx.fill();
       }
-      ctx.globalAlpha = 1.0;
     }
+    ctx.globalAlpha = 1.0;
 
     // Draw workers
     for (const worker of this.game.allWorkers) {
