@@ -753,6 +753,7 @@ input.toggle { width: 22px; height: 22px; accent-color: #d4880a; }
   gap: 5px; font-size: 11px; color: #e8d5a0; min-width: 68px;
   backdrop-filter: blur(4px);
 }
+.pq-bld  { font-size: 10px; line-height: 1; opacity: 0.6; }
 .pq-icon { font-size: 14px; line-height: 1; }
 .pq-bar-wrap { width: 36px; height: 4px; background: rgba(255,255,255,0.15); border-radius: 2px; overflow: hidden; }
 .pq-bar-fill { height: 100%; background: #22aa66; border-radius: 2px; transition: width 0.4s linear; }

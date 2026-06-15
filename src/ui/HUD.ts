@@ -13,6 +13,8 @@ import { CIVILIZATIONS } from '../game/civilizations';
 import { WEATHER_ICONS, WEATHER_NAMES, WEATHER_TIPS } from '../game/WeatherSystem';
 import { AllianceType } from '../game/Diplomacy';
 import { TECH_DEFS, TechType } from '../game/Tech';
+import { BUILDING_DEFS } from '../game/buildingDefs';
+import { getUnitDef } from '../game/civilizations';
 
 function hex(n: number): string {
   return '#' + n.toString(16).padStart(6, '0');
@@ -642,19 +644,17 @@ export class HUD {
     );
     if (buildings.length === 0) { el.classList.add('hidden'); return; }
     el.classList.remove('hidden');
-    const defs = (this.game as any).unitDefs ?? {};
     el.innerHTML = buildings.map(b => {
-      const item = b.productionQueue[0];
-      const pct  = Math.min(100, (item.elapsed / item.totalTime) * 100);
-      const rem  = Math.ceil(item.totalTime - item.elapsed);
-      // Look up emoji from civ def
-      const civDef = this.game.humanPlayer.civDef;
-      const unitDef = civDef?.units?.find((u: {type: string}) => u.type === item.unitType);
-      const emoji = unitDef?.emoji ?? '⚔️';
+      const item    = b.productionQueue[0];
+      const pct     = Math.min(100, (item.elapsed / item.totalTime) * 100);
+      const rem     = Math.ceil(item.totalTime - item.elapsed);
+      const bEmoji  = BUILDING_DEFS[b.type]?.emoji ?? '🏛️';
+      const emoji   = getUnitDef(item.unitType)?.emoji ?? '⚔️';
       const extra = b.productionQueue.length > 1 ? ` +${b.productionQueue.length - 1}` : '';
-      return `<div class="pq-item">` +
+      return `<div class="pq-item" title="${BUILDING_DEFS[b.type]?.name ?? ''}: entrenando ${getUnitDef(item.unitType)?.name ?? ''}">` +
+        `<span class="pq-bld">${bEmoji}</span>` +
         `<span class="pq-icon">${emoji}</span>` +
-        `<div class="pq-bar-wrap"><div class="pq-bar-fill" style="width:${pct}%"></div></div>` +
+        `<div class="pq-bar-wrap"><div class="pq-bar-fill" style="width:${pct.toFixed(1)}%"></div></div>` +
         `<span class="pq-time">${rem}s${extra}</span>` +
         `</div>`;
     }).join('');
