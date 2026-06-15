@@ -93,6 +93,8 @@ export class HUD {
   private _logOpen         = false;
   private _attackArrows:   { angle: number; ts: number }[] = [];
   private _arrowCanvas:    HTMLCanvasElement | null = null;
+  private _weatherCanvas:  HTMLCanvasElement | null = null;
+  private _rainDrops:      { x: number; y: number; len: number; speed: number; opacity: number }[] = [];
 
   private camera: import('../engine/Camera').RTSCamera | null = null;
   setCamera(cam: import('../engine/Camera').RTSCamera) { this.camera = cam; }
@@ -1771,6 +1773,104 @@ export class HUD {
       ctx.stroke();
 
       ctx.restore();
+    }
+  }
+
+  updateWeatherOverlay(dt: number) {
+    const weather = this.game.weather.state;
+    const isActive = weather === 'RAIN' || weather === 'STORM' || weather === 'DROUGHT';
+
+    if (!this._weatherCanvas) {
+      const cv = document.createElement('canvas');
+      cv.id = 'weather-overlay-canvas';
+      cv.style.cssText = 'position:fixed;top:0;left:0;pointer-events:none;z-index:12;';
+      document.body.appendChild(cv);
+      this._weatherCanvas = cv;
+    }
+    const cv = this._weatherCanvas;
+    cv.width  = window.innerWidth;
+    cv.height = window.innerHeight;
+    const ctx = cv.getContext('2d')!;
+    ctx.clearRect(0, 0, cv.width, cv.height);
+
+    if (!isActive || this.game.status !== 'PLAYING') return;
+
+    if (weather === 'RAIN' || weather === 'STORM') {
+      const count  = weather === 'STORM' ? 280 : 140;
+      const speed  = weather === 'STORM' ? 520 : 300;
+      const angle  = weather === 'STORM' ? 0.22 : 0.12; // radians tilt
+      const alpha  = weather === 'STORM' ? 0.30 : 0.18;
+
+      // Spawn drops up to target count
+      while (this._rainDrops.length < count) {
+        this._rainDrops.push({
+          x:       Math.random() * cv.width,
+          y:       Math.random() * cv.height,
+          len:     8 + Math.random() * 12,
+          speed:   speed * (0.8 + Math.random() * 0.4),
+          opacity: 0.4 + Math.random() * 0.6,
+        });
+      }
+      // Trim if weather just changed from storm to rain
+      if (this._rainDrops.length > count) this._rainDrops.length = count;
+
+      ctx.strokeStyle = weather === 'STORM' ? 'rgba(180,210,255,1)' : 'rgba(160,200,255,1)';
+      ctx.lineWidth   = weather === 'STORM' ? 1.2 : 0.8;
+
+      for (const d of this._rainDrops) {
+        d.y += d.speed * dt;
+        d.x += d.speed * Math.tan(angle) * dt;
+        if (d.y > cv.height + 20) { d.y = -20; d.x = Math.random() * cv.width; }
+        if (d.x > cv.width  + 20) { d.x = -20; }
+        ctx.globalAlpha = alpha * d.opacity;
+        ctx.beginPath();
+        ctx.moveTo(d.x, d.y);
+        ctx.lineTo(d.x - d.len * Math.sin(angle), d.y - d.len * Math.cos(angle));
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+
+      // Storm: lightning flash ~every 8s
+      if (weather === 'STORM' && Math.random() < dt * 0.12) {
+        ctx.fillStyle = 'rgba(200,220,255,0.07)';
+        ctx.fillRect(0, 0, cv.width, cv.height);
+      }
+
+      // Dark vignette overlay for storm
+      if (weather === 'STORM') {
+        const grad = ctx.createRadialGradient(cv.width/2, cv.height/2, cv.height*0.3, cv.width/2, cv.height/2, cv.height);
+        grad.addColorStop(0, 'rgba(0,0,20,0)');
+        grad.addColorStop(1, 'rgba(0,0,20,0.35)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, cv.width, cv.height);
+      }
+    } else if (weather === 'DROUGHT') {
+      // Clear any rain drops from previous state
+      this._rainDrops.length = 0;
+
+      // Dust/heat shimmer: subtle amber tint + edge haze
+      const grad = ctx.createRadialGradient(cv.width/2, cv.height/2, cv.height*0.25, cv.width/2, cv.height/2, cv.height);
+      grad.addColorStop(0, 'rgba(50,25,0,0)');
+      grad.addColorStop(1, 'rgba(60,30,0,0.22)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, cv.width, cv.height);
+
+      // Floating dust motes
+      const moteCount = 18;
+      const t = Date.now() / 1000;
+      ctx.fillStyle = 'rgba(200,160,80,0.35)';
+      for (let i = 0; i < moteCount; i++) {
+        const ox  = ((i * 137.5) % 1) * cv.width;
+        const oy  = ((i * 97.3) % 1) * cv.height;
+        const rx  = Math.sin(t * 0.4 + i) * 30;
+        const ry  = Math.cos(t * 0.3 + i * 1.3) * 15;
+        const r   = 1.5 + (i % 3) * 0.8;
+        ctx.globalAlpha = 0.08 + 0.06 * Math.sin(t + i);
+        ctx.beginPath();
+        ctx.arc(ox + rx, oy + ry, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
     }
   }
 }

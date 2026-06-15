@@ -1751,6 +1751,7 @@ class GameInstance {
     }
 
     this.hud.update(selectedNow);
+    this.hud.updateWeatherOverlay(dt);
     this.prodPanel.playerEra = this.game.getEra(this.game.humanPlayerId);
     this.renderer.render();
 
