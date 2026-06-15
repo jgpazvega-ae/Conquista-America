@@ -28,6 +28,30 @@ import { activateCivPower, CIV_POWER_DEFS } from './game/CivPowers';
 import { AllianceType } from './game/Diplomacy';
 import { CIVILIZATIONS } from './game/civilizations';
 
+// ── Veteran names by civilization ─────────────────────────────────────────────
+const CIV_VETERAN_NAMES: Record<CivilizationType, string[]> = {
+  [CivilizationType.AZTEC]: [
+    'Tlacaelel', 'Ahuizotl', 'Chimalli', 'Itzcoatl', 'Yolotl',
+    'Tezca', 'Cuauhtimoc', 'Cipactli', 'Matlal', 'Xochitl',
+    'Acolmiztli', 'Nezahualco', 'Eztli', 'Namacuix', 'Xiuhtecuhtli',
+  ],
+  [CivilizationType.MAYA]: [
+    'K\'awiil', 'Siyaj Chan', 'Itzamnaaj', 'Chaahk', 'Pakal',
+    'Balam', 'Hunac', 'Ek Chuah', 'Bolon', 'Camazotz',
+    'Zipacna', 'Hunahpu', 'Ixbalanque', 'Kukulcán', 'Itzamkana',
+  ],
+  [CivilizationType.INCA]: [
+    'Pachacútec', 'Quilaco', 'Tupac Rimaq', 'Sinchi Roca', 'Huáscar',
+    'Yamqui', 'Ayar Manqo', 'Kusi Yupanqui', 'Rumi Ñawi', 'Puma Inca',
+    'Qori Wayra', 'Atoc', 'Challco', 'Capac Yupanqui', 'Colla Tupac',
+  ],
+  [CivilizationType.CONQUISTADOR]: [
+    'El Vencedor', 'El Fiero', 'El Invicto', 'Brazo de Hierro', 'El Valiente',
+    'El Feroz', 'La Lanza', 'Mano Dura', 'El Audaz', 'El Implacable',
+    'El Bravo', 'El Temible', 'El Fuerte', 'El Guerrero', 'El Infatigable',
+  ],
+};
+
 // ── Choice event type ──────────────────────────────────────────────────────────
 type ChoiceEventDef = {
   emoji: string;
@@ -1046,8 +1070,9 @@ class GameInstance {
             const side = evt.target.playerId === this.game.humanPlayerId ? '☠️' : '⚔️';
             this.hud.addKillFeedEntry(`${side} ${evt.target.heroName ?? evt.target.def.name} ha caído`);
           } else if (evt.target.level >= 2) {
+            const nameLabel = evt.target.veteranName ?? evt.target.def.name;
             const stars = evt.target.level >= 3 ? '★★' : '★';
-            this.hud.addKillFeedEntry(`⚔️ ${evt.target.def.name} ${stars} eliminado`);
+            this.hud.addKillFeedEntry(`⚔️ ${nameLabel} ${stars} eliminado`);
           }
           // Combat combo kill feed entries (human attacker only)
           if (evt.attacker && evt.attacker.playerId === this.game.humanPlayerId) {
@@ -1167,8 +1192,9 @@ class GameInstance {
       const wasBerserk = this._berserkUnits.has(u.id);
       if (u.berserkTimer > 0 && !wasBerserk) {
         this._berserkUnits.add(u.id);
-        this.hud.notify(`🔥 ¡${u.def.name} entró en frenesí! +25% daño por 12s`, 'warning');
-        this.hud.addKillFeedEntry(`🔥 ${u.def.name} — ¡FRENESÍ! (3 bajas consecutivas)`);
+        const bName = u.veteranName ?? u.def.name;
+        this.hud.notify(`🔥 ¡${bName} entró en frenesí! +25% daño por 12s`, 'warning');
+        this.hud.addKillFeedEntry(`🔥 ${bName} — ¡FRENESÍ! (3 bajas consecutivas)`);
         this.renderer.effects.createExplosion(u.worldX, 0.8, u.worldZ, 0.6);
       } else if (u.berserkTimer <= 0 && wasBerserk) {
         this._berserkUnits.delete(u.id);
@@ -1178,10 +1204,22 @@ class GameInstance {
     // Veteran level-up notifications for human units
     for (const u of this.game.newlyLeveledUpUnits) {
       if (u.playerId !== this.game.humanPlayerId) continue;
-      const star = u.level >= 3 ? '🟠' : '⭐';
-      this.hud.notify(`${star} ¡${u.def.name} ha ascendido a veterano rango ${u.level}!`, 'success');
       this.audio.playLevelUp();
       this.renderer.effects.createLevelUpBurst(u.worldX, 1.0, u.worldZ);
+      if (u.level >= 3 && !u.isHero && !u.veteranName) {
+        // Assign a historically-themed name from the civ pool (avoid duplicates)
+        const pool = CIV_VETERAN_NAMES[this.civ];
+        const used = new Set(this.game.allUnits.map(v => v.veteranName).filter(Boolean));
+        const avail = pool.filter(n => !used.has(n));
+        u.veteranName = avail.length > 0
+          ? avail[Math.floor(Math.random() * avail.length)]
+          : pool[Math.floor(Math.random() * pool.length)];
+        this.hud.notify(`👑 ¡${u.def.name} se convierte en "${u.veteranName}"! Campeón legendario`, 'success');
+        this.hud.addKillFeedEntry(`👑 ${u.veteranName} — ¡CAMPEÓN LEGENDARIO!`);
+      } else {
+        const star = u.level >= 3 ? '🟠' : '⭐';
+        this.hud.notify(`${star} ¡${u.def.name} ha ascendido a veterano rango ${u.level}!`, 'success');
+      }
     }
 
     // Hero respawn notifications
