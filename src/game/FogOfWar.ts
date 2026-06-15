@@ -98,6 +98,16 @@ export class FogOfWar {
     return this.playerMemory[row]?.[col] > 0;
   }
 
+  explorationPercent(): number {
+    let explored = 0;
+    for (let r = 0; r < MAP_ROWS; r++) {
+      for (let c = 0; c < MAP_COLS; c++) {
+        if (this.playerMemory[r][c] > 0) explored++;
+      }
+    }
+    return Math.round((explored / (MAP_ROWS * MAP_COLS)) * 100);
+  }
+
   canSeeUnit(unit: Unit, playerId: number): boolean {
     if (unit.playerId === playerId) return true;
     return this.isVisible(Math.round(unit.col), Math.round(unit.row));
@@ -126,6 +136,10 @@ export class FogOfWarManager {
 
   getFog(playerId: number): FogOfWar | undefined {
     return this.fogMaps.get(playerId);
+  }
+
+  explorationPercent(playerId: number): number {
+    return this.fogMaps.get(playerId)?.explorationPercent() ?? 0;
   }
 
   canSeeUnit(unit: Unit, playerId: number): boolean {

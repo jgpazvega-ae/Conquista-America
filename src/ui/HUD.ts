@@ -332,6 +332,12 @@ export class HUD {
     this.updateResearchChip();
     this.updateVillageChip();
     this.updateArmyPanel();
+    this.updateExplorationChip();
+    this.updateDamagedBuildingsChip();
+    this.updateGarrisonChip();
+    this.updateResourceDepletionChip();
+    this.updateEnemyRadarChip();
+    this.updateIdleMilChip();
     this.updateObjectives();
     this.updatePowerButton();
     this.updateBuildingHpBars();
@@ -611,12 +617,23 @@ export class HUD {
     ].filter(([, n]) => (n as number) > 0) as [string, number][];
 
     const total = units.length;
+    const avgMorale  = Math.round(units.reduce((s, u) => s + u.morale, 0) / total);
+    const moraleColor = avgMorale < 40 ? '#dd4422' : avgMorale < 65 ? '#ddaa00' : '#66dd66';
+    const veterans   = units.filter(u => u.level >= 2).length;
+    const vetStr     = veterans > 0 ? ` · ★${veterans}` : '';
+
     el.classList.remove('hidden');
     el.innerHTML =
+      `<div class="ap-row">` +
       cats.map(([icon, n]) =>
         `<span class="ap-cat"><span class="ap-icon">${icon}</span><span class="ap-count">${n}</span></span>`
       ).join('') +
-      `<span class="ap-total">${total} total</span>`;
+      `<span class="ap-total">${total} total</span>` +
+      `</div>` +
+      `<div class="ap-row2">` +
+      `<span style="font-size:8px;color:${moraleColor}">❤ ${avgMorale}%</span>` +
+      `<span style="font-size:8px;color:#ccaa44">${vetStr}</span>` +
+      `</div>`;
   }
 
   private updateVillageChip() {
@@ -634,6 +651,200 @@ export class HUD {
         `<span class="vc-name">${label}</span>` +
         `<div class="vc-track"><div class="vc-fill" style="width:${pct}%"></div></div>` +
         `<span class="vc-eta">guerrero en ${Math.ceil(timer)}s</span>` +
+      `</div>`;
+  }
+
+  private _explorationTick = 0;
+  private updateExplorationChip() {
+    this._explorationTick++;
+    if (this._explorationTick % 60 !== 0) return; // update ~once per second
+    const el = document.getElementById('exploration-chip');
+    if (!el) return;
+    if (this.game.status !== 'PLAYING') { el.classList.add('hidden'); return; }
+    const pct = this.game.explorationPercent;
+    el.classList.remove('hidden');
+    el.innerHTML =
+      `<span class="ex-icon">🗺️</span>` +
+      `<div class="ex-info">` +
+        `<span class="ex-label">Explorado</span>` +
+        `<div class="ex-track"><div class="ex-fill" style="width:${pct}%"></div></div>` +
+        `<span class="ex-pct">${pct}% del mapa</span>` +
+      `</div>`;
+  }
+
+  private _dmgBldTick = 0;
+  private updateDamagedBuildingsChip() {
+    this._dmgBldTick++;
+    if (this._dmgBldTick % 30 !== 0) return; // ~0.5s
+    const el = document.getElementById('dmg-bld-chip');
+    if (!el) return;
+    if (this.game.status !== 'PLAYING') { el.classList.add('hidden'); return; }
+    const damaged = this.game.allBuildings.filter(
+      b => b.playerId === this.game.humanPlayerId && b.isAlive() && b.isComplete() && b.hp < b.maxHp,
+    );
+    if (damaged.length === 0) { el.classList.add('hidden'); el.classList.remove('pulse'); return; }
+
+    const critical = damaged.filter(b => b.hp / b.maxHp < 0.4);
+    el.classList.remove('hidden');
+    if (critical.length > 0) el.classList.add('pulse'); else el.classList.remove('pulse');
+
+    const worst = damaged.reduce((a, b) => (a.hp / a.maxHp < b.hp / b.maxHp ? a : b));
+    const worstPct = Math.round((worst.hp / worst.maxHp) * 100);
+    const label = damaged.length === 1
+      ? `1 edificio dañado (${worstPct}%)`
+      : `${damaged.length} edificios dañados`;
+    el.innerHTML =
+      `<span class="db-icon">🔨</span>` +
+      `<div class="db-info">` +
+        `<span class="db-main">${label}</span>` +
+        `<span class="db-hint">W → reparar</span>` +
+      `</div>`;
+  }
+
+  private _garrisonTick = 0;
+  private updateGarrisonChip() {
+    this._garrisonTick++;
+    if (this._garrisonTick % 30 !== 0) return;
+    const el = document.getElementById('garrison-chip');
+    if (!el) return;
+    if (this.game.status !== 'PLAYING') { el.classList.add('hidden'); return; }
+
+    const garrisonedBuildings = this.game.allBuildings.filter(
+      b => b.playerId === this.game.humanPlayerId && b.isAlive() && b.garrison.length > 0,
+    );
+    const totalGarrisoned = garrisonedBuildings.reduce((s, b) => s + b.garrison.length, 0);
+    if (totalGarrisoned === 0) { el.classList.add('hidden'); return; }
+
+    const bldgSummary = garrisonedBuildings.slice(0, 3).map(b => {
+      const emoji = BUILDING_DEFS[b.type]?.emoji ?? '🏛️';
+      return `${emoji}×${b.garrison.length}`;
+    }).join(' ');
+    const extra = garrisonedBuildings.length > 3 ? ` +${garrisonedBuildings.length - 3}` : '';
+
+    el.classList.remove('hidden');
+    el.innerHTML =
+      `<span class="gc-icon">🏰</span>` +
+      `<div class="gc-info">` +
+        `<span class="gc-main">${totalGarrisoned} en guarnición</span>` +
+        `<span class="gc-hint">${bldgSummary}${extra} · U desalojar</span>` +
+      `</div>`;
+  }
+
+  private _rdTick = 0;
+  private updateResourceDepletionChip() {
+    this._rdTick++;
+    if (this._rdTick % 180 !== 0) return; // every 3 seconds
+    const el = document.getElementById('res-depletion-chip');
+    if (!el) return;
+    if (this.game.status !== 'PLAYING') { el.classList.add('hidden'); return; }
+
+    const types: [ResourceType, string, string][] = [
+      [ResourceType.FOOD,  '🌽', '#44cc44'],
+      [ResourceType.GOLD,  '⚜️',  '#ccaa22'],
+      [ResourceType.STONE, '🪨', '#aaaaaa'],
+      [ResourceType.WOOD,  '🪵', '#885533'],
+    ];
+
+    type StatEntry = { type: ResourceType; icon: string; color: string; pct: number; remaining: number; total: number };
+    const stats: StatEntry[] = [];
+    for (const [type, icon, color] of types) {
+      const nodes = this.game.resourceNodes.filter(n => n.type === type);
+      if (nodes.length === 0) continue;
+      const totalAmt = nodes.reduce((s, n) => s + n.amount, 0);
+      const totalMax = nodes.reduce((s, n) => s + n.maxAmount, 0);
+      const pct = totalMax > 0 ? totalAmt / totalMax : 1;
+      stats.push({ type, icon, color, pct, remaining: nodes.filter(n => !n.isEmpty()).length, total: nodes.length });
+    }
+
+    const scarce = stats.filter(s => s.pct < 0.30);
+    if (scarce.length === 0) { el.classList.add('hidden'); el.classList.remove('critical'); return; }
+
+    const critical = scarce.some(s => s.pct < 0.10);
+    el.classList.remove('hidden');
+    el.classList.toggle('critical', critical);
+
+    el.innerHTML =
+      `<span class="rd-icon">⚠️</span>` +
+      `<div class="rd-info">` +
+        `<span class="rd-title">Recursos escasos</span>` +
+        `<div class="rd-rows">` +
+        scarce.map(s =>
+          `<div class="rd-row">` +
+            `<span>${s.icon}</span>` +
+            `<div class="rd-bar"><div class="rd-fill" style="width:${Math.round(s.pct * 100)}%;background:${s.color}"></div></div>` +
+            `<span style="color:#997755">${s.remaining}/${s.total}</span>` +
+          `</div>`
+        ).join('') +
+        `</div>` +
+      `</div>`;
+  }
+
+  private _erTick = 0;
+  private updateEnemyRadarChip() {
+    this._erTick++;
+    if (this._erTick % 20 !== 0) return; // ~0.33s
+    const el = document.getElementById('enemy-radar-chip');
+    if (!el) return;
+    if (this.game.status !== 'PLAYING') { el.classList.add('hidden'); return; }
+
+    const humanFog = this.game.fog.getFog(this.game.humanPlayerId);
+    let visible = 0, heroes = 0, inRange = 0;
+    for (const p of this.game.players) {
+      if (p.id === this.game.humanPlayerId) continue;
+      for (const u of p.aliveUnits) {
+        if (!u.garrisonedIn && (!humanFog || humanFog.canSeeUnit(u, this.game.humanPlayerId))) {
+          visible++;
+          if (u.isHero) heroes++;
+          const settle = this.game.allBuildings.find(
+            b => b.playerId === this.game.humanPlayerId && b.type === BuildingType.SETTLEMENT && b.isAlive(),
+          );
+          if (settle && Math.abs(u.col - settle.col) <= 20 && Math.abs(u.row - settle.row) <= 20) inRange++;
+        }
+      }
+    }
+
+    if (visible === 0) { el.classList.add('hidden'); el.classList.remove('danger'); return; }
+
+    el.classList.remove('hidden');
+    el.classList.toggle('danger', inRange > 0);
+    const heroStr = heroes > 0 ? ` (incl. ${heroes} héroe${heroes > 1 ? 's' : ''})` : '';
+    const threat  = inRange > 0 ? `⚠️ ${inRange} cerca de base` : 'fuera de base';
+    el.innerHTML =
+      `<span class="er-icon">👁️</span>` +
+      `<div class="er-info">` +
+        `<span class="er-main">${visible} enem. visible${visible > 1 ? 's' : ''}${heroStr}</span>` +
+        `<span class="er-detail">${threat}</span>` +
+      `</div>`;
+  }
+
+  private _imTick = 0;
+  private updateIdleMilChip() {
+    this._imTick++;
+    if (this._imTick % 60 !== 0) return;
+    const el = document.getElementById('idle-mil-chip');
+    if (!el) return;
+    if (this.game.status !== 'PLAYING') { el.classList.add('hidden'); return; }
+    // Only check if player has enough resources to train at least something
+    const res = this.game.humanPlayer.resources;
+    if (res.food < 40 && res.gold < 40) { el.classList.add('hidden'); return; }
+
+    const MILITARY_TYPES = new Set([BuildingType.BARRACKS, BuildingType.HARBOR]);
+    const idleBlds = this.game.allBuildings.filter(
+      b => b.playerId === this.game.humanPlayerId &&
+           b.isAlive() && b.isComplete() &&
+           MILITARY_TYPES.has(b.type) &&
+           b.productionQueue.length === 0,
+    );
+    if (idleBlds.length === 0) { el.classList.add('hidden'); return; }
+
+    const summary = idleBlds.slice(0, 3).map(b => BUILDING_DEFS[b.type]?.emoji ?? '🏛️').join(' ');
+    const extra   = idleBlds.length > 3 ? ` +${idleBlds.length - 3}` : '';
+    el.classList.remove('hidden');
+    el.innerHTML =
+      `<span class="im-icon">⚔️</span>` +
+      `<div class="im-info">` +
+        `<span class="im-main">${idleBlds.length} cuartel${idleBlds.length > 1 ? 'es' : ''} sin entrenar</span>` +
+        `<span class="im-hint">${summary}${extra} — selecciona y entrena</span>` +
       `</div>`;
   }
 
@@ -934,6 +1145,15 @@ export class HUD {
       ctx.beginPath();
       ctx.rect(building.col * tw - buildSize / 2, building.row * th - buildSize / 2, buildSize, buildSize);
       ctx.fill();
+      // Capture pulse: overlay orange when building is being captured
+      if (building.captureProgress > 0) {
+        const pulse = 0.4 + 0.35 * Math.abs(Math.sin(Date.now() / 250));
+        ctx.fillStyle = '#ff8822';
+        ctx.globalAlpha = pulse * (building.captureProgress / 100);
+        ctx.beginPath();
+        ctx.rect(building.col * tw - buildSize / 2, building.row * th - buildSize / 2, buildSize, buildSize);
+        ctx.fill();
+      }
     }
     ctx.globalAlpha = 1.0;
 

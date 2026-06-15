@@ -1673,12 +1673,13 @@ kbd {
   border-radius: 6px;
   padding: 4px 8px;
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 3px;
   margin-top: 5px;
-  flex-wrap: wrap;
   width: 160px;
 }
+.ap-row  { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ap-row2 { display: flex; align-items: center; gap: 8px; }
 #army-panel.hidden { display: none; }
 .ap-cat {
   display: flex;
@@ -1689,3 +1690,124 @@ kbd {
 .ap-icon { font-size: 11px; line-height: 1; }
 .ap-count { color: #e8d898; font-weight: 700; font-size: 10px; }
 .ap-total { font-size: 8px; color: #887755; margin-left: auto; white-space: nowrap; }
+
+/* Map exploration chip */
+#exploration-chip {
+  background: rgba(15,15,30,0.82);
+  border: 1px solid rgba(80,80,160,0.5);
+  border-radius: 6px;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  width: 160px;
+}
+#exploration-chip.hidden { display: none; }
+.ex-icon  { font-size: 11px; flex-shrink: 0; }
+.ex-info  { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.ex-label { font-size: 9px; font-weight: 700; color: #aaaaee; }
+.ex-track { height: 4px; background: #0f0f22; border-radius: 2px; overflow: hidden; }
+.ex-fill  { height: 100%; background: linear-gradient(90deg,#3333aa,#6666ff); border-radius: 2px; transition: width 2s linear; }
+.ex-pct   { font-size: 8px; color: #7777bb; }
+
+/* Damaged buildings chip */
+#dmg-bld-chip {
+  background: rgba(40,15,10,0.88);
+  border: 1px solid rgba(200,80,30,0.55);
+  border-radius: 6px;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  width: 160px;
+  cursor: default;
+}
+#dmg-bld-chip.hidden { display: none; }
+#dmg-bld-chip.pulse { animation: dmgPulse 1.5s ease-in-out infinite; }
+@keyframes dmgPulse {
+  0%, 100% { border-color: rgba(200,80,30,0.55); }
+  50%       { border-color: rgba(255,120,50,0.9); }
+}
+.db-icon  { font-size: 13px; flex-shrink: 0; }
+.db-info  { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.db-main  { font-size: 9px; font-weight: 700; color: #ff9966; white-space: nowrap; }
+.db-hint  { font-size: 8px; color: #886655; }
+
+/* Garrison summary chip */
+#garrison-chip {
+  background: rgba(10,20,30,0.85);
+  border: 1px solid rgba(60,120,180,0.5);
+  border-radius: 6px;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  width: 160px;
+}
+#garrison-chip.hidden { display: none; }
+.gc-icon  { font-size: 13px; flex-shrink: 0; }
+.gc-info  { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.gc-main  { font-size: 9px; font-weight: 700; color: #88bbff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gc-hint  { font-size: 8px; color: #556688; }
+
+/* Resource depletion chip */
+#res-depletion-chip {
+  background: rgba(35,20,5,0.88);
+  border: 1px solid rgba(200,160,30,0.5);
+  border-radius: 6px;
+  padding: 4px 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 5px;
+  width: 160px;
+}
+#res-depletion-chip.hidden { display: none; }
+#res-depletion-chip.critical { border-color: rgba(240,80,30,0.8); }
+.rd-icon { font-size: 13px; flex-shrink: 0; }
+.rd-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.rd-title { font-size: 9px; font-weight: 700; color: #ddaa44; }
+.rd-rows  { display: flex; flex-direction: column; gap: 1px; }
+.rd-row   { display: flex; align-items: center; gap: 3px; font-size: 8px; }
+.rd-bar   { flex: 1; height: 3px; background: #2a1a05; border-radius: 2px; overflow: hidden; }
+.rd-fill  { height: 100%; border-radius: 2px; }
+
+/* Visible enemy radar chip */
+#enemy-radar-chip {
+  background: rgba(35,8,8,0.88);
+  border: 1px solid rgba(200,50,50,0.5);
+  border-radius: 6px;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  width: 160px;
+}
+#enemy-radar-chip.hidden { display: none; }
+#enemy-radar-chip.danger { border-color: rgba(255,80,30,0.9); animation: dmgPulse 1s ease-in-out infinite; }
+.er-icon  { font-size: 13px; flex-shrink: 0; }
+.er-info  { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.er-main  { font-size: 9px; font-weight: 700; color: #ff8888; white-space: nowrap; }
+.er-detail { font-size: 8px; color: #884444; }
+
+/* Idle military buildings chip */
+#idle-mil-chip {
+  background: rgba(20,20,10,0.85);
+  border: 1px solid rgba(160,160,40,0.5);
+  border-radius: 6px;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  width: 160px;
+}
+#idle-mil-chip.hidden { display: none; }
+.im-icon  { font-size: 13px; flex-shrink: 0; }
+.im-info  { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.im-main  { font-size: 9px; font-weight: 700; color: #dddd66; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.im-hint  { font-size: 8px; color: #776644; }
