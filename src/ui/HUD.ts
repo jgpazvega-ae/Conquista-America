@@ -15,6 +15,7 @@ import { AllianceType } from '../game/Diplomacy';
 import { TECH_DEFS, TechType } from '../game/Tech';
 import { BUILDING_DEFS } from '../game/buildingDefs';
 import { getUnitDef } from '../game/civilizations';
+import { WorkerTask } from '../game/Worker';
 
 function hex(n: number): string {
   return '#' + n.toString(16).padStart(6, '0');
@@ -920,14 +921,16 @@ export class HUD {
     }
     ctx.globalAlpha = 1.0;
 
-    // Draw workers
+    // Draw workers — idle workers pulse brightly to signal underutilized labor
+    const idlePulse = 0.5 + 0.5 * Math.sin(Date.now() / 350);
     for (const worker of this.game.allWorkers) {
       const player = this.game.players[worker.playerId];
-      const col = CIV_COLORS[player.civType];
-      ctx.fillStyle = hex(col);
-      ctx.globalAlpha = 0.6;
+      const isIdle = worker.task === WorkerTask.IDLE && worker.playerId === this.game.humanPlayerId;
+      ctx.fillStyle = isIdle ? '#ffee44' : hex(CIV_COLORS[player.civType]);
+      ctx.globalAlpha = isIdle ? 0.4 + 0.6 * idlePulse : 0.6;
+      const r = isIdle ? unitSize / 2 : unitSize / 3;
       ctx.beginPath();
-      ctx.arc(worker.col * tw + tw / 2, worker.row * th + th / 2, unitSize / 3, 0, Math.PI * 2);
+      ctx.arc(worker.col * tw + tw / 2, worker.row * th + th / 2, r, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.globalAlpha = 1.0;
