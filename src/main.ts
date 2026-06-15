@@ -235,6 +235,7 @@ class GameInstance {
   private _battleWindowLosses    = 0;   // allied losses in the current 30s analysis window
   private _battleWindowTimer     = 0;   // > 0 while an analysis window is open
   private _battleReportCooldown  = 0;   // prevents consecutive reports (90s cooldown)
+  private _mapPings: { worldX: number; worldZ: number; el: HTMLDivElement; expires: number }[] = [];
 
   /** Show a tutorial hint at most once per match. */
   private hintOnce(key: string, msg: string) {
@@ -655,6 +656,7 @@ class GameInstance {
     this.input.onHover = (unitId, buildingId, x, y, tileCol, tileRow) => {
       this.hud.showHoverTooltip(unitId, buildingId, x, y, tileCol, tileRow, this.game.map);
     };
+    this.input.onMapPing = (worldX, worldZ) => this.createMapPing(worldX, worldZ);
 
     this.input.onTerrainClick = (col, row) => {
       if (!this._placingType) return;
@@ -948,6 +950,9 @@ class GameInstance {
       this._groupBarTimer = 0.5;
       this.updateCtrlGroupsBar();
     }
+
+    // Map ping positions (world → screen each frame)
+    if (this._mapPings.length > 0) this.tickMapPings();
 
     // Battle report cooldown & window tracking
     if (this._battleReportCooldown > 0) this._battleReportCooldown -= dt;
@@ -2807,6 +2812,35 @@ class GameInstance {
     this.hud.notify(`${evt.emoji} ${evt.name}: ${evt.desc}`, evt.type);
     // Camera shake for dramatic events
     if (evt.type === 'warning') this.camera.shake(0.18, 0.3);
+  }
+
+  private createMapPing(worldX: number, worldZ: number) {
+    const container = document.getElementById('ping-container');
+    if (!container) return;
+    // Limit to 3 simultaneous pings — remove oldest if needed
+    while (this._mapPings.length >= 3) {
+      const old = this._mapPings.shift()!;
+      old.el.remove();
+    }
+    const el = document.createElement('div');
+    el.className = 'map-ping';
+    container.appendChild(el);
+    this._mapPings.push({ worldX, worldZ, el, expires: Date.now() + 5000 });
+    this.audio.playClick();
+  }
+
+  private tickMapPings() {
+    const now = Date.now();
+    this._mapPings = this._mapPings.filter(ping => {
+      if (now >= ping.expires) { ping.el.remove(); return false; }
+      const screen = this.renderer.worldToScreen(ping.worldX, 0.5, ping.worldZ);
+      ping.el.style.left = `${screen.x}px`;
+      ping.el.style.top  = `${screen.y}px`;
+      // Fade out in last 1.5s
+      const remaining = ping.expires - now;
+      ping.el.style.opacity = remaining < 1500 ? String(remaining / 1500) : '1';
+      return true;
+    });
   }
 
   private updateCtrlGroupsBar() {
