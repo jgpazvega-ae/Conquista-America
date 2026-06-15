@@ -75,7 +75,9 @@ export class Unit {
   private rightArm: THREE.Group | null = null;
   healthBar!: THREE.Mesh;
   selectionRing!: THREE.Mesh;
-  private _levelRing: THREE.Mesh | null = null;
+  private _levelRing:  THREE.Mesh | null = null;
+  private _statusRing: THREE.Mesh | null = null;
+  private _statusRingT = Math.random() * 6.28;
   private selected    = false;
   private animT       = Math.random() * 10;
   private attackAnim  = 0;
@@ -845,6 +847,7 @@ export class Unit {
     this.state         = UnitState.DEAD;
     this.selected      = false;
     this.selectionRing.visible = false;
+    if (this._statusRing) { this.mesh.remove(this._statusRing); this._statusRing = null; }
     this._deathTimer   = 0;   // start fall animation; mesh hides after animation completes
   }
 
@@ -879,6 +882,31 @@ export class Unit {
     this.attackTimer  = Math.max(0, this.attackTimer - dt);
     if (this.berserkTimer > 0) this.berserkTimer = Math.max(0, this.berserkTimer - dt);
     this.animT += dt;
+
+    // Status ring: pulsing colored aura for panic / berserk / DoT effects
+    const statusColor = this.panicked ? 0xff2222
+      : this.berserkTimer > 0       ? 0xff8800
+      : (this.burning > 0 || this.poisoned > 0) ? 0xcc44ff : 0;
+    if (statusColor) {
+      if (!this._statusRing) {
+        const mat = new THREE.MeshBasicMaterial({
+          color: statusColor, transparent: true, opacity: 0.7,
+          depthTest: false, side: THREE.DoubleSide,
+        });
+        this._statusRing = new THREE.Mesh(new THREE.RingGeometry(0.86, 1.02, 32), mat);
+        this._statusRing.rotation.x = -Math.PI / 2;
+        this._statusRing.position.y = 0.04;
+        this._statusRing.renderOrder = 8;
+        this.mesh.add(this._statusRing);
+      }
+      this._statusRingT += dt * (this.panicked ? 4.5 : 2.5);
+      const pulse = 0.25 + 0.75 * (0.5 + 0.5 * Math.sin(this._statusRingT));
+      (this._statusRing.material as THREE.MeshBasicMaterial).color.setHex(statusColor);
+      (this._statusRing.material as THREE.MeshBasicMaterial).opacity = pulse * 0.85;
+    } else if (this._statusRing) {
+      this.mesh.remove(this._statusRing);
+      this._statusRing = null;
+    }
 
     // Stationary defense: track time spent holding ground without moving
     if (this.state === UnitState.IDLE || this.state === UnitState.HOLD) {

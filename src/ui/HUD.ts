@@ -1205,9 +1205,25 @@ export class HUD {
             continue; // don't draw in real position
           }
         }
+        // Status-aware dot color: panic=red flash, berserk=orange, DoT=purple
+        const dotNow = Date.now();
+        let dotColor: string | null = null;
+        if (unit.panicked) {
+          const flash = Math.sin(dotNow / 120) > 0;
+          dotColor = flash ? '#ff2222' : '#ff8888';
+        } else if (unit.berserkTimer > 0) {
+          dotColor = '#ff8800';
+        } else if (unit.burning > 0 || unit.poisoned > 0) {
+          dotColor = '#cc44ff';
+        }
+        if (dotColor) ctx.fillStyle = dotColor;
+        ctx.globalAlpha = 0.9;
         ctx.beginPath();
         ctx.arc(unit.col * tw + tw / 2, unit.row * th + th / 2, unitSize / 2, 0, Math.PI * 2);
         ctx.fill();
+        // Restore civ color for next iteration
+        if (dotColor) ctx.fillStyle = hex(col);
+        ctx.globalAlpha = 1.0;
       }
     }
 
