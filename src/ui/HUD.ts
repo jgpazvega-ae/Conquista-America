@@ -1011,6 +1011,27 @@ export class HUD {
       ctx.strokeRect(1, 1, W - 2, H - 2);
     }
 
+    // Rally point flags: small diamond markers for human buildings with rally points set
+    {
+      const civColor = CIV_COLORS[this.game.humanPlayer.civType];
+      ctx.fillStyle = hex(civColor);
+      ctx.globalAlpha = 0.75;
+      for (const b of this.game.allBuildings) {
+        if (b.playerId !== this.game.humanPlayerId || !b.isAlive() || b.rallyCol === null || b.rallyRow === null) continue;
+        const rx = b.rallyCol * tw + tw / 2;
+        const rz = b.rallyRow * th + th / 2;
+        const s = Math.max(2, Math.min(tw, th));
+        ctx.beginPath();
+        ctx.moveTo(rx,     rz - s);
+        ctx.lineTo(rx + s, rz);
+        ctx.lineTo(rx,     rz + s);
+        ctx.lineTo(rx - s, rz);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1.0;
+    }
+
     // Camera viewport rectangle
     if (this.camera) {
       const pos = this.camera.getPosition();
