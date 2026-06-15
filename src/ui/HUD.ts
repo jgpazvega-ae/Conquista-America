@@ -334,6 +334,7 @@ export class HUD {
     this.updateArmyPanel();
     this.updateExplorationChip();
     this.updateDamagedBuildingsChip();
+    this.updateGarrisonChip();
     this.updateObjectives();
     this.updatePowerButton();
     this.updateBuildingHpBars();
@@ -694,6 +695,35 @@ export class HUD {
       `<div class="db-info">` +
         `<span class="db-main">${label}</span>` +
         `<span class="db-hint">W → reparar</span>` +
+      `</div>`;
+  }
+
+  private _garrisonTick = 0;
+  private updateGarrisonChip() {
+    this._garrisonTick++;
+    if (this._garrisonTick % 30 !== 0) return;
+    const el = document.getElementById('garrison-chip');
+    if (!el) return;
+    if (this.game.status !== 'PLAYING') { el.classList.add('hidden'); return; }
+
+    const garrisonedBuildings = this.game.allBuildings.filter(
+      b => b.playerId === this.game.humanPlayerId && b.isAlive() && b.garrison.length > 0,
+    );
+    const totalGarrisoned = garrisonedBuildings.reduce((s, b) => s + b.garrison.length, 0);
+    if (totalGarrisoned === 0) { el.classList.add('hidden'); return; }
+
+    const bldgSummary = garrisonedBuildings.slice(0, 3).map(b => {
+      const emoji = BUILDING_DEFS[b.type]?.emoji ?? '🏛️';
+      return `${emoji}×${b.garrison.length}`;
+    }).join(' ');
+    const extra = garrisonedBuildings.length > 3 ? ` +${garrisonedBuildings.length - 3}` : '';
+
+    el.classList.remove('hidden');
+    el.innerHTML =
+      `<span class="gc-icon">🏰</span>` +
+      `<div class="gc-info">` +
+        `<span class="gc-main">${totalGarrisoned} en guarnición</span>` +
+        `<span class="gc-hint">${bldgSummary}${extra} · U desalojar</span>` +
       `</div>`;
   }
 

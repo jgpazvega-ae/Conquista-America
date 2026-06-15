@@ -1734,3 +1734,21 @@ kbd {
 .db-info  { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
 .db-main  { font-size: 9px; font-weight: 700; color: #ff9966; white-space: nowrap; }
 .db-hint  { font-size: 8px; color: #886655; }
+
+/* Garrison summary chip */
+#garrison-chip {
+  background: rgba(10,20,30,0.85);
+  border: 1px solid rgba(60,120,180,0.5);
+  border-radius: 6px;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  width: 160px;
+}
+#garrison-chip.hidden { display: none; }
+.gc-icon  { font-size: 13px; flex-shrink: 0; }
+.gc-info  { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.gc-main  { font-size: 9px; font-weight: 700; color: #88bbff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gc-hint  { font-size: 8px; color: #556688; }
