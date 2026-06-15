@@ -237,6 +237,8 @@ class GameInstance {
   private _battleReportCooldown  = 0;   // prevents consecutive reports (90s cooldown)
   private _mapPings: { worldX: number; worldZ: number; el: HTMLDivElement; expires: number }[] = [];
   private _killMilestonesReached = new Set<string>(); // `${unitId}-${milestone}` to fire once
+  private _rapidKillTs:  number[] = []; // timestamps of recent enemy kills (for multi-kill detection)
+  private _mkAnnouncerTimer = 0;        // countdown to remove multikill-announcer element
   private _baseAlertCooldown = 0; // seconds until next enemy-near-base notification
   private _popCapWarnCooldown = 0; // seconds until next pop-cap warning
 
@@ -785,6 +787,16 @@ class GameInstance {
     if (this._grandBattleCooldown  > 0) this._grandBattleCooldown  = Math.max(0, this._grandBattleCooldown  - rawDt);
     if (this._baseAlertCooldown    > 0) this._baseAlertCooldown    = Math.max(0, this._baseAlertCooldown    - rawDt);
     if (this._popCapWarnCooldown   > 0) this._popCapWarnCooldown   = Math.max(0, this._popCapWarnCooldown   - rawDt);
+    if (this._mkAnnouncerTimer     > 0) {
+      this._mkAnnouncerTimer = Math.max(0, this._mkAnnouncerTimer - rawDt);
+      if (this._mkAnnouncerTimer === 0) {
+        const el = document.getElementById('multikill-announcer');
+        if (el) {
+          el.classList.add('mk-exit');
+          setTimeout(() => el.classList.add('hidden'), 500);
+        }
+      }
+    }
     this.game.update(dt);
 
     // Register any units produced this frame
@@ -1116,6 +1128,20 @@ class GameInstance {
           if (evt.attacker?.playerId === this.game.humanPlayerId && evt.target.playerId !== this.game.humanPlayerId) {
             if (this._battleWindowTimer <= 0) this._battleWindowTimer = 30;
             this._battleWindowKills++;
+            // Rapid multi-kill announcer: track kills within a 5s window
+            const nowMs = Date.now();
+            this._rapidKillTs.push(nowMs);
+            this._rapidKillTs = this._rapidKillTs.filter(t => nowMs - t < 5000);
+            const rk = this._rapidKillTs.length;
+            if (rk >= 2) {
+              const [title, sub, color] =
+                rk >= 6 ? ['¡IMPARABLE!',       '¡DOMINIO TOTAL!',           '#ff2200'] :
+                rk >= 5 ? ['¡MASACRE!',          'Cinco bajas rápidas',        '#ff5500'] :
+                rk >= 4 ? ['¡CUÁDRUPLE BAJA!',   'Cuatro en el fragor',        '#ff8800'] :
+                rk >= 3 ? ['¡TRIPLE ELIMINACIÓN!','Tres unidades abatidas',     '#ffcc00'] :
+                          ['¡DOBLE BAJA!',        'Dos golpes mortales',        '#aaffaa'];
+              this.showMultiKillAnnouncer(title, sub, color);
+            }
           } else if (evt.target.playerId === this.game.humanPlayerId && this._battleWindowTimer > 0) {
             this._battleWindowLosses++;
           }
@@ -2955,6 +2981,16 @@ class GameInstance {
     void slot.offsetWidth;
     slot.classList.add('cg-flash');
     setTimeout(() => slot.classList.remove('cg-flash'), 400);
+  }
+
+  private showMultiKillAnnouncer(title: string, sub: string, color: string) {
+    const el = document.getElementById('multikill-announcer');
+    if (!el) return;
+    el.innerHTML = `<div class="mk-title" style="color:${color}">${title}</div><div class="mk-sub" style="color:${color}">${sub}</div>`;
+    el.classList.remove('hidden', 'mk-exit');
+    void el.offsetWidth; // force reflow to restart animation
+    el.style.color = color;
+    this._mkAnnouncerTimer = 2.2;
   }
 
   private showBattleReport(kills: number, losses: number) {
