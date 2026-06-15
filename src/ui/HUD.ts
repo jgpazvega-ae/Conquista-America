@@ -829,31 +829,42 @@ export class HUD {
 
     const humanFog = this.game.fog.getFog(this.game.humanPlayerId);
     let visible = 0, heroes = 0, inRange = 0;
+    let melee = 0, ranged = 0, cavalry = 0, cannon = 0;
+    const settle = this.game.allBuildings.find(
+      b => b.playerId === this.game.humanPlayerId && b.type === BuildingType.SETTLEMENT && b.isAlive(),
+    );
     for (const p of this.game.players) {
       if (p.id === this.game.humanPlayerId) continue;
       for (const u of p.aliveUnits) {
         if (!u.garrisonedIn && (!humanFog || humanFog.canSeeUnit(u, this.game.humanPlayerId))) {
           visible++;
-          if (u.isHero) heroes++;
-          const settle = this.game.allBuildings.find(
-            b => b.playerId === this.game.humanPlayerId && b.type === BuildingType.SETTLEMENT && b.isAlive(),
-          );
+          if (u.isHero) { heroes++; continue; }
           if (settle && Math.abs(u.col - settle.col) <= 20 && Math.abs(u.row - settle.row) <= 20) inRange++;
+          if (u.type === UnitType.CANNON)    cannon++;
+          else if (u.def.isCavalry)          cavalry++;
+          else if (u.def.isRanged)           ranged++;
+          else                               melee++;
         }
       }
     }
 
     if (visible === 0) { el.classList.add('hidden'); el.classList.remove('danger'); return; }
 
+    const compParts: string[] = [];
+    if (melee > 0)   compParts.push(`🗡️${melee}`);
+    if (ranged > 0)  compParts.push(`🏹${ranged}`);
+    if (cavalry > 0) compParts.push(`🐎${cavalry}`);
+    if (cannon > 0)  compParts.push(`💣${cannon}`);
+    if (heroes > 0)  compParts.push(`👑${heroes}`);
+    const comp   = compParts.join(' ');
+    const threat = inRange > 0 ? `⚠️ ${inRange} cerca de tu base` : 'fuera de base';
     el.classList.remove('hidden');
     el.classList.toggle('danger', inRange > 0);
-    const heroStr = heroes > 0 ? ` (incl. ${heroes} héroe${heroes > 1 ? 's' : ''})` : '';
-    const threat  = inRange > 0 ? `⚠️ ${inRange} cerca de base` : 'fuera de base';
     el.innerHTML =
       `<span class="er-icon">👁️</span>` +
       `<div class="er-info">` +
-        `<span class="er-main">${visible} enem. visible${visible > 1 ? 's' : ''}${heroStr}</span>` +
-        `<span class="er-detail">${threat}</span>` +
+        `<span class="er-main">${visible} enem. visible${visible > 1 ? 's' : ''}</span>` +
+        `<span class="er-detail">${comp ? comp + ' · ' : ''}${threat}</span>` +
       `</div>`;
   }
 
