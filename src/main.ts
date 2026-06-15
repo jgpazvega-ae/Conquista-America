@@ -230,6 +230,10 @@ class GameInstance {
   private _cheatBuffer           = ''; // accumulates typed chars for cheat-code detection
   private _nextChoiceEventTime   = 240; // first interactive choice event at 4 min game-time
   private _choiceEventActive     = false;
+  private _battleWindowKills     = 0;   // enemy kills in the current 30s analysis window
+  private _battleWindowLosses    = 0;   // allied losses in the current 30s analysis window
+  private _battleWindowTimer     = 0;   // > 0 while an analysis window is open
+  private _battleReportCooldown  = 0;   // prevents consecutive reports (90s cooldown)
 
   /** Show a tutorial hint at most once per match. */
   private hintOnce(key: string, msg: string) {
@@ -937,6 +941,20 @@ class GameInstance {
       this.triggerChoiceEvent();
     }
 
+    // Battle report cooldown & window tracking
+    if (this._battleReportCooldown > 0) this._battleReportCooldown -= dt;
+    if (this._battleWindowTimer > 0) {
+      this._battleWindowTimer -= dt;
+      if (this._battleWindowTimer <= 0) {
+        if (this._battleWindowKills >= 4 && this._battleReportCooldown <= 0) {
+          this.showBattleReport(this._battleWindowKills, this._battleWindowLosses);
+          this._battleReportCooldown = 90;
+        }
+        this._battleWindowKills  = 0;
+        this._battleWindowLosses = 0;
+      }
+    }
+
     // Auto-checkpoint every 3 minutes: save current stats to profile
     if (this.game.gameTime >= this._autoSaveTimer) {
       this._autoSaveTimer += 180;
@@ -1053,6 +1071,13 @@ class GameInstance {
         if (!evt.target.isAlive()) {
           this.audio.playDeath();
           if (evt.target.playerId !== this.game.humanPlayerId) this.killCount++;
+          // Battle analysis window tracking
+          if (evt.attacker?.playerId === this.game.humanPlayerId && evt.target.playerId !== this.game.humanPlayerId) {
+            if (this._battleWindowTimer <= 0) this._battleWindowTimer = 30;
+            this._battleWindowKills++;
+          } else if (evt.target.playerId === this.game.humanPlayerId && this._battleWindowTimer > 0) {
+            this._battleWindowLosses++;
+          }
           // Death burst: scale with unit level / hero status
           const deathScale = evt.target.isHero ? 1.5 : evt.target.level >= 3 ? 1.1 : evt.target.level >= 2 ? 0.75 : 0.45;
           this.renderer.effects.createExplosion(evt.worldX, 0.5, evt.worldZ, deathScale);
@@ -2731,6 +2756,57 @@ class GameInstance {
     this.hud.notify(`${evt.emoji} ${evt.name}: ${evt.desc}`, evt.type);
     // Camera shake for dramatic events
     if (evt.type === 'warning') this.camera.shake(0.18, 0.3);
+  }
+
+  private showBattleReport(kills: number, losses: number) {
+    const overlay = document.getElementById('battle-report-overlay');
+    if (!overlay) return;
+
+    const ratio = kills / Math.max(1, losses);
+    let grade: string, gradeColor: string, gradeLabel: string, advice: string;
+
+    if (losses === 0 && kills >= 6) {
+      grade = 'S'; gradeColor = '#ffd700'; gradeLabel = 'IMPECABLE';
+      advice = '¡Sin bajas! El enemigo está en fuga — presiona el ataque ahora.';
+    } else if (losses === 0) {
+      grade = 'A+'; gradeColor = '#44ff88'; gradeLabel = 'EXCELENTE';
+      advice = 'Victoria limpia. El momentum es tuyo — sigue avanzando.';
+    } else if (ratio >= 4) {
+      grade = 'A'; gradeColor = '#66ee88'; gradeLabel = 'MUY BUENO';
+      advice = 'Eficiencia sobresaliente. El rival está muy debilitado.';
+    } else if (ratio >= 2.5) {
+      grade = 'B'; gradeColor = '#88aaff'; gradeLabel = 'BUENO';
+      advice = 'Buen intercambio. Reagrupa brevemente y sigue la ofensiva.';
+    } else if (ratio >= 1.2) {
+      grade = 'C'; gradeColor = '#ffcc44'; gradeLabel = 'ACEPTABLE';
+      advice = 'Victoria costosa. Considera una pausa para recuperarte.';
+    } else {
+      grade = 'D'; gradeColor = '#ff6644'; gradeLabel = 'PYRRHICO';
+      advice = 'Combate muy costoso. Retira y consolida en el asentamiento.';
+    }
+
+    document.getElementById('br-kills')!.textContent = String(kills);
+    document.getElementById('br-losses')!.textContent = String(losses);
+    const gradeEl = document.getElementById('br-grade')!;
+    gradeEl.textContent = grade;
+    gradeEl.style.color = gradeColor;
+    document.getElementById('br-grade-label')!.textContent = gradeLabel;
+    document.getElementById('br-advice')!.textContent = advice;
+
+    overlay.classList.remove('hidden', 'br-exit');
+    // Auto-dismiss after 6s
+    const tid = setTimeout(() => {
+      overlay.classList.add('br-exit');
+      setTimeout(() => overlay.classList.add('hidden'), 400);
+    }, 6000);
+    // Click to dismiss early
+    const dismiss = () => {
+      clearTimeout(tid);
+      overlay.classList.add('br-exit');
+      setTimeout(() => overlay.classList.add('hidden'), 400);
+      overlay.removeEventListener('click', dismiss);
+    };
+    overlay.addEventListener('click', dismiss);
   }
 
   private showChoiceEvent(evt: ChoiceEventDef) {
