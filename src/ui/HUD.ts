@@ -366,6 +366,7 @@ export class HUD {
     this.updateProductionQueueHUD();
     this.updateDayNightIndicator();
     this.updateEraLabel();
+    this.updateTacticalChip();
     this.updateOffScreenArrows();
   }
 
@@ -1872,5 +1873,72 @@ export class HUD {
       }
       ctx.globalAlpha = 1;
     }
+  }
+
+  private _tcTick = 0;
+  private updateTacticalChip() {
+    this._tcTick++;
+    if (this._tcTick % 90 !== 0) return; // update every ~1.5s
+    const el = document.getElementById('tactical-chip');
+    if (!el) return;
+    if (this.game.status !== 'PLAYING') { el.classList.add('hidden'); return; }
+
+    const humanFog = this.game.fog.getFog(this.game.humanPlayerId);
+    const visibleEnemies = this.game.allUnits.filter(u =>
+      u.isAlive() && u.playerId !== this.game.humanPlayerId &&
+      !u.garrisonedIn &&
+      (!humanFog || humanFog.canSeeUnit(u, this.game.humanPlayerId)),
+    );
+    if (visibleEnemies.length === 0) { el.classList.add('hidden'); return; }
+
+    let cavalry = 0, ranged = 0, cannon = 0, melee = 0, heroes = 0;
+    for (const u of visibleEnemies) {
+      if (u.isHero)           { heroes++;  continue; }
+      if (u.type === UnitType.CANNON)  { cannon++;  continue; }
+      if (u.def.isCavalry)    { cavalry++; continue; }
+      if (u.def.isRanged)     { ranged++;  continue; }
+      melee++;
+    }
+
+    const myUnits = this.game.humanPlayer.aliveUnits;
+    const myMelee = myUnits.filter(u => !u.isHero && !u.def.isCavalry && !u.def.isRanged && u.type !== UnitType.CANNON).length;
+    const myRanged = myUnits.filter(u => u.def.isRanged).length;
+
+    let icon = '🧭', label = 'ASESOR TÁCTICO', advice = '', warning = false;
+
+    if (cannon >= 2) {
+      icon = '💣'; warning = true;
+      advice = `${cannon} cañón${cannon > 1 ? 'es' : ''} — dispersa unidades, no agrupes ejércitos`;
+    } else if (cavalry >= 3 && myMelee < cavalry) {
+      icon = '🐎'; warning = cavalry >= 5;
+      advice = `${cavalry} caball. enemigos — entrena lanceros/chakana (×1.9 daño)`;
+    } else if (ranged >= 4 && myMelee < 3) {
+      icon = '🏹';
+      advice = `${ranged} arqueros — avanza con infantería de escudo al frente`;
+    } else if (heroes > 0 && !myUnits.find(u => u.isHero && u.isAlive())) {
+      icon = '🦅'; warning = true;
+      advice = `¡Héroe enemigo en campo! Usa tu poder de héroe (H/Y)`;
+    } else if (cannon >= 1) {
+      icon = '⚠️';
+      advice = `Artillería enemiga — ataca en movimiento, flanquea`;
+    } else if (ranged >= 2 && myRanged < ranged) {
+      icon = '🎯';
+      advice = `${ranged} unid. a distancia — forma Falange (F2) para protección`;
+    } else if (cavalry >= 1 && myMelee < cavalry * 2) {
+      icon = '🛡️';
+      advice = `Caball. enemigas — mantén lanceros en frente`;
+    } else {
+      icon = '⚔️';
+      advice = `${visibleEnemies.length} enemigos visibles — ataca en formación cerrada`;
+    }
+
+    el.classList.remove('hidden');
+    el.classList.toggle('warning', warning);
+    el.innerHTML =
+      `<span class="tc-icon">${icon}</span>` +
+      `<div class="tc-info">` +
+        `<span class="tc-label">${label}</span>` +
+        `<span class="tc-advice">${advice}</span>` +
+      `</div>`;
   }
 }

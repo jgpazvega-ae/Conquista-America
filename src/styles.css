@@ -1811,3 +1811,23 @@ kbd {
 .im-info  { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
 .im-main  { font-size: 9px; font-weight: 700; color: #dddd66; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .im-hint  { font-size: 8px; color: #776644; }
+
+/* Tactical advisor chip */
+#tactical-chip {
+  background: rgba(8,18,30,0.90);
+  border: 1px solid rgba(60,160,220,0.55);
+  border-radius: 6px;
+  padding: 5px 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 5px;
+  width: 160px;
+  box-shadow: 0 0 8px rgba(40,140,255,0.15);
+}
+#tactical-chip.hidden  { display: none; }
+#tactical-chip.warning { border-color: rgba(255,160,40,0.7); background: rgba(30,16,4,0.92); box-shadow: 0 0 8px rgba(255,140,0,0.2); }
+.tc-icon { font-size: 13px; flex-shrink: 0; margin-top: 1px; }
+.tc-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.tc-label { font-size: 8px; font-weight: 700; color: #4ab0ff; text-transform: uppercase; letter-spacing: 0.5px; }
+.tc-advice { font-size: 9px; color: #ddeeff; line-height: 1.35; }
