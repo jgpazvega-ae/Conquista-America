@@ -238,6 +238,7 @@ class GameInstance {
   private _mapPings: { worldX: number; worldZ: number; el: HTMLDivElement; expires: number }[] = [];
   private _killMilestonesReached = new Set<string>(); // `${unitId}-${milestone}` to fire once
   private _baseAlertCooldown = 0; // seconds until next enemy-near-base notification
+  private _popCapWarnCooldown = 0; // seconds until next pop-cap warning
 
   /** Show a tutorial hint at most once per match. */
   private hintOnce(key: string, msg: string) {
@@ -760,6 +761,7 @@ class GameInstance {
     if (this._flankWarnTimer       > 0) this._flankWarnTimer       = Math.max(0, this._flankWarnTimer       - rawDt);
     if (this._grandBattleCooldown  > 0) this._grandBattleCooldown  = Math.max(0, this._grandBattleCooldown  - rawDt);
     if (this._baseAlertCooldown    > 0) this._baseAlertCooldown    = Math.max(0, this._baseAlertCooldown    - rawDt);
+    if (this._popCapWarnCooldown   > 0) this._popCapWarnCooldown   = Math.max(0, this._popCapWarnCooldown   - rawDt);
     this.game.update(dt);
 
     // Register any units produced this frame
@@ -1428,6 +1430,19 @@ class GameInstance {
     if (this.game.humanPlayer.resources.gold < 20 && this._goldCritWarnTimer <= 0) {
       this.hud.notify('⚜️ ¡ORO CRÍTICO! Captura aldeas o espera ingresos para contratar tropas', 'warning');
       this._goldCritWarnTimer = 60;
+    }
+    // Population cap warning
+    if (this.game.status === 'PLAYING' && this._popCapWarnCooldown <= 0) {
+      const pop = this.game.humanPlayer.aliveUnits.length;
+      const cap = this.game.getPopCap(this.game.humanPlayerId);
+      if (pop >= cap) {
+        this.hud.notify('👥 ¡LÍMITE DE POBLACIÓN alcanzado! Construye Casas (+12 pop) o Almacenes (+5 pop)', 'warning');
+        this._popCapWarnCooldown = 60;
+        this.hintOnce('popCap', '💡 Límite de población: construye Casas para ampliarlo (+12 cada una). Almacenes y Aldeas también suman.');
+      } else if (pop >= cap - 3 && pop > 0) {
+        this.hud.notify(`👥 Casi al límite de población (${pop}/${cap}) — construye más Casas`, 'info');
+        this._popCapWarnCooldown = 90;
+      }
     }
 
     // Idle army reminder: nudge player if all military units have been idle for 60s
