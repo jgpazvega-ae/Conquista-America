@@ -237,6 +237,7 @@ class GameInstance {
   private _battleReportCooldown  = 0;   // prevents consecutive reports (90s cooldown)
   private _mapPings: { worldX: number; worldZ: number; el: HTMLDivElement; expires: number }[] = [];
   private _killMilestonesReached = new Set<string>(); // `${unitId}-${milestone}` to fire once
+  private _baseAlertCooldown = 0; // seconds until next enemy-near-base notification
 
   /** Show a tutorial hint at most once per match. */
   private hintOnce(key: string, msg: string) {
@@ -758,6 +759,7 @@ class GameInstance {
     if (this._enemyDisarrayCooldown > 0) this._enemyDisarrayCooldown = Math.max(0, this._enemyDisarrayCooldown - rawDt);
     if (this._flankWarnTimer       > 0) this._flankWarnTimer       = Math.max(0, this._flankWarnTimer       - rawDt);
     if (this._grandBattleCooldown  > 0) this._grandBattleCooldown  = Math.max(0, this._grandBattleCooldown  - rawDt);
+    if (this._baseAlertCooldown    > 0) this._baseAlertCooldown    = Math.max(0, this._baseAlertCooldown    - rawDt);
     this.game.update(dt);
 
     // Register any units produced this frame
@@ -1387,6 +1389,27 @@ class GameInstance {
         } else if (newlySpotted === 0) {
           // Also track units individually even outside army detection
           // (covered above per unit) — no extra action needed
+        }
+      }
+    }
+
+    // Enemy-near-base alert: warn when a visible enemy comes within 12 tiles of the human settlement
+    if (this.game.status === 'PLAYING' && this._baseAlertCooldown <= 0) {
+      const settle = this.game.allBuildings.find(
+        b => b.playerId === this.game.humanPlayerId && b.type === BuildingType.SETTLEMENT && b.isAlive(),
+      );
+      if (settle) {
+        const humanFog = this.game.fog.getFog(this.game.humanPlayerId);
+        const threat = this.game.allUnits.find(u =>
+          u.playerId !== this.game.humanPlayerId && u.isAlive() && u.garrisonedIn === null &&
+          Math.abs(u.col - settle.col) <= 12 && Math.abs(u.row - settle.row) <= 12 &&
+          (!humanFog || humanFog.canSeeUnit(u, this.game.humanPlayerId)),
+        );
+        if (threat) {
+          this._baseAlertCooldown = 45;
+          this.hud.notify('🚨 ¡ENEMIGO CERCA DE LA BASE! Unidades enemigas a menos de 12 casillas del asentamiento', 'warning');
+          this.hud.addCombatPing(settle.col, settle.row);
+          this.camera.shake(0.3, 0.5);
         }
       }
     }
