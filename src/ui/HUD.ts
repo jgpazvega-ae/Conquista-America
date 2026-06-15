@@ -70,6 +70,9 @@ export class HUD {
   private elTreasuryWrap    = document.getElementById('treasury-wrap') as HTMLElement | null;
   private elTreasuryFill    = document.getElementById('treasury-bar-fill') as HTMLDivElement | null;
   static readonly ECON_GOAL = 800;
+  private elMoraleGauge     = document.getElementById('morale-gauge') as HTMLElement | null;
+  private elMoralePct       = document.getElementById('morale-pct') as HTMLElement | null;
+  private elMoraleBarFill   = document.getElementById('morale-bar-fill') as HTMLDivElement | null;
   private elScoreboard = document.getElementById('scoreboard')!
   private elEraLabel   = document.getElementById('era-label')
 
@@ -366,6 +369,7 @@ export class HUD {
     this.updateProductionQueueHUD();
     this.updateDayNightIndicator();
     this.updateEraLabel();
+    this.updateMoraleGauge();
     this.updateTacticalChip();
     this.updateOffScreenArrows();
   }
@@ -1889,6 +1893,26 @@ export class HUD {
       }
       ctx.globalAlpha = 1;
     }
+  }
+
+  private updateMoraleGauge() {
+    if (!this.elMoraleGauge || !this.elMoralePct || !this.elMoraleBarFill) return;
+    if (this.game.status !== 'PLAYING') { this.elMoraleGauge.classList.add('hidden'); return; }
+
+    const combat = this.game.humanPlayer.aliveUnits.filter(u => !u.isHero && u.isAlive());
+    if (combat.length === 0) { this.elMoraleGauge.classList.add('hidden'); return; }
+
+    const avg = Math.round(combat.reduce((s, u) => s + u.morale, 0) / combat.length);
+    const pct = avg; // morale is 0-100
+
+    const isCrit = avg < 35;
+    const isWarn = !isCrit && avg < 55;
+
+    this.elMoraleGauge.classList.remove('hidden');
+    this.elMoralePct.textContent = `${avg}`;
+    this.elMoralePct.className   = isCrit ? 'morale-crit' : isWarn ? 'morale-warn' : '';
+    this.elMoraleBarFill.style.width    = `${pct}%`;
+    this.elMoraleBarFill.className      = isCrit ? 'morale-crit' : isWarn ? 'morale-warn' : '';
   }
 
   private _tcTick = 0;
