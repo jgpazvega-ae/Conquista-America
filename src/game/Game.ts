@@ -127,6 +127,8 @@ export class Game {
   private _navalBattleNotified = false; // throttle naval battle notification (1/min)
   villageIncomeEvents: { playerId: number; food: number; gold: number }[] = [];
   pendingAIDiploProposal: { fromId: number; civType: CivilizationType } | null = null;
+  treasureCaches: { col: number; row: number; gold: number; food: number; stone: number; claimed: boolean }[] = [];
+  newlyClaimedCaches: { col: number; row: number; gold: number; food: number; stone: number }[] = [];
   private _aiDiploCheckTimer = 60;
   private _playerEraCache   = new Map<number, 1 | 2 | 3>(); // tracks prior era per player for advancement detection
   eraAdvanceEvents: { playerId: number; era: 2 | 3 }[] = []; // consumed by main.ts each frame
@@ -156,6 +158,7 @@ export class Game {
     this.diplomacy.init();
     this.fog = new FogOfWarManager(this.players.length);
     this.objectives = new ObjectiveSystem(this);
+    this.generateTreasureCaches();
   }
 
   private spawnPlayers(humanCiv: CivilizationType) {
@@ -338,6 +341,32 @@ export class Game {
       (village as any).state = 'COMPLETE';
       village.progressBar.visible = false;
       this.allBuildings.push(village);
+    }
+  }
+
+  private generateTreasureCaches() {
+    const tried = new Set<string>();
+    const count = 5 + Math.floor(Math.random() * 4); // 5–8 caches
+    let placed = 0;
+    let attempts = 0;
+    while (placed < count && attempts < 400) {
+      attempts++;
+      const col = 6 + Math.floor(Math.random() * (this.map.cols - 12));
+      const row = 6 + Math.floor(Math.random() * (this.map.rows - 12));
+      const key = `${col},${row}`;
+      if (tried.has(key)) continue;
+      tried.add(key);
+      if (!this.map.isWalkable(col, row)) continue;
+      // Keep away from settlements (min 10 tiles)
+      const nearSettle = this.allBuildings.some(
+        b => b.type === BuildingType.SETTLEMENT && Math.abs(b.col - col) + Math.abs(b.row - row) < 10,
+      );
+      if (nearSettle) continue;
+      const gold  = 40 + Math.floor(Math.random() * 60);
+      const food  = 60 + Math.floor(Math.random() * 80);
+      const stone = Math.random() < 0.4 ? 30 + Math.floor(Math.random() * 40) : 0;
+      this.treasureCaches.push({ col, row, gold, food, stone, claimed: false });
+      placed++;
     }
   }
 
@@ -631,6 +660,8 @@ export class Game {
 
     this.newlyCapturedBuildings = [];
     this.newWarDeclarations = [];
+    this.newlyClaimedCaches = [];
+    this._checkTreasureCaches();
     this.updateCaptures(dt);
     this.updateFormations(dt);
 
@@ -1832,6 +1863,19 @@ export class Game {
     [UnitType.CHAKANA_GUARD]: new Set([UnitType.QUECHUA, UnitType.ANTIS_WARRIOR]),
     [UnitType.CAVALRY]:       new Set([UnitType.ARQUEBUSIER]),
   };
+
+  private _checkTreasureCaches() {
+    for (const cache of this.treasureCaches) {
+      if (cache.claimed) continue;
+      const unit = this.humanPlayer.aliveUnits.find(u => u.col === cache.col && u.row === cache.row);
+      if (!unit) continue;
+      cache.claimed = true;
+      this.humanPlayer.resources.gold  = Math.min(2000, this.humanPlayer.resources.gold  + cache.gold);
+      this.humanPlayer.resources.food  = Math.min(2000, this.humanPlayer.resources.food  + cache.food);
+      this.humanPlayer.resources.stone = Math.min(2000, this.humanPlayer.resources.stone + cache.stone);
+      this.newlyClaimedCaches.push({ col: cache.col, row: cache.row, gold: cache.gold, food: cache.food, stone: cache.stone });
+    }
+  }
 
   private updateFormations(dt: number) {
     this._formationTimer += dt;

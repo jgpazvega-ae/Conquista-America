@@ -908,6 +908,20 @@ export class HUD {
     }
     ctx.globalAlpha = 1.0;
 
+    // Draw undiscovered treasure caches (only in explored/visible fog tiles)
+    for (const cache of this.game.treasureCaches) {
+      if (cache.claimed) continue;
+      const vis = humanFog?.getVisibility(cache.col, cache.row);
+      if (vis === TileVisibility.UNEXPLORED) continue;
+      const pulse = 0.55 + 0.45 * Math.sin(Date.now() / 400);
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = '#ffd700';
+      ctx.beginPath();
+      ctx.arc(cache.col * tw + tw / 2, cache.row * th + th / 2, Math.max(2, tw * 0.7), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1.0;
+
     // Draw resource nodes (only visible/fogged tiles)
     const nodeSize = Math.max(1.5, Math.min(tw, th));
     for (const node of this.game.resourceNodes) {
