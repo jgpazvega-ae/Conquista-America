@@ -42,6 +42,11 @@ export class AISystem {
   private _warDeclared = new Set<string>(); // "fromId→toId" pairs already declared
   private _armyFormation = new Map<number, string | null>(); // playerId → current army formation
 
+  // Adaptive difficulty: bias applied to diffMult based on observed KDR
+  private _adaptBias = 0;
+  private _adaptTimer = 0;
+  private _adaptNote: 'harder' | 'easier' | null = null;
+
   /** Apply a formation to all non-hero combat units; only touches units whose formation differs. */
   private applyFormation(player: Player, name: string | null) {
     this._armyFormation.set(player.id, name);
@@ -51,6 +56,31 @@ export class AISystem {
   }
 
   update(dt: number, game: Game) {
+    // Adaptive difficulty: recalculate every 30 s based on human kill-to-death ratio
+    this._adaptTimer += dt;
+    if (this._adaptTimer >= 30) {
+      this._adaptTimer = 0;
+      const humanKills = game.killsByPlayer.get(game.humanPlayerId) ?? 0;
+      let aiKills = 0;
+      for (const p of game.players) if (!p.isHuman) aiKills += game.killsByPlayer.get(p.id) ?? 0;
+      const kdr = humanKills / Math.max(1, aiKills);
+      // cap: maximum bias magnitude per difficulty
+      const cap = game.difficulty === 'easy' ? 0.50 : game.difficulty === 'hard' ? 0.22 : 0.38;
+      // target: dominating (kdr≥2) → tighten AI (negative bias); struggling (kdr≤0.55) → loosen AI
+      const target = kdr >= 2.0 ? -cap : kdr <= 0.55 ? cap : 0;
+      this._adaptBias = Math.max(-cap, Math.min(cap, this._adaptBias * 0.75 + target * 0.25));
+      // single notification per direction shift
+      if (this._adaptBias <= -cap * 0.55 && this._adaptNote !== 'harder') {
+        this._adaptNote = 'harder';
+        game.pendingEventMessages.push('⚖️ La IA intensifica su estrategia');
+      } else if (this._adaptBias >= cap * 0.55 && this._adaptNote !== 'easier') {
+        this._adaptNote = 'easier';
+        game.pendingEventMessages.push('⚖️ La IA ajusta su ritmo de batalla');
+      } else if (Math.abs(this._adaptBias) < cap * 0.3) {
+        this._adaptNote = null;
+      }
+    }
+
     for (const player of game.players) {
       if (player.isHuman) continue;
 
@@ -75,8 +105,9 @@ export class AISystem {
       state.upgradeTimer += dt;
       state.phaseTimer   += dt;
 
-      // Difficulty: base scale multiplier
-      const diffMult = game.difficulty === 'easy' ? 2.2 : game.difficulty === 'hard' ? 0.6 : 1.0;
+      // Difficulty: base scale multiplier adjusted by adaptive bias
+      const baseDiff = game.difficulty === 'easy' ? 2.2 : game.difficulty === 'hard' ? 0.6 : 1.0;
+      const diffMult = Math.max(0.35, baseDiff + this._adaptBias);
 
       // Time-based scaling: intervals shrink with game time
       const elapsed  = game.gameTime;
