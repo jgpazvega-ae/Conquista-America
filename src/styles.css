@@ -1774,3 +1774,22 @@ kbd {
 .rd-row   { display: flex; align-items: center; gap: 3px; font-size: 8px; }
 .rd-bar   { flex: 1; height: 3px; background: #2a1a05; border-radius: 2px; overflow: hidden; }
 .rd-fill  { height: 100%; border-radius: 2px; }
+
+/* Visible enemy radar chip */
+#enemy-radar-chip {
+  background: rgba(35,8,8,0.88);
+  border: 1px solid rgba(200,50,50,0.5);
+  border-radius: 6px;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  width: 160px;
+}
+#enemy-radar-chip.hidden { display: none; }
+#enemy-radar-chip.danger { border-color: rgba(255,80,30,0.9); animation: dmgPulse 1s ease-in-out infinite; }
+.er-icon  { font-size: 13px; flex-shrink: 0; }
+.er-info  { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.er-main  { font-size: 9px; font-weight: 700; color: #ff8888; white-space: nowrap; }
+.er-detail { font-size: 8px; color: #884444; }

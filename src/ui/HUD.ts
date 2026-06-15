@@ -336,6 +336,7 @@ export class HUD {
     this.updateDamagedBuildingsChip();
     this.updateGarrisonChip();
     this.updateResourceDepletionChip();
+    this.updateEnemyRadarChip();
     this.updateObjectives();
     this.updatePowerButton();
     this.updateBuildingHpBars();
@@ -774,6 +775,44 @@ export class HUD {
           `</div>`
         ).join('') +
         `</div>` +
+      `</div>`;
+  }
+
+  private _erTick = 0;
+  private updateEnemyRadarChip() {
+    this._erTick++;
+    if (this._erTick % 20 !== 0) return; // ~0.33s
+    const el = document.getElementById('enemy-radar-chip');
+    if (!el) return;
+    if (this.game.status !== 'PLAYING') { el.classList.add('hidden'); return; }
+
+    const humanFog = this.game.fog.getFog(this.game.humanPlayerId);
+    let visible = 0, heroes = 0, inRange = 0;
+    for (const p of this.game.players) {
+      if (p.id === this.game.humanPlayerId) continue;
+      for (const u of p.aliveUnits) {
+        if (!u.garrisonedIn && (!humanFog || humanFog.canSeeUnit(u, this.game.humanPlayerId))) {
+          visible++;
+          if (u.isHero) heroes++;
+          const settle = this.game.allBuildings.find(
+            b => b.playerId === this.game.humanPlayerId && b.type === BuildingType.SETTLEMENT && b.isAlive(),
+          );
+          if (settle && Math.abs(u.col - settle.col) <= 20 && Math.abs(u.row - settle.row) <= 20) inRange++;
+        }
+      }
+    }
+
+    if (visible === 0) { el.classList.add('hidden'); el.classList.remove('danger'); return; }
+
+    el.classList.remove('hidden');
+    el.classList.toggle('danger', inRange > 0);
+    const heroStr = heroes > 0 ? ` (incl. ${heroes} héroe${heroes > 1 ? 's' : ''})` : '';
+    const threat  = inRange > 0 ? `⚠️ ${inRange} cerca de base` : 'fuera de base';
+    el.innerHTML =
+      `<span class="er-icon">👁️</span>` +
+      `<div class="er-info">` +
+        `<span class="er-main">${visible} enem. visible${visible > 1 ? 's' : ''}${heroStr}</span>` +
+        `<span class="er-detail">${threat}</span>` +
       `</div>`;
   }
 
