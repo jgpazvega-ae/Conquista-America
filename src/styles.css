@@ -1752,3 +1752,25 @@ kbd {
 .gc-info  { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
 .gc-main  { font-size: 9px; font-weight: 700; color: #88bbff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gc-hint  { font-size: 8px; color: #556688; }
+
+/* Resource depletion chip */
+#res-depletion-chip {
+  background: rgba(35,20,5,0.88);
+  border: 1px solid rgba(200,160,30,0.5);
+  border-radius: 6px;
+  padding: 4px 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 5px;
+  width: 160px;
+}
+#res-depletion-chip.hidden { display: none; }
+#res-depletion-chip.critical { border-color: rgba(240,80,30,0.8); }
+.rd-icon { font-size: 13px; flex-shrink: 0; }
+.rd-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.rd-title { font-size: 9px; font-weight: 700; color: #ddaa44; }
+.rd-rows  { display: flex; flex-direction: column; gap: 1px; }
+.rd-row   { display: flex; align-items: center; gap: 3px; font-size: 8px; }
+.rd-bar   { flex: 1; height: 3px; background: #2a1a05; border-radius: 2px; overflow: hidden; }
+.rd-fill  { height: 100%; border-radius: 2px; }

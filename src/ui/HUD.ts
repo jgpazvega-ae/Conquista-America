@@ -335,6 +335,7 @@ export class HUD {
     this.updateExplorationChip();
     this.updateDamagedBuildingsChip();
     this.updateGarrisonChip();
+    this.updateResourceDepletionChip();
     this.updateObjectives();
     this.updatePowerButton();
     this.updateBuildingHpBars();
@@ -724,6 +725,55 @@ export class HUD {
       `<div class="gc-info">` +
         `<span class="gc-main">${totalGarrisoned} en guarnición</span>` +
         `<span class="gc-hint">${bldgSummary}${extra} · U desalojar</span>` +
+      `</div>`;
+  }
+
+  private _rdTick = 0;
+  private updateResourceDepletionChip() {
+    this._rdTick++;
+    if (this._rdTick % 180 !== 0) return; // every 3 seconds
+    const el = document.getElementById('res-depletion-chip');
+    if (!el) return;
+    if (this.game.status !== 'PLAYING') { el.classList.add('hidden'); return; }
+
+    const types: [ResourceType, string, string][] = [
+      [ResourceType.FOOD,  '🌽', '#44cc44'],
+      [ResourceType.GOLD,  '⚜️',  '#ccaa22'],
+      [ResourceType.STONE, '🪨', '#aaaaaa'],
+      [ResourceType.WOOD,  '🪵', '#885533'],
+    ];
+
+    type StatEntry = { type: ResourceType; icon: string; color: string; pct: number; remaining: number; total: number };
+    const stats: StatEntry[] = [];
+    for (const [type, icon, color] of types) {
+      const nodes = this.game.resourceNodes.filter(n => n.type === type);
+      if (nodes.length === 0) continue;
+      const totalAmt = nodes.reduce((s, n) => s + n.amount, 0);
+      const totalMax = nodes.reduce((s, n) => s + n.maxAmount, 0);
+      const pct = totalMax > 0 ? totalAmt / totalMax : 1;
+      stats.push({ type, icon, color, pct, remaining: nodes.filter(n => !n.isEmpty()).length, total: nodes.length });
+    }
+
+    const scarce = stats.filter(s => s.pct < 0.30);
+    if (scarce.length === 0) { el.classList.add('hidden'); el.classList.remove('critical'); return; }
+
+    const critical = scarce.some(s => s.pct < 0.10);
+    el.classList.remove('hidden');
+    el.classList.toggle('critical', critical);
+
+    el.innerHTML =
+      `<span class="rd-icon">⚠️</span>` +
+      `<div class="rd-info">` +
+        `<span class="rd-title">Recursos escasos</span>` +
+        `<div class="rd-rows">` +
+        scarce.map(s =>
+          `<div class="rd-row">` +
+            `<span>${s.icon}</span>` +
+            `<div class="rd-bar"><div class="rd-fill" style="width:${Math.round(s.pct * 100)}%;background:${s.color}"></div></div>` +
+            `<span style="color:#997755">${s.remaining}/${s.total}</span>` +
+          `</div>`
+        ).join('') +
+        `</div>` +
       `</div>`;
   }
 
