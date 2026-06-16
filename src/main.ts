@@ -2367,6 +2367,31 @@ class GameInstance {
         }
         return;
       }
+      // K: focus fire — all selected units concentrate on the weakest enemy in range
+      if (e.code === 'KeyK' && !e.ctrlKey && !e.altKey) {
+        const sel = this.input.getSelectedUnits().filter(
+          u => u.playerId === this.game.humanPlayerId && u.isAlive() && !u.panicked && u.garrisonedIn === null,
+        );
+        if (sel.length === 0) return;
+        const enemies = this.game.allUnits.filter(u => u.playerId !== this.game.humanPlayerId && u.isAlive());
+        if (enemies.length === 0) { this.hud.notify('Sin enemigos en el campo', 'info'); return; }
+        // Selection centroid — prefer nearby enemies; among those pick lowest HP
+        const cx = sel.reduce((s, u) => s + u.col, 0) / sel.length;
+        const cz = sel.reduce((s, u) => s + u.row, 0) / sel.length;
+        const nearby = enemies.filter(e => Math.hypot(e.col - cx, e.row - cz) <= 22);
+        const pool = nearby.length > 0 ? nearby : enemies;
+        const focus = pool.reduce((best, e) => {
+          const scoreE = e.hp + Math.hypot(e.col - cx, e.row - cz) * 0.4;
+          const scoreB = best.hp + Math.hypot(best.col - cx, best.row - cz) * 0.4;
+          return scoreE < scoreB ? e : best;
+        }, pool[0]);
+        for (const u of sel) u.attackUnit(focus);
+        this.hud.notify(
+          `🎯 Fuego concentrado: ${sel.length} unidad${sel.length !== 1 ? 'es' : ''} → ${focus.def.name} (${focus.hp}⚔️)`,
+          'info',
+        );
+        return;
+      }
       // H: hero secondary ability (when hero selected) or hold position (otherwise)
       if (e.code === 'KeyH' && !e.ctrlKey && !e.altKey) {
         const sel  = this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId);
