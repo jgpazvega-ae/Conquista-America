@@ -1151,9 +1151,18 @@ export class Unit {
     }
     // Cavalry desert sprint: horses thrive in open arid terrain (+20% speed)
     if (this.type === UnitType.CAVALRY && tile?.terrain === TerrainType.DESERT) terrainMult *= 1.20;
-    // INCA highland runner: INCA units move faster on their native high-altitude terrain
-    if (this.civType === CivilizationType.INCA && !this.isHero && tile?.terrain === TerrainType.HIGHLAND) {
-      terrainMult *= 1.20;
+    // Civilization terrain affinity bonuses (historical flavor)
+    if (this.civType === CivilizationType.INCA && !this.isHero &&
+        (tile?.terrain === TerrainType.HIGHLAND || tile?.terrain === TerrainType.MOUNTAIN)) {
+      terrainMult *= 1.22; // Inca highland/mountain runners
+    }
+    if ((this.civType === CivilizationType.AZTEC || this.civType === CivilizationType.MAYA) &&
+        !this.isHero && tile?.terrain === TerrainType.JUNGLE) {
+      terrainMult *= 1.28; // Native jungle expertise (partially offsets 0.62× penalty)
+    }
+    if (this.civType === CivilizationType.CONQUISTADOR && !this.isHero &&
+        tile?.terrain === TerrainType.JUNGLE) {
+      terrainMult *= 0.82; // European steel armour is brutally hot in the jungle
     }
     // Heavy wounds (< 25% HP) impair movement — bleeding soldiers can't keep pace
     if (this.hp < this.maxHp * 0.25) terrainMult *= 0.7;
