@@ -34,6 +34,7 @@ export class InputHandler {
   onCaptureOrder:     ((count: number, buildingId: number) => void) | null = null;
   onHover:            ((unitId: number | null, buildingId: number | null, screenX: number, screenY: number, tileCol?: number, tileRow?: number) => void) | null = null;
   onMapPing:          ((worldX: number, worldZ: number) => void) | null = null;
+  onFollowUnit:       ((followers: import('../game/Unit').Unit[], target: import('../game/Unit').Unit) => void) | null = null;
 
   private _placingMode     = false;
   private _attackMoveMode  = false;
@@ -165,6 +166,10 @@ export class InputHandler {
       if (!target || !target.isAlive()) return;
       if (target.playerId !== this.game.humanPlayerId) {
         for (const u of myUnits) u.attackUnit(target);
+      } else if (target.id !== myUnits[0]?.id || myUnits.length > 1) {
+        // Right-click own unit → follow order
+        const followers = myUnits.filter(u => u.id !== target.id);
+        if (followers.length > 0) this.onFollowUnit?.(followers, target);
       }
       return;
     }

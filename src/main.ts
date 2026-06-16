@@ -243,6 +243,7 @@ class GameInstance {
   private _baseAlertCooldown = 0; // seconds until next enemy-near-base notification
   private _lastStandFired    = false;   // true once Last Stand buff has been granted this match
   private _enemyBounties     = new Map<number, number>(); // enemyUnitId → kills against human player
+  private _followOrders      = new Map<number, number>(); // followerUnitId → targetUnitId
   private _popCapWarnCooldown = 0; // seconds until next pop-cap warning
 
   /** Show a tutorial hint at most once per match. */
@@ -307,6 +308,8 @@ class GameInstance {
     };
     this.touch.onSelectionChange = () => this.hud.update(this.touch ? [] : []);
     this.input.onMoveOrder = () => {
+      // Cancel follow orders for all selected units that got a new move command
+      for (const u of this.input.getSelectedUnits()) this._followOrders.delete(u.id);
       this.audio.playMove();
       // Re-draw path dots shortly after move order (path is computed async)
       setTimeout(() => {
@@ -361,6 +364,13 @@ class GameInstance {
 
     this.input.onCaptureOrder = (count) => {
       this.hud.notify(`🚩 ${count} unidad${count > 1 ? 'es' : ''} a la captura — mantenlas junto al edificio`, 'info');
+      this.audio.playMove();
+    };
+
+    this.input.onFollowUnit = (followers, target) => {
+      for (const u of followers) this._followOrders.set(u.id, target.id);
+      const n = followers.length;
+      this.hud.notify(`🔗 ${n} unidad${n !== 1 ? 'es' : ''} siguiendo a ${target.def.name} — clic der. en terreno para cancelar`, 'info');
       this.audio.playMove();
     };
 
@@ -1008,6 +1018,22 @@ class GameInstance {
         }
         this._battleWindowKills  = 0;
         this._battleWindowLosses = 0;
+      }
+    }
+
+    // Follow orders: keep followers near their target unit
+    for (const [followerId, targetId] of this._followOrders) {
+      const follower = this.game.getUnitById(followerId);
+      const target   = this.game.getUnitById(targetId);
+      if (!follower?.isAlive() || !target?.isAlive()) { this._followOrders.delete(followerId); continue; }
+      if (follower.state === UnitState.ATTACKING || follower.state === UnitState.ATTACK_MOVE) continue;
+      const dist = Math.hypot(follower.col - target.col, follower.row - target.row);
+      if (dist > 3.5 && follower.state !== UnitState.MOVING) {
+        const near = this.game.map.findWalkableNear(target.col, target.row, 2);
+        if (near) {
+          const path = findPath(this.game.map, follower.gridPos(), { col: near[0], row: near[1] }, 300);
+          if (path.length > 0) follower.moveTo(path);
+        }
       }
     }
 
