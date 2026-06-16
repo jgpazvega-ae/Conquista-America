@@ -1329,6 +1329,36 @@ export class HUD {
       ctx.globalAlpha = 1.0;
     }
 
+    // Movement path lines: thin arrow from unit to destination for moving human units
+    {
+      const civColor = CIV_COLORS[this.game.humanPlayer.civType];
+      ctx.setLineDash([1, 3]);
+      ctx.lineWidth = 0.8;
+      ctx.globalAlpha = 0.28;
+      for (const unit of this.game.humanPlayer.aliveUnits) {
+        if (unit.state !== UnitState.MOVING || !unit.path || unit.path.length <= unit.pathIndex) continue;
+        const dest = unit.path[unit.path.length - 1];
+        const ux = unit.col * tw + tw / 2, uz = unit.row * th + th / 2;
+        const dx = dest.col * tw + tw / 2, dz = dest.row * th + th / 2;
+        if (Math.hypot(dx - ux, dz - uz) < tw * 2) continue; // skip tiny moves — too cluttered
+        ctx.strokeStyle = hex(civColor);
+        ctx.beginPath(); ctx.moveTo(ux, uz); ctx.lineTo(dx, dz); ctx.stroke();
+        // Small arrowhead at destination
+        const angle = Math.atan2(dz - uz, dx - ux);
+        const alen = 3;
+        ctx.fillStyle = hex(civColor);
+        ctx.globalAlpha = 0.38;
+        ctx.beginPath();
+        ctx.moveTo(dx, dz);
+        ctx.lineTo(dx - alen * Math.cos(angle - 0.5), dz - alen * Math.sin(angle - 0.5));
+        ctx.lineTo(dx - alen * Math.cos(angle + 0.5), dz - alen * Math.sin(angle + 0.5));
+        ctx.closePath(); ctx.fill();
+        ctx.globalAlpha = 0.28;
+      }
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1.0;
+    }
+
     // Draw workers — idle workers pulse brightly to signal underutilized labor
     const idlePulse = 0.5 + 0.5 * Math.sin(Date.now() / 350);
     for (const worker of this.game.allWorkers) {
