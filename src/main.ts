@@ -2308,6 +2308,24 @@ class GameInstance {
         this.hud.notify(`🔍 Unidad inactiva seleccionada (${this._idleUnitIdx}/${idle.length})`, 'info');
         return;
       }
+      // M: select all critically wounded units (<50% HP) — combine with J to retreat them
+      if (e.code === 'KeyM' && !e.ctrlKey && !e.altKey) {
+        const wounded = this.game.humanPlayer.aliveUnits.filter(
+          u => !u.isHero && u.hp < u.maxHp * 0.5 && u.garrisonedIn === null,
+        );
+        if (wounded.length === 0) { this.hud.notify('Ninguna unidad gravemente herida', 'info'); return; }
+        for (const u of this.game.getAllUnits()) u.setSelected(false);
+        for (const u of wounded) u.setSelected(true);
+        this.input.onSelectionChange?.();
+        const cx = wounded.reduce((s, u) => s + u.col, 0) / wounded.length * TILE_SIZE;
+        const cz = wounded.reduce((s, u) => s + u.row, 0) / wounded.length * TILE_SIZE;
+        this.camera.panTo(cx, cz);
+        this.hud.notify(
+          `🩸 ${wounded.length} unidad${wounded.length !== 1 ? 'es' : ''} grave${wounded.length !== 1 ? 'mente heridas' : 'mente herida'} — usa J para retirarlas`,
+          'warning',
+        );
+        return;
+      }
       // N: select all units of same type as current selection; no selection → select all idle units
       if (e.code === 'KeyN' && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
