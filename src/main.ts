@@ -2342,6 +2342,21 @@ class GameInstance {
         this.hud.notify(`⚔️ ${engaged.length} unidad${engaged.length !== 1 ? 'es' : ''} en combate seleccionada${engaged.length !== 1 ? 's' : ''}`, 'info');
         return;
       }
+      // S: select ALL idle military units at once (complement to I which cycles one-by-one)
+      if (e.code === 'KeyS' && !e.ctrlKey && !e.altKey) {
+        const idle = this.game.humanPlayer.aliveUnits.filter(
+          u => !u.isHero && u.garrisonedIn === null && u.state === UnitState.IDLE,
+        );
+        if (idle.length === 0) { this.hud.notify('No hay tropas ociosas', 'info'); return; }
+        for (const u of this.game.getAllUnits()) u.setSelected(false);
+        for (const u of idle) u.setSelected(true);
+        this.input.onSelectionChange?.();
+        const cx = idle.reduce((s, u) => s + u.col, 0) / idle.length * TILE_SIZE;
+        const cz = idle.reduce((s, u) => s + u.row, 0) / idle.length * TILE_SIZE;
+        this.camera.panTo(cx, cz);
+        this.hud.notify(`🗡️ ${idle.length} tropa${idle.length !== 1 ? 's' : ''} ociosa${idle.length !== 1 ? 's' : ''} seleccionada${idle.length !== 1 ? 's' : ''} — da órdenes`, 'info');
+        return;
+      }
       // N: select all units of same type as current selection; no selection → select all idle units
       if (e.code === 'KeyN' && !e.ctrlKey && !e.altKey) {
         e.preventDefault();

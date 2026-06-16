@@ -378,6 +378,7 @@ export class HUD {
     this.updateGarrisonChip();
     this.updateResourceDepletionChip();
     this.updateEnemyRadarChip();
+    this.updateArmyPowerChip();
     this.updateIdleMilChip();
     this.updateObjectives();
     this.updatePowerButton();
@@ -880,6 +881,55 @@ export class HUD {
       `<div class="er-info">` +
         `<span class="er-main">${visible} enem. visible${visible > 1 ? 's' : ''}</span>` +
         `<span class="er-detail">${comp ? comp + ' · ' : ''}${threat}</span>` +
+      `</div>`;
+  }
+
+  private _apTick = 0;
+  private updateArmyPowerChip() {
+    this._apTick++;
+    if (this._apTick % 30 !== 0) return; // ~0.5s
+    const el = document.getElementById('army-power-chip');
+    if (!el) return;
+    if (this.game.status !== 'PLAYING') { el.classList.add('hidden'); return; }
+
+    const humanFog = this.game.fog.getFog(this.game.humanPlayerId);
+    let myPower = 0, enemyPower = 0;
+    for (const p of this.game.players) {
+      for (const u of p.aliveUnits) {
+        if (u.garrisonedIn) continue;
+        const power = u.attack * (u.hp / u.maxHp);
+        if (p.id === this.game.humanPlayerId) {
+          myPower += power;
+        } else if (!humanFog || humanFog.canSeeUnit(u, this.game.humanPlayerId)) {
+          enemyPower += power;
+        }
+      }
+    }
+    if (myPower === 0 && enemyPower === 0) { el.classList.add('hidden'); return; }
+
+    const total = myPower + enemyPower || 1;
+    const myPct   = Math.round((myPower   / total) * 100);
+    const enPct   = Math.round((enemyPower / total) * 100);
+    const ratio   = enemyPower > 0 ? myPower / enemyPower : 99;
+    const ratioStr = ratio >= 99 ? 'sin rivales' : ratio >= 1.5 ? `+${Math.round((ratio - 1) * 100)}% adelante`
+      : ratio < 0.67 ? `-${Math.round((1 - ratio) * 100)}% atrás` : 'equilibrado';
+    const ratioClass = ratio >= 1.15 ? 'ahead' : ratio < 0.87 ? 'behind' : 'even';
+
+    el.classList.remove('hidden', 'losing', 'winning');
+    el.classList.add(ratioClass === 'ahead' ? 'winning' : ratioClass === 'behind' ? 'losing' : '');
+    el.innerHTML =
+      `<span class="ap-icon">⚔️</span>` +
+      `<div class="ap-info">` +
+        `<span class="ap-label">Poder de batalla visible</span>` +
+        `<div class="ap-bars">` +
+          `<div class="ap-bar-row">` +
+            `<div class="ap-bar-track"><div class="ap-bar-fill you" style="width:${myPct}%"></div></div>` +
+          `</div>` +
+          `<div class="ap-bar-row">` +
+            `<div class="ap-bar-track"><div class="ap-bar-fill enemy" style="width:${enPct}%"></div></div>` +
+          `</div>` +
+        `</div>` +
+        `<span class="ap-ratio ${ratioClass}">${ratioStr}</span>` +
       `</div>`;
   }
 

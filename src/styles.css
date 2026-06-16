@@ -1852,6 +1852,35 @@ kbd {
 .er-main  { font-size: 9px; font-weight: 700; color: #ff8888; white-space: nowrap; }
 .er-detail { font-size: 8px; color: #884444; }
 
+/* Army power comparison chip */
+#army-power-chip {
+  background: rgba(8,20,35,0.88);
+  border: 1px solid rgba(50,120,200,0.5);
+  border-radius: 6px;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  width: 160px;
+}
+#army-power-chip.hidden { display: none; }
+#army-power-chip.losing { border-color: rgba(255,100,30,0.8); }
+#army-power-chip.winning { border-color: rgba(50,220,100,0.7); }
+.ap-icon { font-size: 13px; flex-shrink: 0; }
+.ap-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.ap-label { font-size: 8px; color: #6688aa; white-space: nowrap; }
+.ap-bars { display: flex; flex-direction: column; gap: 1px; }
+.ap-bar-row { display: flex; align-items: center; gap: 3px; }
+.ap-bar-track { flex: 1; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; }
+.ap-bar-fill { height: 100%; border-radius: 2px; transition: width 0.4s; }
+.ap-bar-fill.you { background: #44bbff; }
+.ap-bar-fill.enemy { background: #ff5544; }
+.ap-ratio { font-size: 8px; font-weight: 700; white-space: nowrap; }
+.ap-ratio.ahead { color: #44ee88; }
+.ap-ratio.behind { color: #ff6644; }
+.ap-ratio.even { color: #aabbcc; }
+
 /* Idle military buildings chip */
 #idle-mil-chip {
   background: rgba(20,20,10,0.85);
