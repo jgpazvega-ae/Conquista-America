@@ -2326,6 +2326,22 @@ class GameInstance {
         );
         return;
       }
+      // O: select all units currently engaged in active combat
+      if (e.code === 'KeyO' && !e.ctrlKey && !e.altKey) {
+        const engaged = this.game.humanPlayer.aliveUnits.filter(
+          u => !u.isHero && u.garrisonedIn === null &&
+               (u.state === UnitState.ATTACKING || u.state === UnitState.ATTACK_MOVE),
+        );
+        if (engaged.length === 0) { this.hud.notify('Ninguna unidad en combate activo', 'info'); return; }
+        for (const u of this.game.getAllUnits()) u.setSelected(false);
+        for (const u of engaged) u.setSelected(true);
+        this.input.onSelectionChange?.();
+        const cx = engaged.reduce((s, u) => s + u.col, 0) / engaged.length * TILE_SIZE;
+        const cz = engaged.reduce((s, u) => s + u.row, 0) / engaged.length * TILE_SIZE;
+        this.camera.panTo(cx, cz);
+        this.hud.notify(`⚔️ ${engaged.length} unidad${engaged.length !== 1 ? 'es' : ''} en combate seleccionada${engaged.length !== 1 ? 's' : ''}`, 'info');
+        return;
+      }
       // N: select all units of same type as current selection; no selection → select all idle units
       if (e.code === 'KeyN' && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
