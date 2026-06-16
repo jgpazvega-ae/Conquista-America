@@ -242,6 +242,7 @@ class GameInstance {
   private _mkAnnouncerTimer = 0;        // countdown to remove multikill-announcer element
   private _baseAlertCooldown = 0; // seconds until next enemy-near-base notification
   private _lastStandFired    = false;   // true once Last Stand buff has been granted this match
+  private _enemyBounties     = new Map<number, number>(); // enemyUnitId → kills against human player
   private _popCapWarnCooldown = 0; // seconds until next pop-cap warning
 
   /** Show a tutorial hint at most once per match. */
@@ -1174,6 +1175,28 @@ class GameInstance {
             }
           } else if (evt.target.playerId === this.game.humanPlayerId && this._battleWindowTimer > 0) {
             this._battleWindowLosses++;
+          }
+          // Bounty system: track enemy units that kill your troops; reward eliminating them
+          if (evt.attacker && evt.attacker.playerId !== this.game.humanPlayerId &&
+              evt.target.playerId === this.game.humanPlayerId) {
+            const prev = this._enemyBounties.get(evt.attacker.id) ?? 0;
+            const next = prev + 1;
+            this._enemyBounties.set(evt.attacker.id, next);
+            if (next === 3 || next === 5 || next === 10) {
+              const n = evt.attacker.def.name;
+              const emoji = next >= 10 ? '💀' : next >= 5 ? '☠️' : '⚠️';
+              this.hud.notify(`${emoji} ${n} enemigo ha matado ${next} de tus unidades — ¡OBJETIVO DE RECOMPENSA! Elimínalo`, 'warning');
+            }
+          }
+          if (evt.attacker?.playerId === this.game.humanPlayerId &&
+              evt.target.playerId !== this.game.humanPlayerId) {
+            const bountyKills = this._enemyBounties.get(evt.target.id) ?? 0;
+            if (bountyKills >= 3) {
+              const bonus = Math.min(300, bountyKills * 25);
+              this.game.humanPlayer.resources.gold = Math.min(2000, this.game.humanPlayer.resources.gold + bonus);
+              this.showMultiKillAnnouncer('¡OBJETIVO ELIMINADO!', `${evt.target.def.name} — +${bonus}⚜️ recompensa`, '#ffd700');
+              this._enemyBounties.delete(evt.target.id);
+            }
           }
           // Death burst: scale with unit level / hero status
           const deathScale = evt.target.isHero ? 1.5 : evt.target.level >= 3 ? 1.1 : evt.target.level >= 2 ? 0.75 : 0.45;
