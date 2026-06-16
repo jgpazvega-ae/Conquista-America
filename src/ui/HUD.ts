@@ -100,6 +100,7 @@ export class HUD {
   private _rainDrops:      { x: number; y: number; len: number; speed: number; opacity: number }[] = [];
   // Territory control cache: Int8Array indexed [row * MAP_COLS + col], value = playerId+1 (0=unclaimed)
   private _territoryCache: Int8Array = new Int8Array(0);
+  private _capWarnTimer = 0; // cooldown between near-cap notifications (seconds)
   private _territoryTick  = 999; // force first compute immediately
 
   private camera: import('../engine/Camera').RTSCamera | null = null;
@@ -214,6 +215,20 @@ export class HUD {
     foodEl?.classList.toggle('res-critical', player.resources.food < 10);
     this.elGold.closest('.res')?.classList.toggle('res-low', player.resources.gold < 30);
     this.elStone.closest('.res')?.classList.toggle('res-low', player.resources.stone < 30);
+
+    // Near-cap warning: notify once per ~60 s when any resource is at ≥ 85 % of the 2000 cap
+    if (this.game.gameTime - this._capWarnTimer > 60) {
+      const cap = 2000, thresh = cap * 0.85;
+      const near: string[] = [];
+      if (player.resources.food  >= thresh) near.push('🌽 alimentos');
+      if (player.resources.gold  >= thresh) near.push('💰 oro');
+      if (player.resources.stone >= thresh) near.push('🪨 piedra');
+      if ((player.resources.wood ?? 0) >= thresh) near.push('🪵 madera');
+      if (near.length > 0) {
+        this._capWarnTimer = this.game.gameTime;
+        this.notify(`⚠️ ${near.join(', ')} cerca del límite — gasta o perderás producción`, 'warning');
+      }
+    }
 
     // Weather badge + dawn/dusk countdown
     if (this.elWeather) {
