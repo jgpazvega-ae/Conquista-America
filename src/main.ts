@@ -241,6 +241,7 @@ class GameInstance {
   private _rapidKillTs:  number[] = []; // timestamps of recent enemy kills (for multi-kill detection)
   private _mkAnnouncerTimer = 0;        // countdown to remove multikill-announcer element
   private _baseAlertCooldown = 0; // seconds until next enemy-near-base notification
+  private _lastStandFired    = false;   // true once Last Stand buff has been granted this match
   private _popCapWarnCooldown = 0; // seconds until next pop-cap warning
 
   /** Show a tutorial hint at most once per match. */
@@ -1009,6 +1010,18 @@ class GameInstance {
       }
     }
 
+    // Last Stand: one-time emergency buff when only ≤5 military units remain
+    if (!this._lastStandFired && this.game.status === 'PLAYING') {
+      const mil = this.game.humanPlayer.aliveUnits.filter(u => !u.isHero && u.garrisonedIn === null);
+      if (mil.length > 0 && mil.length <= 5) {
+        this._lastStandFired = true;
+        for (const u of mil) u.attack = Math.round(u.attack * 1.35);
+        this.showMultiKillAnnouncer('¡ÚLTIMA RESISTENCIA!', '¡Tus tropas luchan con desesperación! +35% ATK', '#ff2244');
+        this.camera.shake(0.5, 0.8);
+        this.hud.notify('☠️ ¡ÚLTIMA RESISTENCIA! Tus pocas tropas restantes reciben +35% de ataque — ¡no te rindas!', 'warning');
+      }
+    }
+
     // Auto-checkpoint every 3 minutes: save current stats to profile
     if (this.game.gameTime >= this._autoSaveTimer) {
       this._autoSaveTimer += 180;
@@ -1124,7 +1137,23 @@ class GameInstance {
         }
         if (!evt.target.isAlive()) {
           this.audio.playDeath();
-          if (evt.target.playerId !== this.game.humanPlayerId) this.killCount++;
+          if (evt.target.playerId !== this.game.humanPlayerId) {
+            this.killCount++;
+            // Total kill-count milestones
+            const _kmThresholds: [number, string, string, string][] = [
+              [200, '¡CONQUISTADOR LEGENDARIO!', '200 bajas en batalla',    '#ffd700'],
+              [100, '¡CIEN BAJAS!',              'Maestro de la guerra',    '#ff8800'],
+              [ 50, '¡CINCUENTA BAJAS!',         'La batalla es tuya',      '#ff5500'],
+              [ 25, '¡VEINTICINCO BAJAS!',       'Guerrero implacable',     '#ffcc00'],
+              [ 10, '¡DIEZ BAJAS!',              'La conquista avanza',     '#aaffaa'],
+            ];
+            for (const [m, title, sub, color] of _kmThresholds) {
+              if (this.killCount === m) {
+                this.showMultiKillAnnouncer(title, sub, color);
+                break;
+              }
+            }
+          }
           // Battle analysis window tracking
           if (evt.attacker?.playerId === this.game.humanPlayerId && evt.target.playerId !== this.game.humanPlayerId) {
             if (this._battleWindowTimer <= 0) this._battleWindowTimer = 30;

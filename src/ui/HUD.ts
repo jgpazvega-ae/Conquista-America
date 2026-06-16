@@ -100,7 +100,8 @@ export class HUD {
   private _rainDrops:      { x: number; y: number; len: number; speed: number; opacity: number }[] = [];
   // Territory control cache: Int8Array indexed [row * MAP_COLS + col], value = playerId+1 (0=unclaimed)
   private _territoryCache: Int8Array = new Int8Array(0);
-  private _capWarnTimer = 0; // cooldown between near-cap notifications (seconds)
+  private _capWarnTimer = 0;    // cooldown between near-cap resource notifications (seconds)
+  private _popCapWarnTimer = 0; // cooldown between population cap warnings (seconds)
   private _territoryTick  = 999; // force first compute immediately
 
   private camera: import('../engine/Camera').RTSCamera | null = null;
@@ -311,6 +312,16 @@ export class HUD {
       this.elPopBarFill.style.width = `${pct}%`;
       this.elPopBarFill.classList.toggle('pop-near', pct >= 75 && pct < 100);
       this.elPopBarFill.classList.toggle('pop-full',  pct >= 100);
+
+      // Pop-cap warning: nudge the player to build more houses when nearly full (once per 90 s)
+      if (pct >= 90 && this.game.gameTime - this._popCapWarnTimer > 90) {
+        this._popCapWarnTimer = this.game.gameTime;
+        if (pct >= 100) {
+          this.notify('🏘️ ¡Límite de población alcanzado! Construye casas (B → 🏘️) para entrenar más tropas', 'warning');
+        } else {
+          this.notify(`🏘️ Población al ${Math.round(pct)}% — construye casas para expandir tu límite`, 'info');
+        }
+      }
     }
 
     // Game status
