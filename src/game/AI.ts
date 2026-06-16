@@ -235,7 +235,7 @@ export class AISystem {
           }
           // AI civilization power: activate at full strength during attack when ready
           if (player.powerCooldown <= 0 && player.aliveUnits.length >= 4 && !player.powerActive) {
-            this.activateAIPower(player);
+            this.activateAIPower(player, game);
           }
           const allDead = game.allUnits.filter(u => u.playerId !== player.id && u.isAlive()).length === 0;
           if (state.phaseTimer >= ATTACK_DURATION || allDead) {
@@ -254,6 +254,11 @@ export class AISystem {
         if (player.powerActiveTimer <= 0) {
           player.powerActive = false;
           this.removeAIPower(player);
+          // Notify the human that the dangerous buff has expired
+          if (player.civType === CivilizationType.INCA)
+            game.pendingEventMessages.push('✅ INCA — Unidad expirada. Sus tropas vuelven a la normalidad');
+          else if (player.civType === CivilizationType.CONQUISTADOR)
+            game.pendingEventMessages.push('✅ CONQUISTADOR — Conquista expirada. ¡Aprovecha la ventana!');
         }
       }
 
@@ -1071,7 +1076,7 @@ export class AISystem {
   }
 
   /** Activate an AI player's civilization power during an attack wave. */
-  private activateAIPower(player: Player) {
+  private activateAIPower(player: Player, game: Game) {
     const COOLDOWNS: Record<CivilizationType, number> = {
       [CivilizationType.AZTEC]: 40, [CivilizationType.INCA]: 80,
       [CivilizationType.MAYA]: 60,  [CivilizationType.CONQUISTADOR]: 70,
@@ -1114,6 +1119,16 @@ export class AISystem {
         player.powerActive = true; player.powerActiveTimer = DURATIONS[player.civType];
         break;
     }
+
+    // Alert the human player so they can react
+    const POWER_ALERTS: Partial<Record<CivilizationType, string>> = {
+      [CivilizationType.AZTEC]:        '🦅 AZTECA activa SACRIFICIO — refuerza sus recursos con sangre',
+      [CivilizationType.INCA]:         '🌄 INCA activa UNIDAD — ¡+30% ataque y velocidad 25s! Mantente alerta',
+      [CivilizationType.MAYA]:         '🌿 MAYA activa PROFECÍA — tus posiciones han sido reveladas',
+      [CivilizationType.CONQUISTADOR]: '⚔️ CONQUISTADOR activa CONQUISTA — ¡+80% daño 20s! Retira tus tropas débiles',
+    };
+    const msg = POWER_ALERTS[player.civType];
+    if (msg) game.pendingEventMessages.push(msg);
   }
 
   /** Remove expired buff from AI player units. */
