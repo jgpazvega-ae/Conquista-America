@@ -2834,6 +2834,37 @@ class GameInstance {
         }
         return;
       }
+      // Alt+1-4: sub-select by unit type
+      // If units are currently selected → narrow to that type; if nothing selected → global type select
+      if (e.altKey && !e.ctrlKey && !e.shiftKey && /^Digit[1-4]$/.test(e.code)) {
+        e.preventDefault();
+        const digit = parseInt(e.code.replace('Digit', ''));
+        type TypeFilter = { label: string; emoji: string; test: (u: Unit) => boolean };
+        const filters: Record<number, TypeFilter> = {
+          1: { label: 'infantería de melé',   emoji: '🗡️',  test: u => !u.def.isRanged && !u.def.isCavalry && u.type !== UnitType.CANNON && !u.isHero },
+          2: { label: 'unidades a distancia', emoji: '🏹',  test: u => u.def.isRanged },
+          3: { label: 'caballería',            emoji: '🐎',  test: u => u.def.isCavalry },
+          4: { label: 'artillería',            emoji: '💣',  test: u => u.type === UnitType.CANNON },
+        };
+        const f = filters[digit];
+        if (!f) return;
+        const current = this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId && !u.garrisonedIn);
+        const pool = current.length > 0 ? current : this.game.humanPlayer.aliveUnits.filter(u => u.garrisonedIn === null);
+        const typed = pool.filter(f.test);
+        if (typed.length === 0) {
+          this.hud.notify(`Sin ${f.label} en ${current.length > 0 ? 'la selección' : 'el ejército'}`, 'info');
+          return;
+        }
+        for (const u of this.game.getAllUnits()) u.setSelected(false);
+        for (const u of typed) u.setSelected(true);
+        this.input.onSelectionChange?.();
+        const cx = typed.reduce((s, u) => s + u.col, 0) / typed.length * TILE_SIZE;
+        const cz = typed.reduce((s, u) => s + u.row, 0) / typed.length * TILE_SIZE;
+        this.camera.panTo(cx, cz);
+        const ctx = current.length > 0 ? 'selección' : 'ejército';
+        this.hud.notify(`${f.emoji} ${typed.length} ${f.label} del ${ctx} seleccionada${typed.length !== 1 ? 's' : ''}`, 'info');
+        return;
+      }
       // Ctrl+1-5: save unit group
       if (e.ctrlKey && /^Digit[1-5]$/.test(e.code)) {
         e.preventDefault();
