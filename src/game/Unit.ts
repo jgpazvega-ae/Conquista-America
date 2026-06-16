@@ -117,6 +117,9 @@ export class Unit {
   // Entrench (X key): dig in for +5 defense; cleared on any movement order
   entrenched = false;
 
+  // Target priority for auto-attack targeting
+  targetPriority: 'NEAREST' | 'WEAKEST' | 'STRONGEST' = 'NEAREST';
+
   // Shield wall: set each frame when ≥2 PHALANX allies are adjacent (within 2.5 tiles)
   shieldWall = false;
 
