@@ -106,9 +106,9 @@ export class InputHandler {
   private onMouseUp(e: MouseEvent) {
     if (e.button !== 0) return;
     if (this.drag.active) {
-      this.endDragSelect();
+      this.endDragSelect(e.ctrlKey);
     } else {
-      this.handleClick(e.clientX, e.clientY);
+      this.handleClick(e.clientX, e.clientY, e.ctrlKey);
     }
     this.drag.active  = false;
     this.mouseDownPos = null;
@@ -286,7 +286,7 @@ export class InputHandler {
     canvas.style.cursor = on ? 'crosshair' : '';
   }
 
-  private handleClick(screenX: number, screenY: number) {
+  private handleClick(screenX: number, screenY: number, ctrlKey = false) {
     const hit = this.renderer.pickFromScreen(screenX, screenY);
 
     // Placement mode intercepts terrain clicks
@@ -306,7 +306,7 @@ export class InputHandler {
       return;
     }
 
-    for (const unit of this.game.getAllUnits()) unit.setSelected(false);
+    if (!ctrlKey) for (const unit of this.game.getAllUnits()) unit.setSelected(false);
 
     if (hit?.type === 'unit') {
       const unit = this.game.getUnitById(hit.unitId);
@@ -326,6 +326,9 @@ export class InputHandler {
                 this.game.fog.canSeeUnit(u, this.game.humanPlayerId),
               );
             }
+          } else if (ctrlKey && unit.playerId === this.game.humanPlayerId) {
+            // Ctrl+click: toggle this unit in/out of current selection
+            unit.setSelected(!unit.isSelected());
           } else {
             unit.setSelected(true);
           }
@@ -346,13 +349,13 @@ export class InputHandler {
     this.onSelectionChange?.();
   }
 
-  private endDragSelect() {
+  private endDragSelect(additive = false) {
     const x1 = Math.min(this.drag.startX, this.drag.currentX);
     const y1 = Math.min(this.drag.startY, this.drag.currentY);
     const x2 = Math.max(this.drag.startX, this.drag.currentX);
     const y2 = Math.max(this.drag.startY, this.drag.currentY);
 
-    for (const unit of this.game.getAllUnits()) unit.setSelected(false);
+    if (!additive) for (const unit of this.game.getAllUnits()) unit.setSelected(false);
 
     for (const unit of this.game.getAllUnits()) {
       if (!unit.isAlive()) continue;
