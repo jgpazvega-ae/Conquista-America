@@ -2885,6 +2885,19 @@ class GameInstance {
       }
       // Alt+1-4: sub-select by unit type
       // If units are currently selected → narrow to that type; if nothing selected → global type select
+      // Alt+P: cycle target priority for selected units (NEAREST → WEAKEST → STRONGEST)
+      if (e.code === 'KeyP' && e.altKey && !e.ctrlKey) {
+        e.preventDefault();
+        const sel = this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId);
+        if (sel.length === 0) { this.hud.notify('Selecciona unidades para cambiar prioridad de ataque', 'info'); return; }
+        const cur = sel[0].targetPriority;
+        const next: 'NEAREST' | 'WEAKEST' | 'STRONGEST' =
+          cur === 'NEAREST' ? 'WEAKEST' : cur === 'WEAKEST' ? 'STRONGEST' : 'NEAREST';
+        for (const u of sel) u.targetPriority = next;
+        const label = next === 'NEAREST' ? '🎯 Más cercano' : next === 'WEAKEST' ? '💔 Más débil' : '💪 Más fuerte';
+        this.hud.notify(`🎯 Prioridad de ataque → ${label} (${sel.length} unidad${sel.length !== 1 ? 'es' : ''})`, 'info');
+        return;
+      }
       if (e.altKey && !e.ctrlKey && !e.shiftKey && /^Digit[1-4]$/.test(e.code)) {
         e.preventDefault();
         const digit = parseInt(e.code.replace('Digit', ''));

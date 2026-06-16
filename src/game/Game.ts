@@ -1825,11 +1825,16 @@ export class Game {
       if (unit.attackTarget !== null || unit.attackBuildingTarget !== null) continue;
 
       let best: Unit | null = null;
-      let bestDist = unit.sight;
+      let bestScore = -Infinity;
       for (const enemy of this.allUnits) {
         if (!enemy.isAlive() || enemy.playerId === unit.playerId) continue;
         const d = unit.distanceTo(enemy);
-        if (d < bestDist) { bestDist = d; best = enemy; }
+        if (d > unit.sight) continue;
+        const score =
+          unit.targetPriority === 'WEAKEST'   ? -enemy.hp :
+          unit.targetPriority === 'STRONGEST' ?  enemy.maxHp :
+                                                 -d; // NEAREST (default)
+        if (score > bestScore) { bestScore = score; best = enemy; }
       }
       if (best) { unit.attackUnit(best); continue; }
 
