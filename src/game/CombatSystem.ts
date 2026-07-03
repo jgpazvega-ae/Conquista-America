@@ -119,7 +119,7 @@ export class CombatSystem {
 
         if (isVolley || unit.attackTimer <= 0) {
           const attackerTile = map.getTile(unit.col, unit.row);
-          const baseAtk = unit.outOfAmmo ? Math.max(4, Math.round(unit.def.stats.attack * 0.4)) : unit.attack;
+          const baseAtk = unit.outOfAmmo ? Math.max(4, Math.round(unit.def.stats.attack * 0.4)) : unit.getEffectiveAttack();
           let dmg = baseAtk + Math.floor(Math.random() * 6) - 3 + terrainAttackBonus(attackerTile?.terrain);
           // Formation attack bonus (LOOSE: -10%, PHALANX: -20%, WEDGE: +25%)
           if (unit.formation && FORMATIONS[unit.formation]) {

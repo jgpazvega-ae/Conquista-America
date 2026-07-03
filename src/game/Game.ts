@@ -491,6 +491,15 @@ export class Game {
       unit._isolated = allyUnits.filter(u => u !== unit && u.isAlive()).every(
         ally => Math.abs(unit.col - ally.col) > 6 || Math.abs(unit.row - ally.row) > 6,
       );
+      // Supply line: calculate distance to nearest friendly building (for stat penalties)
+      let minSupplyDist = Infinity;
+      for (const bldg of this.allBuildings) {
+        if (bldg.playerId === unit.playerId && bldg.isAlive()) {
+          const d = Math.sqrt((unit.col - bldg.col) ** 2 + (unit.row - bldg.row) ** 2);
+          if (d < minSupplyDist) minSupplyDist = d;
+        }
+      }
+      unit.supplyDist = minSupplyDist === Infinity ? 0 : minSupplyDist;
       unit.update(dt, this.map);
 
       // Hero death → start respawn countdown (60s)
@@ -2141,7 +2150,9 @@ export class Game {
       const siegeMult = unit.type === UnitType.CANNON ? 3.0 : 1.0;
       // Garrison wall defense: defenders inside reinforce the structure (−15% siege damage)
       const garrisonDefMult = bldg.garrison.length > 0 ? 0.85 : 1.0;
-      const rawDmg = Math.max(1, Math.round((unit.attack - 5) * assaultMult * siegeMult * garrisonDefMult)); // buildings have some armor
+      // Supply line: units far from bases have reduced building damage too
+      const supplyDmgMult = unit.supplyDist > 30 ? 0.8 : unit.supplyDist > 15 ? 0.9 : 1.0;
+      const rawDmg = Math.max(1, Math.round((unit.getEffectiveAttack() - 5) * assaultMult * siegeMult * garrisonDefMult * supplyDmgMult)); // buildings have some armor
       bldg.takeDamage(rawDmg);
       // Garrison sortie: when human building reaches ≤30% HP with ≥2 garrison, half exit to counterattack
       if (bldg.isAlive() && bldg.playerId === this.humanPlayerId &&
