@@ -120,6 +120,9 @@ export class Unit {
   // Target priority for auto-attack targeting
   targetPriority: 'NEAREST' | 'WEAKEST' | 'STRONGEST' = 'NEAREST';
 
+  // Unit AI stance: Aggressive (seek combat), Defensive (retreat on damage), Balanced (normal)
+  stance: 'AGGRESSIVE' | 'DEFENSIVE' | 'BALANCED' = 'BALANCED';
+
   // Shield wall: set each frame when ≥2 PHALANX allies are adjacent (within 2.5 tiles)
   shieldWall = false;
 
@@ -828,7 +831,9 @@ export class Unit {
     this._idleHealTimer  = 0;
     this.killStreak      = 0;  // reset streak on taking damage
     this.loseMorale(3);
-    if (this.hp > 0 && this.hp < this.maxHp * 0.20 && !this.wantsRetreat) {
+    // Retreat threshold based on stance: DEFENSIVE 30%, BALANCED 20%, AGGRESSIVE 10%
+    const retreatThreshold = this.stance === 'DEFENSIVE' ? 0.30 : this.stance === 'AGGRESSIVE' ? 0.10 : 0.20;
+    if (this.hp > 0 && this.hp < this.maxHp * retreatThreshold && !this.wantsRetreat) {
       this.wantsRetreat = true;
     }
     // Champion last stand: veteran (level 3) unit drops below 25% HP → surge of desperate fury
