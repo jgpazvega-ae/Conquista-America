@@ -2883,6 +2883,36 @@ class GameInstance {
         }
         return;
       }
+      // Alt+R: rush all idle military units to join nearest active combat
+      if (e.code === 'KeyR' && e.altKey && !e.ctrlKey) {
+        e.preventDefault();
+        const combatants = this.game.humanPlayer.aliveUnits.filter(
+          u => !u.isHero && u.garrisonedIn === null &&
+               (u.state === UnitState.ATTACKING || u.state === UnitState.ATTACK_MOVE),
+        );
+        if (combatants.length === 0) {
+          this.hud.notify('Sin combate activo para reforzar', 'info');
+          return;
+        }
+        const cx = combatants.reduce((s, u) => s + u.col, 0) / combatants.length;
+        const cz = combatants.reduce((s, u) => s + u.row, 0) / combatants.length;
+        const idle = this.game.humanPlayer.aliveUnits.filter(
+          u => !u.isHero && u.garrisonedIn === null && u.state === UnitState.IDLE,
+        );
+        if (idle.length === 0) { this.hud.notify('Sin tropas ociosas para reforzar', 'info'); return; }
+        let sent = 0;
+        for (const u of idle) {
+          const near = this.game.map.findWalkableNear(Math.round(cx), Math.round(cz), 4);
+          if (!near) continue;
+          const path = findPath(this.game.map, u.gridPos(), { col: near[0], row: near[1] }, 400);
+          if (path.length > 0) { u.attackMove(path); sent++; }
+        }
+        if (sent > 0) {
+          this.hud.notify(`⚔️ ${sent} tropa${sent !== 1 ? 's' : ''} de reserva enviada${sent !== 1 ? 's' : ''} al frente`, 'success');
+          this.audio.playMove();
+        }
+        return;
+      }
       // Alt+1-4: sub-select by unit type
       // If units are currently selected → narrow to that type; if nothing selected → global type select
       // Alt+P: cycle target priority for selected units (NEAREST → WEAKEST → STRONGEST)
