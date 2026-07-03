@@ -44,6 +44,7 @@ export class Unit {
   targetRow: number;
   path: GridPos[] = [];
   pathIndex: number = 0;
+  waypointPaths: GridPos[][] = []; // queued paths to visit sequentially
   attackTarget: Unit | null = null;
   attackBuildingTarget: import('./Building').Building | null = null;
   attackTimer: number = 0;
@@ -1131,6 +1132,16 @@ export class Unit {
 
   private updateMovement(dt: number, map: GameMap) {
     if (this.pathIndex >= this.path.length) {
+      // Check if there are waypoint paths to visit
+      if (this.waypointPaths.length > 0) {
+        const nextPath = this.waypointPaths.shift();
+        if (nextPath && nextPath.length > 0) {
+          this.path = nextPath;
+          this.pathIndex = 0;
+          this.state = UnitState.MOVING;
+          return;
+        }
+      }
       this.state = UnitState.IDLE;
       this.formationSpeedCap = null;
       return;
