@@ -223,6 +223,8 @@ export class CombatSystem {
           if (unit.berserkTimer > 0) dmg = Math.round(dmg * 1.25);
           // Leadership aura: +5% damage when player has any level-3 unit alive
           if (playersWithLeader.has(unit.playerId)) dmg = Math.round(dmg * 1.05);
+          // Officer discipline: fighting under a field officer's command (+10% damage)
+          if (unit.nearOfficer) dmg = Math.round(dmg * 1.10);
           // Civ unit synergy: +10% damage when fighting alongside a complementary unit type
           if (unit.nearSynergy) dmg = Math.round(dmg * 1.10);
           // Hero passive specialization: +15% when hero's signature unit type fights nearby

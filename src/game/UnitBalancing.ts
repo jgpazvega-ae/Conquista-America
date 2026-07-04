@@ -105,6 +105,8 @@ export const UNIT_COUNTERS: Record<UnitType, CounterMatrix> = {
     [UnitType.SHAMAN]: { multiplier: 0.8, reason: 'Chamán resiste conversión' },
     [UnitType.SOLDIER]: { multiplier: 0.6, reason: 'No es combatiente' },
   },
+  [UnitType.OFFICER]: {},
+  [UnitType.DRUMMER]: {},
 };
 
 export function getDamageMultiplier(attacker: UnitType, defender: UnitType): number {

@@ -152,9 +152,13 @@ export class Unit {
   // Recomputed periodically by Game.updateFormations.
   inFormation = false;
 
-  // Officer aura: a level-3 champion ally or hero within 5 tiles grants +2 defense.
+  // Officer aura: a level-3 champion ally, hero, or OFFICER unit within 5 tiles grants +2 defense.
   // Recomputed periodically by Game.updateFormations.
   nearOfficer = false;
+
+  // Drummer aura: a DRUMMER ally within 6 tiles → morale regen 2× and panic resistance.
+  // Recomputed periodically by Game.updateFormations.
+  nearDrummer = false;
 
   // Civ unit synergy: complementary elite unit type nearby (Eagle+Jaguar, Quechua+Antis, etc.)
   // Grants +10% damage when active. Recomputed periodically by Game.updateFormations.
@@ -778,6 +782,8 @@ export class Unit {
   /** Reduce morale; heroes never waver. Panic is triggered by Game when morale ≤ 25. */
   loseMorale(amount: number) {
     if (this.isHero) return;
+    // Drummer aura: the steady beat halves morale damage (panic resistance)
+    if (this.nearDrummer) amount = Math.ceil(amount * 0.5);
     this.morale = Math.max(0, this.morale - amount);
     this._moraleCooldown = 3;
   }
@@ -972,6 +978,7 @@ export class Unit {
       let regen = this._nearSettlement ? 9 : 4;
       if (this._isolated) regen *= 0.5; // lone units struggle to recover morale
       if (this.inFormation) regen *= 1.5; // close ranks steady the nerves
+      if (this.nearDrummer) regen *= 2.0; // the drumbeat steels the ranks
       // Home terrain bonus: natives recover morale faster on their ancestral lands
       const tile = map.getTile(this.col, this.row);
       if (tile) {

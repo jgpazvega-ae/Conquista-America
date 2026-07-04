@@ -1905,6 +1905,7 @@ export class Game {
     for (const u of active) {
       let allies = 0;
       let hasOfficer = false;
+      let hasDrummer = false;
       let hasSynergy = false;
       let hasHeroPower = false;
       for (const o of active) {
@@ -1912,7 +1913,9 @@ export class Game {
         const dc = u.col - o.col, dr = u.row - o.row;
         const d2 = dc * dc + dr * dr;
         if (d2 <= 9) allies++;
-        if (!hasOfficer && (o.isHero || o.level >= 3) && d2 <= 25) hasOfficer = true;
+        if (!hasOfficer && (o.isHero || o.level >= 3 || o.type === UnitType.OFFICER) && d2 <= 25) hasOfficer = true;
+        // Drummer aura: morale regen + panic resistance within 6 tiles
+        if (!hasDrummer && o.type === UnitType.DRUMMER && d2 <= 36) hasDrummer = true;
         // Synergy: check if this unit forms a complementary pair with an ally within 5 tiles
         if (!hasSynergy && d2 <= 25) {
           hasSynergy = Game.SYNERGY_PAIRS.some(
@@ -1926,6 +1929,7 @@ export class Game {
       }
       u.inFormation   = allies >= 3;
       u.nearOfficer   = hasOfficer;
+      u.nearDrummer   = hasDrummer;
       u.nearSynergy   = hasSynergy;
       u.heroPowerBuff = hasHeroPower;
       // Veteran teaching: level-3 same-type unit within 3 tiles accelerates XP gain (+30%)

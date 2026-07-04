@@ -46,6 +46,9 @@ export enum UnitType {
   // Spiritual/conversion units
   SHAMAN = 'SHAMAN',         // native civs — heals & curses
   MISSIONARY = 'MISSIONARY', // Conquistador — converts enemies
+  // Command units (American Conquest style)
+  OFFICER = 'OFFICER',       // combat aura: nearby allies fight harder
+  DRUMMER = 'DRUMMER',       // morale aura: nearby allies recover morale faster and resist panic
 }
 
 export enum UnitState {

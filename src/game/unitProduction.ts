@@ -37,6 +37,9 @@ export const TRAIN_COSTS: Partial<Record<UnitType, TrainCost>> = {
   // Espiritual
   [UnitType.SHAMAN]:        { food: 80,  gold: 60 },
   [UnitType.MISSIONARY]:    { food: 60,  gold: 80 },
+  // Mando (estilo American Conquest)
+  [UnitType.OFFICER]:       { food: 90,  gold: 70 },
+  [UnitType.DRUMMER]:       { food: 50,  gold: 35 },
 };
 
 // Units that require a Barracks building to train (not available in Settlement)
@@ -45,6 +48,7 @@ export const ELITE_UNITS = new Set<UnitType>([
   UnitType.CHAKANA_GUARD, UnitType.ANTIS_WARRIOR, // Inca elite
   UnitType.AHAU_WARRIOR, UnitType.BALAM_JAGUAR,  // Maya elite
   UnitType.CAVALRY, UnitType.CANNON,             // Conquistador elite
+  UnitType.OFFICER, UnitType.DRUMMER,            // command units (Barracks-trained)
 ]);
 
 export const TRAIN_TIMES: Partial<Record<UnitType, number>> = {
@@ -70,4 +74,6 @@ export const TRAIN_TIMES: Partial<Record<UnitType, number>> = {
   [UnitType.GALLEON]:       70,
   [UnitType.SHAMAN]:        22,
   [UnitType.MISSIONARY]:    25,
+  [UnitType.OFFICER]:       26,
+  [UnitType.DRUMMER]:       14,
 };
