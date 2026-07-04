@@ -162,6 +162,19 @@ const UNIT_DEFS: Record<UnitType, UnitDef> = {
     description: 'Convierte unidades enemigas al bando español con el tiempo.',
     stats: { maxHp: 50, attack: 5, defense: 5, speed: 2.5, attackRange: 3.5, sight: 7, attackCooldown: 4.0 },
   },
+  // ── MANDO (estilo American Conquest) ───────────────────
+  [UnitType.OFFICER]: {
+    type: UnitType.OFFICER, name: 'Oficial', emoji: '🎖️',
+    isRanged: false, isCavalry: false,
+    description: 'Líder de campo. Los aliados a 5 casillas luchan con más disciplina (+ataque/defensa).',
+    stats: { maxHp: 110, attack: 18, defense: 16, speed: 3.0, attackRange: 1.5, sight: 8, attackCooldown: 1.6 },
+  },
+  [UnitType.DRUMMER]: {
+    type: UnitType.DRUMMER, name: 'Tambor', emoji: '🥁',
+    isRanged: false, isCavalry: false,
+    description: 'Marca el ritmo de marcha. Aliados cercanos recuperan moral 2× más rápido y resisten el pánico.',
+    stats: { maxHp: 60, attack: 4, defense: 8, speed: 3.2, attackRange: 1.5, sight: 6, attackCooldown: 2.5 },
+  },
 };
 
 export const CIVILIZATIONS: Record<CivilizationType, CivDef> = {
@@ -172,7 +185,7 @@ export const CIVILIZATIONS: Record<CivilizationType, CivDef> = {
     color: 0x1aaa60,
     accentColor: 0x0d7040,
     description: 'El poderoso Imperio Mexica, maestros de la guerra florida.',
-    units: [UNIT_DEFS[UnitType.EAGLE_WARRIOR], UNIT_DEFS[UnitType.JAGUAR_KNIGHT], UNIT_DEFS[UnitType.ATLATL], UNIT_DEFS[UnitType.CUACHIC], UNIT_DEFS[UnitType.CANOE], UNIT_DEFS[UnitType.WAR_CANOE], UNIT_DEFS[UnitType.SHAMAN]],
+    units: [UNIT_DEFS[UnitType.EAGLE_WARRIOR], UNIT_DEFS[UnitType.JAGUAR_KNIGHT], UNIT_DEFS[UnitType.ATLATL], UNIT_DEFS[UnitType.CUACHIC], UNIT_DEFS[UnitType.CANOE], UNIT_DEFS[UnitType.WAR_CANOE], UNIT_DEFS[UnitType.SHAMAN], UNIT_DEFS[UnitType.OFFICER], UNIT_DEFS[UnitType.DRUMMER]],
     startUnits: [
       ...Array(12).fill(UnitType.EAGLE_WARRIOR),
       ...Array(6).fill(UnitType.JAGUAR_KNIGHT),
@@ -187,7 +200,7 @@ export const CIVILIZATIONS: Record<CivilizationType, CivDef> = {
     color: 0xd4a810,
     accentColor: 0xa07808,
     description: 'El vasto Imperio Inca, maestros de organización y arquitectura.',
-    units: [UNIT_DEFS[UnitType.QUECHUA], UNIT_DEFS[UnitType.SLINGER], UNIT_DEFS[UnitType.CHAKANA_GUARD], UNIT_DEFS[UnitType.ANTIS_WARRIOR], UNIT_DEFS[UnitType.CANOE], UNIT_DEFS[UnitType.SHAMAN]],
+    units: [UNIT_DEFS[UnitType.QUECHUA], UNIT_DEFS[UnitType.SLINGER], UNIT_DEFS[UnitType.CHAKANA_GUARD], UNIT_DEFS[UnitType.ANTIS_WARRIOR], UNIT_DEFS[UnitType.CANOE], UNIT_DEFS[UnitType.SHAMAN], UNIT_DEFS[UnitType.OFFICER], UNIT_DEFS[UnitType.DRUMMER]],
     startUnits: [
       ...Array(12).fill(UnitType.QUECHUA),
       ...Array(8).fill(UnitType.SLINGER),
@@ -202,7 +215,7 @@ export const CIVILIZATIONS: Record<CivilizationType, CivDef> = {
     color: 0x20b040,
     accentColor: 0x107828,
     description: 'Las ciudades-estado mayas, guerreros de la selva y ciencias avanzadas.',
-    units: [UNIT_DEFS[UnitType.SPEARMAN], UNIT_DEFS[UnitType.ARCHER], UNIT_DEFS[UnitType.AHAU_WARRIOR], UNIT_DEFS[UnitType.BALAM_JAGUAR], UNIT_DEFS[UnitType.WAR_CANOE], UNIT_DEFS[UnitType.SHAMAN]],
+    units: [UNIT_DEFS[UnitType.SPEARMAN], UNIT_DEFS[UnitType.ARCHER], UNIT_DEFS[UnitType.AHAU_WARRIOR], UNIT_DEFS[UnitType.BALAM_JAGUAR], UNIT_DEFS[UnitType.WAR_CANOE], UNIT_DEFS[UnitType.SHAMAN], UNIT_DEFS[UnitType.OFFICER], UNIT_DEFS[UnitType.DRUMMER]],
     startUnits: [
       ...Array(12).fill(UnitType.SPEARMAN),
       ...Array(8).fill(UnitType.ARCHER),
@@ -217,7 +230,7 @@ export const CIVILIZATIONS: Record<CivilizationType, CivDef> = {
     color: 0xcc2020,
     accentColor: 0x901010,
     description: 'Soldados europeos con tecnología superior: acero, pólvora y caballos.',
-    units: [UNIT_DEFS[UnitType.SOLDIER], UNIT_DEFS[UnitType.ARQUEBUSIER], UNIT_DEFS[UnitType.CAVALRY], UNIT_DEFS[UnitType.CANNON], UNIT_DEFS[UnitType.BRIGANTINE], UNIT_DEFS[UnitType.GALLEON], UNIT_DEFS[UnitType.MISSIONARY]],
+    units: [UNIT_DEFS[UnitType.SOLDIER], UNIT_DEFS[UnitType.ARQUEBUSIER], UNIT_DEFS[UnitType.CAVALRY], UNIT_DEFS[UnitType.CANNON], UNIT_DEFS[UnitType.BRIGANTINE], UNIT_DEFS[UnitType.GALLEON], UNIT_DEFS[UnitType.MISSIONARY], UNIT_DEFS[UnitType.OFFICER], UNIT_DEFS[UnitType.DRUMMER]],
     startUnits: [
       ...Array(10).fill(UnitType.SOLDIER),
       ...Array(8).fill(UnitType.ARQUEBUSIER),
