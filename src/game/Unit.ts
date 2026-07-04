@@ -145,6 +145,9 @@ export class Unit {
   // Formation march: group moves are capped to the slowest member's speed
   formationSpeedCap: number | null = null;
 
+  // Supply line: distance to nearest friendly building; applies penalties if too far
+  supplyDist: number = 0; // updated each frame; 0 = just built or at base
+
   // Close ranks: 3+ allies within 3 tiles → +2 defense, faster morale recovery.
   // Recomputed periodically by Game.updateFormations.
   inFormation = false;
@@ -852,6 +855,20 @@ export class Unit {
     this.updateHealthBar();
   }
 
+  /** Get effective attack value, reduced by supply line penalties. */
+  getEffectiveAttack(): number {
+    if (this.supplyDist > 30) return this.attack * 0.8;  // -20% attack far from supply
+    if (this.supplyDist > 15) return this.attack * 0.9;  // -10% attack medium distance
+    return this.attack;
+  }
+
+  /** Get effective speed value, reduced by supply line penalties. */
+  getEffectiveSpeed(): number {
+    if (this.supplyDist > 30) return this.speed * 0.8;   // -20% speed far from supply
+    if (this.supplyDist > 15) return this.speed * 0.9;   // -10% speed medium distance
+    return this.speed;
+  }
+
   private die() {
     this.state         = UnitState.DEAD;
     this.selected      = false;
@@ -1189,7 +1206,9 @@ export class Unit {
     terrainMult *= Unit.weatherSpeedMult;
     // Slinger slow: stone projectiles stagger the target (-40% speed)
     if (this.slowed > 0) terrainMult *= 0.6;
-    const effSpeed = this.formationSpeedCap !== null ? Math.min(this.speed, this.formationSpeedCap) : this.speed;
+    // Apply supply line speed penalty (units far from bases move slower)
+    const supplyAdjustedSpeed = this.getEffectiveSpeed();
+    const effSpeed = this.formationSpeedCap !== null ? Math.min(supplyAdjustedSpeed, this.formationSpeedCap) : supplyAdjustedSpeed;
     const step = effSpeed * TILE_SIZE * dt * terrainMult;
 
     if (dist <= step) {
