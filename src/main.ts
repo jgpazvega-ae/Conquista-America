@@ -2883,6 +2883,29 @@ class GameInstance {
         }
         return;
       }
+      // Alt+F: focus fire — all selected units target the nearest enemy
+      if (e.code === 'KeyF' && e.altKey && !e.ctrlKey) {
+        e.preventDefault();
+        const sel = this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId && u.isAlive());
+        if (sel.length === 0) { this.hud.notify('Selecciona unidades para el fuego concentrado', 'info'); return; }
+        let bestTarget: Unit | null = null;
+        let bestDist = Infinity;
+        const maxSight = Math.max(...sel.map(u => u.sight));
+        for (const enemy of this.game.allUnits) {
+          if (!enemy.isAlive() || enemy.playerId === this.game.humanPlayerId) continue;
+          const d = sel[0].distanceTo(enemy);
+          if (d <= maxSight && d < bestDist) { bestDist = d; bestTarget = enemy; }
+        }
+        if (!bestTarget) {
+          this.hud.notify('Sin enemigos a la vista', 'info');
+          return;
+        }
+        let focused = 0;
+        for (const u of sel) { u.attackUnit(bestTarget); focused++; }
+        this.hud.notify(`🎯 ${focused} unidad${focused !== 1 ? 's' : ''} enfocando fuego en el ${bestTarget.def.name} más cercano`, 'success');
+        this.audio.playMove();
+        return;
+      }
       // Alt+D: defensive circle — selected units spread around their centroid for 360° coverage
       if (e.code === 'KeyD' && e.altKey && !e.ctrlKey) {
         e.preventDefault();
