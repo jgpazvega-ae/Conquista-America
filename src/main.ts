@@ -1,6 +1,6 @@
 import './styles.css';
 import * as THREE from 'three';
-import { CivilizationType, UnitState, UnitType } from './game/types';
+import { CivilizationType, UnitState, UnitType, GridPos } from './game/types';
 import { Unit } from './game/Unit';
 import { SaveSystem } from './game/SaveSystem';
 import { AuthScreen } from './ui/AuthScreen';
@@ -372,6 +372,37 @@ class GameInstance {
       const n = followers.length;
       this.hud.notify(`🔗 ${n} unidad${n !== 1 ? 'es' : ''} siguiendo a ${target.def.name} — clic der. en terreno para cancelar`, 'info');
       this.audio.playMove();
+    };
+
+    this.input.onWaypointAdd = (pos: GridPos) => {
+      const sel = this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId && u.isAlive());
+      if (sel.length === 0) {
+        this.hud.notify('📍 Selecciona unidades para agregar puntos de ruta', 'info');
+        return;
+      }
+      // Add waypoint path to all selected units
+      let added = 0;
+      const map = this.game.map;
+      for (const u of sel) {
+        const near = map.findWalkableNear(pos.col, pos.row, 3);
+        if (near) {
+          const path = findPath(map, u.gridPos(), { col: near[0], row: near[1] }, 400);
+          if (path.length > 0) {
+            // If unit is idle or currently has no active movement, move immediately
+            if (u.path.length === 0 && u.state === UnitState.IDLE) {
+              u.moveTo(path);
+            } else {
+              // Otherwise queue the waypoint path for later
+              u.waypointPaths.push(path);
+            }
+            added++;
+          }
+        }
+      }
+      if (added > 0) {
+        this.hud.notify(`📍 ${added} unidad${added !== 1 ? 'es' : ''} en ruta a punto de paso`, 'info');
+        this.audio.playMove();
+      }
     };
 
     this.hud.onPowerActivate = () => this.triggerCivPower();
@@ -2883,6 +2914,58 @@ class GameInstance {
         }
         return;
       }
+      // Alt+F: focus fire — all selected units target the nearest enemy
+      if (e.code === 'KeyF' && e.altKey && !e.ctrlKey) {
+        e.preventDefault();
+        const sel = this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId && u.isAlive());
+        if (sel.length === 0) { this.hud.notify('Selecciona unidades para el fuego concentrado', 'info'); return; }
+        let bestTarget: Unit | null = null;
+        let bestDist = Infinity;
+        const maxSight = Math.max(...sel.map(u => u.sight));
+        for (const enemy of this.game.allUnits) {
+          if (!enemy.isAlive() || enemy.playerId === this.game.humanPlayerId) continue;
+          const d = sel[0].distanceTo(enemy);
+          if (d <= maxSight && d < bestDist) { bestDist = d; bestTarget = enemy; }
+        }
+        if (!bestTarget) {
+          this.hud.notify('Sin enemigos a la vista', 'info');
+          return;
+        }
+        let focused = 0;
+        for (const u of sel) { u.attackUnit(bestTarget); focused++; }
+        this.hud.notify(`🎯 ${focused} unidad${focused !== 1 ? 's' : ''} enfocando fuego en el ${bestTarget.def.name} más cercano`, 'success');
+        this.audio.playMove();
+        return;
+      }
+      // Alt+D: defensive circle — selected units spread around their centroid for 360° coverage
+      if (e.code === 'KeyD' && e.altKey && !e.ctrlKey) {
+        e.preventDefault();
+        const sel = this.input.getSelectedUnits().filter(
+          u => u.playerId === this.game.humanPlayerId && u.garrisonedIn === null,
+        );
+        if (sel.length < 2) {
+          this.hud.notify('Selecciona al menos 2 unidades para la formación circular', 'info');
+          return;
+        }
+        const cx = sel.reduce((s, u) => s + u.col, 0) / sel.length;
+        const cz = sel.reduce((s, u) => s + u.row, 0) / sel.length;
+        const radius = Math.max(2.5, Math.sqrt(sel.length) * 1.2);
+        let placed = 0;
+        sel.forEach((u, i) => {
+          const angle = (2 * Math.PI * i) / sel.length;
+          const tc = Math.round(cx + radius * Math.cos(angle));
+          const tr = Math.round(cz + radius * Math.sin(angle));
+          const near = this.game.map.findWalkableNear(tc, tr, 2);
+          if (!near) return;
+          const path = findPath(this.game.map, u.gridPos(), { col: near[0], row: near[1] }, 300);
+          if (path.length > 0) { u.moveTo(path); placed++; }
+        });
+        if (placed > 0) {
+          this.hud.notify(`⭕ Formación circular — ${placed} unidad${placed !== 1 ? 'es' : ''} cubriendo el perímetro`, 'info');
+          this.audio.playMove();
+        }
+        return;
+      }
       // Alt+R: rush all idle military units to join nearest active combat
       if (e.code === 'KeyR' && e.altKey && !e.ctrlKey) {
         e.preventDefault();
@@ -2939,6 +3022,45 @@ class GameInstance {
         for (const u of sel) u.stance = next;
         const label = next === 'AGGRESSIVE' ? '⚔️ Agresivo' : next === 'DEFENSIVE' ? '🛡️ Defensivo' : '⚖️ Equilibrado';
         this.hud.notify(`${label} — ${sel.length} unidad${sel.length !== 1 ? 'es' : ''}`, 'info');
+        return;
+      }
+      // Alt+G: smart garrison — garrison all ranged units in nearby friendly buildings
+      if (e.code === 'KeyG' && e.altKey && !e.ctrlKey) {
+        e.preventDefault();
+        const ranged = this.game.humanPlayer.aliveUnits.filter(
+          u => u.def.isRanged && u.garrisonedIn === null && u.state === UnitState.IDLE,
+        );
+        if (ranged.length === 0) {
+          this.hud.notify('📍 Sin unidades de rango disponibles para garrison', 'info');
+          return;
+        }
+        let garrisoned = 0;
+        for (const u of ranged) {
+          // Find nearest friendly building with garrison capacity
+          let best: import('./game/Building').Building | null = null;
+          let bestDist = Infinity;
+          for (const b of this.game.allBuildings) {
+            if (b.playerId !== this.game.humanPlayerId || !b.isAlive() || !b.isComplete()) continue;
+            if (b.garrison.length >= b.garrisonCapacity) continue;
+            const d = Math.abs(b.col - u.col) + Math.abs(b.row - u.row);
+            if (d < bestDist) { bestDist = d; best = b; }
+          }
+          if (best) {
+            u.garrisonTarget = best;
+            const near = this.game.map.findWalkableNear(best.col, best.row, 2);
+            if (near) {
+              const path = findPath(this.game.map, u.gridPos(), { col: near[0], row: near[1] }, 300);
+              if (path.length > 0) {
+                u.moveTo(path);
+                garrisoned++;
+              }
+            }
+          }
+        }
+        if (garrisoned > 0) {
+          this.hud.notify(`🏰 ${garrisoned} unidad${garrisoned !== 1 ? 'es' : ''} en garrison defensivo`, 'success');
+          this.audio.playMove();
+        }
         return;
       }
       if (e.altKey && !e.ctrlKey && !e.shiftKey && /^Digit[1-4]$/.test(e.code)) {
