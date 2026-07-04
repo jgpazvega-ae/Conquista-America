@@ -3011,6 +3011,45 @@ class GameInstance {
         this.hud.notify(`🎯 Prioridad de ataque → ${label} (${sel.length} unidad${sel.length !== 1 ? 'es' : ''})`, 'info');
         return;
       }
+      // Alt+G: smart garrison — garrison all ranged units in nearby friendly buildings
+      if (e.code === 'KeyG' && e.altKey && !e.ctrlKey) {
+        e.preventDefault();
+        const ranged = this.game.humanPlayer.aliveUnits.filter(
+          u => u.def.isRanged && u.garrisonedIn === null && u.state === UnitState.IDLE,
+        );
+        if (ranged.length === 0) {
+          this.hud.notify('📍 Sin unidades de rango disponibles para garrison', 'info');
+          return;
+        }
+        let garrisoned = 0;
+        for (const u of ranged) {
+          // Find nearest friendly building with garrison capacity
+          let best: import('./game/Building').Building | null = null;
+          let bestDist = Infinity;
+          for (const b of this.game.allBuildings) {
+            if (b.playerId !== this.game.humanPlayerId || !b.isAlive() || !b.isComplete()) continue;
+            if (b.garrison.length >= b.garrisonCapacity) continue;
+            const d = Math.abs(b.col - u.col) + Math.abs(b.row - u.row);
+            if (d < bestDist) { bestDist = d; best = b; }
+          }
+          if (best) {
+            u.garrisonTarget = best;
+            const near = this.game.map.findWalkableNear(best.col, best.row, 2);
+            if (near) {
+              const path = findPath(this.game.map, u.gridPos(), { col: near[0], row: near[1] }, 300);
+              if (path.length > 0) {
+                u.moveTo(path);
+                garrisoned++;
+              }
+            }
+          }
+        }
+        if (garrisoned > 0) {
+          this.hud.notify(`🏰 ${garrisoned} unidad${garrisoned !== 1 ? 'es' : ''} en garrison defensivo`, 'success');
+          this.audio.playMove();
+        }
+        return;
+      }
       if (e.altKey && !e.ctrlKey && !e.shiftKey && /^Digit[1-4]$/.test(e.code)) {
         e.preventDefault();
         const digit = parseInt(e.code.replace('Digit', ''));
