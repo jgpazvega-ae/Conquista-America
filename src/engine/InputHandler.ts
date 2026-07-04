@@ -35,6 +35,7 @@ export class InputHandler {
   onHover:            ((unitId: number | null, buildingId: number | null, screenX: number, screenY: number, tileCol?: number, tileRow?: number) => void) | null = null;
   onMapPing:          ((worldX: number, worldZ: number) => void) | null = null;
   onFollowUnit:       ((followers: import('../game/Unit').Unit[], target: import('../game/Unit').Unit) => void) | null = null;
+  onWaypointAdd:      ((pos: import('../game/types').GridPos) => void) | null = null;
 
   private _placingMode     = false;
   private _attackMoveMode  = false;
@@ -146,6 +147,15 @@ export class InputHandler {
 
     const myUnits = selected.filter(u => u.playerId === this.game.humanPlayerId);
     if (myUnits.length === 0) return;
+
+    // Ctrl+right-click = add waypoint to unit queue
+    if (e.ctrlKey && !e.shiftKey) {
+      const hit = this.renderer.pickFromScreen(e.clientX, e.clientY);
+      if (hit?.type === 'tile') {
+        this.onWaypointAdd?.({ col: hit.col, row: hit.row });
+      }
+      return;
+    }
 
     // Shift+right-click = set patrol route (current pos → clicked tile)
     if (e.shiftKey) {

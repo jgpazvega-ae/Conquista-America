@@ -1,6 +1,6 @@
 import './styles.css';
 import * as THREE from 'three';
-import { CivilizationType, UnitState, UnitType } from './game/types';
+import { CivilizationType, UnitState, UnitType, GridPos } from './game/types';
 import { Unit } from './game/Unit';
 import { SaveSystem } from './game/SaveSystem';
 import { AuthScreen } from './ui/AuthScreen';
@@ -372,6 +372,37 @@ class GameInstance {
       const n = followers.length;
       this.hud.notify(`🔗 ${n} unidad${n !== 1 ? 'es' : ''} siguiendo a ${target.def.name} — clic der. en terreno para cancelar`, 'info');
       this.audio.playMove();
+    };
+
+    this.input.onWaypointAdd = (pos: GridPos) => {
+      const sel = this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId && u.isAlive());
+      if (sel.length === 0) {
+        this.hud.notify('📍 Selecciona unidades para agregar puntos de ruta', 'info');
+        return;
+      }
+      // Add waypoint path to all selected units
+      let added = 0;
+      const map = this.game.map;
+      for (const u of sel) {
+        const near = map.findWalkableNear(pos.col, pos.row, 3);
+        if (near) {
+          const path = findPath(map, u.gridPos(), { col: near[0], row: near[1] }, 400);
+          if (path.length > 0) {
+            // If unit is idle or currently has no active movement, move immediately
+            if (u.path.length === 0 && u.state === UnitState.IDLE) {
+              u.moveTo(path);
+            } else {
+              // Otherwise queue the waypoint path for later
+              u.waypointPaths.push(path);
+            }
+            added++;
+          }
+        }
+      }
+      if (added > 0) {
+        this.hud.notify(`📍 ${added} unidad${added !== 1 ? 'es' : ''} en ruta a punto de paso`, 'info');
+        this.audio.playMove();
+      }
     };
 
     this.hud.onPowerActivate = () => this.triggerCivPower();
