@@ -1682,6 +1682,24 @@ export class Game {
       }
     }
 
+    // Field healing (AC style): idle Shamans/Missionaries mend the most-wounded ally within 4 tiles (3 HP/s)
+    for (const unit of this.allUnits) {
+      if (!unit.isAlive()) continue;
+      if (unit.type !== UnitType.SHAMAN && unit.type !== UnitType.MISSIONARY) continue;
+      if (unit.state !== UnitState.IDLE && unit.state !== UnitState.HOLD) continue;
+      let healTarget: Unit | null = null;
+      let worstFrac = 1.0;
+      for (const other of this.allUnits) {
+        if (!other.isAlive() || other.playerId !== unit.playerId || other === unit) continue;
+        if (other.garrisonedIn !== null || other.hp >= other.maxHp) continue;
+        const d = Math.hypot(other.col - unit.col, other.row - unit.row);
+        if (d > 4) continue;
+        const frac = other.hp / other.maxHp;
+        if (frac < worstFrac) { worstFrac = frac; healTarget = other; }
+      }
+      if (healTarget) healTarget.heal(3 * dt);
+    }
+
     // Missionary conversion: Missionaries convert adjacent enemy units over 6 seconds
     for (const unit of this.allUnits) {
       if (!unit.isAlive()) continue;
