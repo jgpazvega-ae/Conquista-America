@@ -1826,10 +1826,13 @@ export class Game {
 
       let best: Unit | null = null;
       let bestScore = -Infinity;
+      // AGGRESSIVE stance extends sight range; DEFENSIVE reduces it slightly
+      const sightMult = unit.stance === 'AGGRESSIVE' ? 1.3 : unit.stance === 'DEFENSIVE' ? 0.85 : 1.0;
+      const effectiveSight = unit.sight * sightMult;
       for (const enemy of this.allUnits) {
         if (!enemy.isAlive() || enemy.playerId === unit.playerId) continue;
         const d = unit.distanceTo(enemy);
-        if (d > unit.sight) continue;
+        if (d > effectiveSight) continue;
         const score =
           unit.targetPriority === 'WEAKEST'   ? -enemy.hp :
           unit.targetPriority === 'STRONGEST' ?  enemy.maxHp :

@@ -3011,6 +3011,19 @@ class GameInstance {
         this.hud.notify(`🎯 Prioridad de ataque → ${label} (${sel.length} unidad${sel.length !== 1 ? 'es' : ''})`, 'info');
         return;
       }
+      // Alt+A: cycle unit AI stance (Aggressive → Defensive → Balanced)
+      if (e.code === 'KeyA' && e.altKey && !e.ctrlKey) {
+        e.preventDefault();
+        const sel = this.input.getSelectedUnits().filter(u => u.playerId === this.game.humanPlayerId);
+        if (sel.length === 0) { this.hud.notify('Selecciona unidades para cambiar postura de combate', 'info'); return; }
+        const cur = sel[0].stance;
+        const next: 'AGGRESSIVE' | 'DEFENSIVE' | 'BALANCED' =
+          cur === 'AGGRESSIVE' ? 'DEFENSIVE' : cur === 'DEFENSIVE' ? 'BALANCED' : 'AGGRESSIVE';
+        for (const u of sel) u.stance = next;
+        const label = next === 'AGGRESSIVE' ? '⚔️ Agresivo' : next === 'DEFENSIVE' ? '🛡️ Defensivo' : '⚖️ Equilibrado';
+        this.hud.notify(`${label} — ${sel.length} unidad${sel.length !== 1 ? 'es' : ''}`, 'info');
+        return;
+      }
       // Alt+G: smart garrison — garrison all ranged units in nearby friendly buildings
       if (e.code === 'KeyG' && e.altKey && !e.ctrlKey) {
         e.preventDefault();
