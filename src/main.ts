@@ -2906,6 +2906,35 @@ class GameInstance {
         this.audio.playMove();
         return;
       }
+      // Alt+D: defensive circle — selected units spread around their centroid for 360° coverage
+      if (e.code === 'KeyD' && e.altKey && !e.ctrlKey) {
+        e.preventDefault();
+        const sel = this.input.getSelectedUnits().filter(
+          u => u.playerId === this.game.humanPlayerId && u.garrisonedIn === null,
+        );
+        if (sel.length < 2) {
+          this.hud.notify('Selecciona al menos 2 unidades para la formación circular', 'info');
+          return;
+        }
+        const cx = sel.reduce((s, u) => s + u.col, 0) / sel.length;
+        const cz = sel.reduce((s, u) => s + u.row, 0) / sel.length;
+        const radius = Math.max(2.5, Math.sqrt(sel.length) * 1.2);
+        let placed = 0;
+        sel.forEach((u, i) => {
+          const angle = (2 * Math.PI * i) / sel.length;
+          const tc = Math.round(cx + radius * Math.cos(angle));
+          const tr = Math.round(cz + radius * Math.sin(angle));
+          const near = this.game.map.findWalkableNear(tc, tr, 2);
+          if (!near) return;
+          const path = findPath(this.game.map, u.gridPos(), { col: near[0], row: near[1] }, 300);
+          if (path.length > 0) { u.moveTo(path); placed++; }
+        });
+        if (placed > 0) {
+          this.hud.notify(`⭕ Formación circular — ${placed} unidad${placed !== 1 ? 'es' : ''} cubriendo el perímetro`, 'info');
+          this.audio.playMove();
+        }
+        return;
+      }
       // Alt+R: rush all idle military units to join nearest active combat
       if (e.code === 'KeyR' && e.altKey && !e.ctrlKey) {
         e.preventDefault();
