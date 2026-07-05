@@ -8,6 +8,8 @@ export enum ResourceType {
   GOLD = 'GOLD',
   STONE = 'STONE',
   WOOD = 'WOOD',
+  COAL = 'COAL',   // gunpowder economy (American Conquest style)
+  IRON = 'IRON',   // gunpowder economy (American Conquest style)
 }
 
 export class ResourceNode {
@@ -77,6 +79,32 @@ export class ResourceNode {
         const end = new THREE.Mesh(new THREE.CircleGeometry(0.14, 8), grain);
         end.rotation.y = Math.PI / 2; end.position.set((i - 1) * 0.22 + 0.35, 0.16 + Math.floor(i / 2) * 0.28, (i % 2) * 0.1 - 0.05);
         this.mesh.add(end);
+      }
+    } else if (this.type === ResourceType.COAL) {
+      // Coal seam — jet-black glossy chunks
+      const coal = new THREE.MeshStandardMaterial({ color: 0x1c1c22, roughness: 0.35, metalness: 0.15, flatShading: true });
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        const s = 0.16 + Math.random() * 0.16;
+        const b = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), coal);
+        b.position.set(Math.cos(a) * 0.26, s * 0.8, Math.sin(a) * 0.26);
+        b.rotation.set(i * 0.9, i * 1.3, i * 0.4);
+        b.castShadow = true; this.mesh.add(b);
+      }
+    } else if (this.type === ResourceType.IRON) {
+      // Iron vein — rusty boulders with metallic streaks
+      const rust  = new THREE.MeshStandardMaterial({ color: 0x8a4a2a, roughness: 0.85, flatShading: true });
+      const steel = new THREE.MeshStandardMaterial({ color: 0xb8bec8, roughness: 0.25, metalness: 0.9 });
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2;
+        const s = 0.18 + Math.random() * 0.16;
+        const b = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), rust);
+        b.position.set(Math.cos(a) * 0.25, s * 0.8, Math.sin(a) * 0.25);
+        b.rotation.set(i, i * 1.7, i * 0.5);
+        b.castShadow = true; this.mesh.add(b);
+        const streak = new THREE.Mesh(new THREE.OctahedronGeometry(0.06, 0), steel);
+        streak.position.set(Math.cos(a) * 0.25, s * 1.3, Math.sin(a) * 0.25);
+        this.mesh.add(streak);
       }
     } else {
       // Stone — pile of grey boulders

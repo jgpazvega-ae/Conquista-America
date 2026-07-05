@@ -31,6 +31,8 @@ export class ResourceSystem {
             if (res.type === 'food')       player.resources.food  += res.amount;
             else if (res.type === 'gold')  player.resources.gold  += res.amount;
             else if (res.type === 'wood')  player.resources.wood  += res.amount;
+            else if (res.type === 'coal')  player.resources.coal  += res.amount;
+            else if (res.type === 'iron')  player.resources.iron  += res.amount;
             else                           player.resources.stone += res.amount;
           }
           worker.task = WorkerTask.IDLE;
@@ -50,7 +52,9 @@ export class ResourceSystem {
       const isGathering = worker.task === WorkerTask.GATHERING_FOOD ||
                           worker.task === WorkerTask.GATHERING_GOLD ||
                           worker.task === WorkerTask.GATHERING_STONE ||
-                          worker.task === WorkerTask.GATHERING_WOOD;
+                          worker.task === WorkerTask.GATHERING_WOOD ||
+                          worker.task === WorkerTask.GATHERING_COAL ||
+                          worker.task === WorkerTask.GATHERING_IRON;
       if (isGathering) {
         const nearStorehouse = game.allBuildings.some(
           b => b.playerId === worker.playerId &&
@@ -70,7 +74,9 @@ export class ResourceSystem {
           const nativeBonus = (playerCiv === CivilizationType.AZTEC || playerCiv === CivilizationType.MAYA) ? 0.10 : 0;
           worker.taskProgress += game.lastDt * (0.30 + nativeBonus);
         }
-        if (worker.task === WorkerTask.GATHERING_STONE &&
+        if ((worker.task === WorkerTask.GATHERING_STONE ||
+             worker.task === WorkerTask.GATHERING_COAL ||
+             worker.task === WorkerTask.GATHERING_IRON) &&
             (workerTile?.terrain === TerrainType.HIGHLAND || workerTile?.terrain === TerrainType.MOUNTAIN)) {
           const incaBonus = playerCiv === CivilizationType.INCA ? 0.15 : 0;
           worker.taskProgress += game.lastDt * (0.25 + incaBonus);
@@ -94,6 +100,8 @@ export class ResourceSystem {
         const task = node.type === ResourceType.FOOD  ? WorkerTask.GATHERING_FOOD :
                      node.type === ResourceType.GOLD  ? WorkerTask.GATHERING_GOLD :
                      node.type === ResourceType.WOOD  ? WorkerTask.GATHERING_WOOD :
+                     node.type === ResourceType.COAL  ? WorkerTask.GATHERING_COAL :
+                     node.type === ResourceType.IRON  ? WorkerTask.GATHERING_IRON :
                                                         WorkerTask.GATHERING_STONE;
         worker.setTask(task, node.col, node.row);
       } else {

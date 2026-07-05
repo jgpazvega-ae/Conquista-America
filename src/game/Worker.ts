@@ -13,6 +13,8 @@ export enum WorkerTask {
   GATHERING_GOLD = 'GATHERING_GOLD',
   GATHERING_STONE = 'GATHERING_STONE',
   GATHERING_WOOD = 'GATHERING_WOOD',
+  GATHERING_COAL = 'GATHERING_COAL',
+  GATHERING_IRON = 'GATHERING_IRON',
   RETURNING = 'RETURNING',
   REPAIRING = 'REPAIRING',
 }
@@ -32,7 +34,7 @@ export class Worker {
   targetRow: number;
   path: GridPos[] = [];
   pathIndex: number = 0;
-  carrying: 'food' | 'gold' | 'stone' | 'wood' | null = null;
+  carrying: 'food' | 'gold' | 'stone' | 'wood' | 'coal' | 'iron' | null = null;
   carryAmount: number = 0;
   repairTarget: import('./Building').Building | null = null;
 
@@ -127,6 +129,8 @@ export class Worker {
         if (this.task === WorkerTask.GATHERING_FOOD) this.carrying = 'food';
         else if (this.task === WorkerTask.GATHERING_GOLD) this.carrying = 'gold';
         else if (this.task === WorkerTask.GATHERING_WOOD) this.carrying = 'wood';
+        else if (this.task === WorkerTask.GATHERING_COAL) this.carrying = 'coal';
+        else if (this.task === WorkerTask.GATHERING_IRON) this.carrying = 'iron';
         else this.carrying = 'stone';
         this.updateResourceIndicator();
         this.task = WorkerTask.IDLE;
@@ -196,15 +200,17 @@ export class Worker {
       if (this.carrying === 'food') mat.color.setHex(0xddaa44);
       else if (this.carrying === 'gold') mat.color.setHex(0xffd000);
       else if (this.carrying === 'wood') mat.color.setHex(0x8B5A2B);
+      else if (this.carrying === 'coal') mat.color.setHex(0x22222a);
+      else if (this.carrying === 'iron') mat.color.setHex(0xb8bec8);
       else mat.color.setHex(0x999999);
     } else {
       this.resourceIndicator.visible = false;
     }
   }
 
-  dropResources(): { type: 'food' | 'gold' | 'stone' | 'wood'; amount: number } | null {
+  dropResources(): { type: 'food' | 'gold' | 'stone' | 'wood' | 'coal' | 'iron'; amount: number } | null {
     if (!this.carrying) return null;
-    const res = { type: this.carrying as 'food' | 'gold' | 'stone' | 'wood', amount: this.carryAmount };
+    const res = { type: this.carrying, amount: this.carryAmount };
     this.carrying = null;
     this.carryAmount = 0;
     this.updateResourceIndicator();

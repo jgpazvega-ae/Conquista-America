@@ -866,7 +866,9 @@ class GameInstance {
       );
       if (myWorkersHere) {
         this.audio.playResourceDepleted();
-        const typeLabel = node.type === ResourceType.FOOD ? 'Alimentos' : node.type === ResourceType.GOLD ? 'Oro' : 'Piedra';
+        const typeLabel = node.type === ResourceType.FOOD ? 'Alimentos' : node.type === ResourceType.GOLD ? 'Oro' :
+          node.type === ResourceType.WOOD ? 'Madera' : node.type === ResourceType.COAL ? 'Carbón' :
+          node.type === ResourceType.IRON ? 'Hierro' : 'Piedra';
         this.hud.notify(`⚠️ Yacimiento de ${typeLabel} agotado — reasigna tus trabajadores (Q)`, 'warning');
       }
     }
@@ -876,7 +878,9 @@ class GameInstance {
       const fog = this.game.fog.getFog(this.game.humanPlayerId);
       const vis = fog ? fog.getVisibility(node.col, node.row) : 1;
       if (vis === 2 /* VISIBLE */) {
-        const typeLabel = node.type === ResourceType.FOOD ? 'Alimentos' : node.type === ResourceType.GOLD ? 'Oro' : 'Piedra';
+        const typeLabel = node.type === ResourceType.FOOD ? 'Alimentos' : node.type === ResourceType.GOLD ? 'Oro' :
+          node.type === ResourceType.WOOD ? 'Madera' : node.type === ResourceType.COAL ? 'Carbón' :
+          node.type === ResourceType.IRON ? 'Hierro' : 'Piedra';
         this.hud.notify(`🌱 Yacimiento de ${typeLabel} regenerado`, 'success');
       }
     }
