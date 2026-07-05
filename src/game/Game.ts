@@ -56,6 +56,8 @@ export class Game {
 
   damageEvents: DamageEvent[] = [];
   readonly killsByPlayer = new Map<number, number>(); // playerId → total kills
+  readonly lossesByPlayer = new Map<number, number>(); // playerId → own units lost
+  readonly buildingsLostByPlayer = new Map<number, number>(); // playerId → own buildings destroyed
   newlySpawnedUnits: Unit[] = [];
   newlyPlacedBuildings: Building[] = [];
   newlyCompletedBuildings: Building[] = [];
@@ -531,6 +533,9 @@ export class Game {
       }
     }
 
+    for (const b of this.newlyDestroyedBuildings) {
+      this.buildingsLostByPlayer.set(b.playerId, (this.buildingsLostByPlayer.get(b.playerId) ?? 0) + 1);
+    }
     this.newlySpawnedUnits = [];
     this.newlyPlacedBuildings = [];
     this.newlyCompletedBuildings = [];
@@ -886,6 +891,7 @@ export class Game {
     for (const evt of this.damageEvents) {
       if (!evt.target.isAlive() && evt.attacker) {
         this.killsByPlayer.set(evt.attacker.playerId, (this.killsByPlayer.get(evt.attacker.playerId) ?? 0) + 1);
+        this.lossesByPlayer.set(evt.target.playerId, (this.lossesByPlayer.get(evt.target.playerId) ?? 0) + 1);
         this._killsThisCycle.set(evt.attacker.playerId, (this._killsThisCycle.get(evt.attacker.playerId) ?? 0) + 1);
         // Kill morale boost: victory euphoria (+5 morale, cap 70; night raids cap 80)
         const nightKillBoost = this.isNight ? 10 : 5;

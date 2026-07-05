@@ -1972,6 +1972,42 @@ class GameInstance {
       </div>
     `;
 
+    // AC-style comparative scoreboard: one row per player
+    const rows = this.game.players.map(p => {
+      const civDef  = CIVILIZATIONS[p.civType];
+      const kills   = this.game.killsByPlayer.get(p.id) ?? 0;
+      const losses  = this.game.lossesByPlayer.get(p.id) ?? 0;
+      const bLost   = this.game.buildingsLostByPlayer.get(p.id) ?? 0;
+      const army    = p.aliveUnits.length;
+      const alive   = army > 0 || this.game.allBuildings.some(b => b.playerId === p.id && b.isAlive());
+      const label   = p.isHuman ? `${civDef.emoji} ${civDef.name} (Tú)` : `${civDef.emoji} ${civDef.name}`;
+      const status  = alive ? '' : ' 💀';
+      const hl      = p.isHuman ? 'font-weight:700;color:#f0c060;' : '';
+      return `<tr style="${hl}">
+        <td style="text-align:left;padding:4px 10px;">${label}${status}</td>
+        <td style="padding:4px 10px;">${kills}</td>
+        <td style="padding:4px 10px;">${losses}</td>
+        <td style="padding:4px 10px;">${bLost}</td>
+        <td style="padding:4px 10px;">${army}</td>
+      </tr>`;
+    }).join('');
+    stats.innerHTML += `
+      <div style="grid-column:1/-1;margin-top:14px;overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.85rem;text-align:center;">
+          <thead>
+            <tr style="opacity:0.7;border-bottom:1px solid rgba(255,255,255,0.25);">
+              <th style="text-align:left;padding:4px 10px;">Jugador</th>
+              <th style="padding:4px 10px;">⚔️ Bajas causadas</th>
+              <th style="padding:4px 10px;">🩸 Bajas propias</th>
+              <th style="padding:4px 10px;">🏚️ Edificios perdidos</th>
+              <th style="padding:4px 10px;">🛡️ Ejército final</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `;
+
     // Particle burst
     if (won) this.spawnEndParticles();
 
