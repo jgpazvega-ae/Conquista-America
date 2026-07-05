@@ -1682,6 +1682,35 @@ export class Game {
       }
     }
 
+    // Worker capture (AC style): an enemy melee soldier adjacent to an unprotected worker
+    // for 2 seconds captures it — the worker switches sides and wears the captor's colors.
+    for (const worker of this.allWorkers) {
+      let captor: Unit | null = null;
+      for (const soldier of this.allUnits) {
+        if (!soldier.isAlive() || soldier.playerId === worker.playerId) continue;
+        if (soldier.attackRange > 1.5 || soldier.garrisonedIn !== null || soldier.panicked) continue;
+        if (Math.hypot(soldier.col - worker.col, soldier.row - worker.row) <= 1.8) { captor = soldier; break; }
+      }
+      if (!captor) { worker._captureTimer = 0; continue; }
+      // Protected: any friendly military unit within 5 tiles prevents the capture
+      const protector = this.allUnits.some(u =>
+        u.isAlive() && u.playerId === worker.playerId && u.garrisonedIn === null &&
+        Math.hypot(u.col - worker.col, u.row - worker.row) <= 5,
+      );
+      if (protector) { worker._captureTimer = 0; continue; }
+      worker._captureTimer += dt;
+      if (worker._captureTimer < 2) continue;
+      const origOwner = worker.playerId;
+      const newPlayer = this.players[captor.playerId];
+      if (!newPlayer) continue;
+      worker.convertTo(captor.playerId, CIV_COLORS[newPlayer.civType]);
+      if (captor.playerId === this.humanPlayerId) {
+        this.pendingEventMessages.push('👷 ¡Trabajador enemigo capturado! Ahora trabaja para ti');
+      } else if (origOwner === this.humanPlayerId) {
+        this.pendingEventMessages.push('⚠️ ¡El enemigo ha capturado a uno de tus trabajadores!');
+      }
+    }
+
     // Artillery capture (AC style): a crippled cannon (≤30% HP) with an enemy melee unit
     // adjacent for 3 seconds changes hands instead of being destroyed.
     for (const cannon of this.allUnits) {

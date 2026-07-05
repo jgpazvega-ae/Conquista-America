@@ -19,7 +19,8 @@ export enum WorkerTask {
 
 export class Worker {
   readonly id: number;
-  readonly playerId: number;
+  playerId: number; // mutable: workers can be captured (American Conquest style)
+  _captureTimer = 0; // seconds an enemy soldier has been seizing this worker
 
   col: number;
   row: number;
@@ -37,6 +38,7 @@ export class Worker {
 
   mesh!: THREE.Group;
   private rig!: THREE.Group;
+  private _clothMat: THREE.MeshStandardMaterial | null = null;
   resourceIndicator!: THREE.Mesh;
   private animT = Math.random() * 10;
 
@@ -57,6 +59,7 @@ export class Worker {
     this.mesh.add(this.rig);
 
     const cloth = new THREE.MeshStandardMaterial({ color: civColor, roughness: 0.9 });
+    this._clothMat = cloth;
     const skin  = new THREE.MeshStandardMaterial({ color: 0xc28a5a, roughness: 0.75 });
     const wood  = new THREE.MeshStandardMaterial({ color: 0x6a4a2a, roughness: 0.9 });
     const lightMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 });
@@ -86,6 +89,19 @@ export class Worker {
 
     this.mesh.position.set(this.worldX, 0, this.worldZ);
     this.mesh.userData.workerId = this.id;
+  }
+
+  /** Capture: transfer this worker to another player (AC style). Drops any cargo and task. */
+  convertTo(playerId: number, civColor: number) {
+    this.playerId = playerId;
+    this._clothMat?.color.setHex(civColor);
+    this.task = WorkerTask.IDLE;
+    this.carrying = null;
+    this.carryAmount = 0;
+    this.path = [];
+    this.pathIndex = 0;
+    this.repairTarget = null;
+    this._captureTimer = 0;
   }
 
   setTask(task: WorkerTask, targetCol?: number, targetRow?: number) {
