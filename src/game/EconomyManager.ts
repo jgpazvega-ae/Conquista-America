@@ -34,6 +34,23 @@ export class EconomyManager {
       player.resources.gold  = Math.min(cap, Math.max(0, player.resources.gold  + stats.netProduction.gold  * rate));
       player.resources.stone = Math.min(cap, Math.max(0, player.resources.stone + stats.netProduction.stone * rate));
       player.resources.wood  = Math.min(cap, Math.max(0, (player.resources.wood ?? 0) + stats.netProduction.wood * rate));
+
+      // Forge smelting (AC style): each Forge burns charcoal and smelts ore every cycle —
+      // 4🪵 → 2⚫ and 4🪨 → 2🔩. Only runs while powder stocks are low (<300) so the
+      // Forge never drains the building economy once the arsenal is full.
+      const forges = game.allBuildings.filter(
+        b => b.playerId === player.id && (b.type as string) === 'FORGE' && b.isComplete(),
+      ).length;
+      for (let i = 0; i < forges; i++) {
+        if ((player.resources.coal ?? 0) < 300 && (player.resources.wood ?? 0) >= 4) {
+          player.resources.wood -= 4;
+          player.resources.coal = (player.resources.coal ?? 0) + 2;
+        }
+        if ((player.resources.iron ?? 0) < 300 && player.resources.stone >= 4) {
+          player.resources.stone -= 4;
+          player.resources.iron = (player.resources.iron ?? 0) + 2;
+        }
+      }
     }
   }
 

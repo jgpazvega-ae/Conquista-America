@@ -80,7 +80,7 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     buildTime: 18,
     maxHp: 160,
     buildRadius: 3,
-    description: 'Mejora armas y armaduras. Aumenta ataque/defensa de unidades.',
+    description: 'Mejora armas y armaduras. Funde mineral: convierte 🪵→⚫ carbón y 🪨→🔩 hierro para la pólvora.',
   },
   [BuildingType.WONDER]: {
     type: BuildingType.WONDER,
