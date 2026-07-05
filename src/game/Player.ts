@@ -9,6 +9,8 @@ export interface Resources {
   gold:  number;
   stone: number;
   wood:  number;
+  coal:  number; // gunpowder economy (AC style)
+  iron:  number; // gunpowder economy (AC style)
 }
 
 export interface PlayerUpgrades {

@@ -43,6 +43,8 @@ export class HUD {
   private elGoldRate  = document.getElementById('res-gold-rate');
   private elStoneRate = document.getElementById('res-stone-rate');
   private elWoodRate  = document.getElementById('res-wood-rate');
+  private elCoal      = document.getElementById('res-coal');
+  private elIron      = document.getElementById('res-iron');
   private elStatus  = document.getElementById('game-status')!;
   private elWeather = document.getElementById('weather-badge');
   private elCivBadge = document.getElementById('civ-badge')!;
@@ -200,6 +202,8 @@ export class HUD {
     this.elGold.textContent  = String(Math.floor(player.resources.gold));
     this.elStone.textContent = String(Math.floor(player.resources.stone));
     if (this.elWood) this.elWood.textContent = String(Math.floor(player.resources.wood ?? 0));
+    if (this.elCoal) this.elCoal.textContent = String(Math.floor(player.resources.coal ?? 0));
+    if (this.elIron) this.elIron.textContent = String(Math.floor(player.resources.iron ?? 0));
 
     // Economy rate indicators
     const econStats = this.game.getEconomyStats(player.id);
@@ -810,6 +814,8 @@ export class HUD {
       [ResourceType.GOLD,  '⚜️',  '#ccaa22'],
       [ResourceType.STONE, '🪨', '#aaaaaa'],
       [ResourceType.WOOD,  '🪵', '#885533'],
+      [ResourceType.COAL,  '⚫', '#444450'],
+      [ResourceType.IRON,  '🔩', '#9aa2b0'],
     ];
 
     type StatEntry = { type: ResourceType; icon: string; color: string; pct: number; remaining: number; total: number };

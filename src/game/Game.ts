@@ -388,7 +388,9 @@ export class Game {
         } else if (tile.terrain === TerrainType.BEACH) {
           type = rand < 0.45 ? ResourceType.GOLD : rand < 0.70 ? ResourceType.FOOD : ResourceType.WOOD;
         } else {
-          type = rand < 0.35 ? ResourceType.FOOD : rand < 0.60 ? ResourceType.GOLD : rand < 0.80 ? ResourceType.STONE : ResourceType.WOOD;
+          type = rand < 0.32 ? ResourceType.FOOD : rand < 0.54 ? ResourceType.GOLD :
+                 rand < 0.72 ? ResourceType.STONE : rand < 0.82 ? ResourceType.COAL :
+                 rand < 0.90 ? ResourceType.IRON  : ResourceType.WOOD;
         }
         const amount = 200 + Math.floor(Math.random() * 200);
         this.resourceNodes.push(new ResourceNode(type, c, r, amount));
