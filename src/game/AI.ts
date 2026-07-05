@@ -297,6 +297,8 @@ export class AISystem {
           state.hardBonusTimer = 60;
           player.resources.food += 15;
           player.resources.gold += 10;
+          player.resources.coal = (player.resources.coal ?? 0) + 8;
+          player.resources.iron = (player.resources.iron ?? 0) + 8;
         }
       }
 
@@ -806,11 +808,15 @@ export class AISystem {
         const cost = TRAIN_COSTS[nu.type as UnitType];
         if (!cost) continue;
         if (player.resources.food >= cost.food && player.resources.gold >= cost.gold &&
-            (player.resources.wood ?? 0) >= (cost.wood ?? 0)) {
+            (player.resources.wood ?? 0) >= (cost.wood ?? 0) &&
+            (player.resources.coal ?? 0) >= (cost.coal ?? 0) &&
+            (player.resources.iron ?? 0) >= (cost.iron ?? 0)) {
           if (harbor.trainUnit(nu.type as UnitType)) {
             player.resources.food -= cost.food;
             player.resources.gold -= cost.gold;
             player.resources.wood = (player.resources.wood ?? 0) - (cost.wood ?? 0);
+            player.resources.coal = (player.resources.coal ?? 0) - (cost.coal ?? 0);
+            player.resources.iron = (player.resources.iron ?? 0) - (cost.iron ?? 0);
             return;
           }
         }
@@ -852,7 +858,9 @@ export class AISystem {
         return player.resources.food >= cost.food &&
                player.resources.gold >= cost.gold &&
                player.resources.stone >= (cost.stone ?? 0) &&
-               player.resources.wood  >= (cost.wood  ?? 0);
+               player.resources.wood  >= (cost.wood  ?? 0) &&
+               (player.resources.coal ?? 0) >= (cost.coal ?? 0) &&
+               (player.resources.iron ?? 0) >= (cost.iron ?? 0);
       });
       if (affordableElites.length > 0) {
         const pool = affordableElites.flatMap(u => {
@@ -875,6 +883,8 @@ export class AISystem {
           player.resources.gold  -= cost.gold;
           player.resources.stone -= cost.stone ?? 0;
           player.resources.wood  -= cost.wood  ?? 0;
+          player.resources.coal  = (player.resources.coal ?? 0) - (cost.coal ?? 0);
+          player.resources.iron  = (player.resources.iron ?? 0) - (cost.iron ?? 0);
           return;
         }
       }
@@ -899,7 +909,9 @@ export class AISystem {
       return player.resources.food >= cost.food &&
              player.resources.gold >= cost.gold &&
              player.resources.stone >= (cost.stone ?? 0) &&
-             player.resources.wood  >= (cost.wood  ?? 0);
+             player.resources.wood  >= (cost.wood  ?? 0) &&
+             (player.resources.coal ?? 0) >= (cost.coal ?? 0) &&
+             (player.resources.iron ?? 0) >= (cost.iron ?? 0);
     });
     if (affordable.length === 0) return;
 
@@ -938,6 +950,8 @@ export class AISystem {
       player.resources.gold  -= cost.gold;
       player.resources.stone -= cost.stone ?? 0;
       player.resources.wood  -= cost.wood  ?? 0;
+      player.resources.coal  = (player.resources.coal ?? 0) - (cost.coal ?? 0);
+      player.resources.iron  = (player.resources.iron ?? 0) - (cost.iron ?? 0);
     }
   }
 
@@ -1014,6 +1028,9 @@ export class AISystem {
         if (nearestDist <= 1.5) {
           const taskType = nearestNode.type === ResourceType.FOOD ? WorkerTask.GATHERING_FOOD :
                            nearestNode.type === ResourceType.GOLD ? WorkerTask.GATHERING_GOLD :
+                           nearestNode.type === ResourceType.WOOD ? WorkerTask.GATHERING_WOOD :
+                           nearestNode.type === ResourceType.COAL ? WorkerTask.GATHERING_COAL :
+                           nearestNode.type === ResourceType.IRON ? WorkerTask.GATHERING_IRON :
                            WorkerTask.GATHERING_STONE;
           worker.setTask(taskType, nearestNode.col, nearestNode.row);
         } else {

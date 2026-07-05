@@ -20,6 +20,10 @@ export class Unit {
   /** Global weather movement multiplier, set once per frame by Game (1.0 = clear, <1 = rain/storm mud). */
   static weatherSpeedMult = 1.0;
 
+  /** Gunpowder economy hook (AC style), set by Game: deducts coal/iron for one round of
+   *  ARQUEBUSIER/CANNON ammo. Returns false when the player's stock is empty — no resupply. */
+  static tryConsumeGunpowder: ((playerId: number, unitType: UnitType) => boolean) | null = null;
+
   readonly id: number;
   readonly type: UnitType;
   readonly civType: CivilizationType;
@@ -1127,12 +1131,17 @@ export class Unit {
       }
     }
 
-    // Ammo resupply: 1 round per 1.5 s when near own settlement OR a Storehouse supply depot
+    // Ammo resupply: 1 round per 1.5 s when near own settlement OR a Storehouse supply depot.
+    // Gunpowder rounds (arquebus/cannon) consume coal + iron from the player's stock (AC style).
     if (this.ammo >= 0 && this.ammo < this.maxAmmo && (this._nearSettlement || this._nearSupplyDepot)) {
       this._ammoRechargeTimer += dt;
       if (this._ammoRechargeTimer >= 1.5) {
         this._ammoRechargeTimer -= 1.5;
-        this.ammo++;
+        const isGunpowder = this.type === UnitType.ARQUEBUSIER || this.type === UnitType.CANNON;
+        if (!isGunpowder || Unit.tryConsumeGunpowder === null ||
+            Unit.tryConsumeGunpowder(this.playerId, this.type)) {
+          this.ammo++;
+        }
       }
     } else {
       this._ammoRechargeTimer = 0;

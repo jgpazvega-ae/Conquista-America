@@ -5,6 +5,8 @@ export interface TrainCost {
   gold:   number;
   stone?: number;
   wood?:  number;
+  coal?:  number; // gunpowder economy (AC style)
+  iron?:  number;
 }
 
 export const TRAIN_COSTS: Partial<Record<UnitType, TrainCost>> = {
@@ -25,15 +27,15 @@ export const TRAIN_COSTS: Partial<Record<UnitType, TrainCost>> = {
   [UnitType.BALAM_JAGUAR]:  { food: 58,  gold: 28 },
   // Conquistador
   [UnitType.SOLDIER]:       { food: 55,  gold: 22 },
-  [UnitType.ARQUEBUSIER]:   { food: 48,  gold: 35 },
+  [UnitType.ARQUEBUSIER]:   { food: 48,  gold: 35, coal: 10, iron: 15 },
   [UnitType.CAVALRY]:       { food: 65,  gold: 48 },
-  [UnitType.CANNON]:        { food: 40,  gold: 65, stone: 30 },
+  [UnitType.CANNON]:        { food: 40,  gold: 65, stone: 30, coal: 25, iron: 40 },
   // Naval — nativas
   [UnitType.CANOE]:         { food: 40,  gold: 20, wood: 60 },
   [UnitType.WAR_CANOE]:     { food: 60,  gold: 40, wood: 90 },
   // Naval — Conquistador
-  [UnitType.BRIGANTINE]:    { food: 80,  gold: 120, wood: 150 },
-  [UnitType.GALLEON]:       { food: 100, gold: 250, wood: 250, stone: 50 },
+  [UnitType.BRIGANTINE]:    { food: 80,  gold: 120, wood: 150, iron: 20 },
+  [UnitType.GALLEON]:       { food: 100, gold: 250, wood: 250, stone: 50, coal: 30, iron: 50 },
   // Espiritual
   [UnitType.SHAMAN]:        { food: 80,  gold: 60 },
   [UnitType.MISSIONARY]:    { food: 60,  gold: 80 },

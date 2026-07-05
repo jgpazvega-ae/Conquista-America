@@ -161,6 +161,17 @@ export class Game {
     this.fog = new FogOfWarManager(this.players.length);
     this.objectives = new ObjectiveSystem(this);
     this.generateTreasureCaches();
+
+    // Gunpowder economy (AC style): each arquebus round costs 1⚫+1🔩; each cannonball 3⚫+3🔩
+    Unit.tryConsumeGunpowder = (playerId: number, unitType: UnitType) => {
+      const p = this.players[playerId];
+      if (!p) return false;
+      const cost = unitType === UnitType.CANNON ? 3 : 1;
+      if ((p.resources.coal ?? 0) < cost || (p.resources.iron ?? 0) < cost) return false;
+      p.resources.coal -= cost;
+      p.resources.iron -= cost;
+      return true;
+    };
   }
 
   private spawnPlayers(humanCiv: CivilizationType) {
@@ -1253,6 +1264,8 @@ export class Game {
           }
           weakestAI.resources.food = Math.min(2000, weakestAI.resources.food + 50);
           weakestAI.resources.gold = Math.min(2000, weakestAI.resources.gold + 30);
+          weakestAI.resources.coal = Math.min(2000, (weakestAI.resources.coal ?? 0) + 15);
+          weakestAI.resources.iron = Math.min(2000, (weakestAI.resources.iron ?? 0) + 15);
         }
       }
       // Player is getting overwhelmed (1:3+ disadvantage) → give human a subtle morale boost
