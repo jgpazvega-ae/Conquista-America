@@ -35,6 +35,7 @@ interface AIState {
   volleyTimer:   number; // countdown to next AI volley fire
   hardBonusTimer: number; // countdown to next hard-mode resource bonus
   tauntTimer:    number; // countdown to next taunt during attack phase
+  regimentTimer: number; // countdown between auto-regiment formation checks
 }
 
 export class AISystem {
@@ -95,6 +96,7 @@ export class AISystem {
           volleyTimer: 12 + Math.random() * 8,
           hardBonusTimer: 60,
           tauntTimer: 40 + Math.random() * 30,
+          regimentTimer: 15 + Math.random() * 10,
         };
         this.aiStates.set(player.id, state);
       }
@@ -104,6 +106,32 @@ export class AISystem {
       state.trainTimer   += dt;
       state.upgradeTimer += dt;
       state.phaseTimer   += dt;
+
+      // Auto-form regiments (AC style): an idle officer + drummer + 9 soldiers within 10 tiles
+      state.regimentTimer -= dt;
+      if (state.regimentTimer <= 0) {
+        state.regimentTimer = 12;
+        const officers = player.aliveUnits.filter(
+          u => u.type === UnitType.OFFICER && u.regimentLeaderId === null && u.garrisonedIn === null,
+        );
+        for (const officer of officers) {
+          const drummer = player.aliveUnits.find(
+            u => u.type === UnitType.DRUMMER && u.regimentLeaderId === null && u.garrisonedIn === null &&
+                 Math.hypot(u.col - officer.col, u.row - officer.row) <= 10,
+          );
+          if (!drummer) continue;
+          const soldiers = player.aliveUnits.filter(
+            u => u !== officer && u !== drummer && !u.isHero &&
+                 u.type !== UnitType.OFFICER && u.type !== UnitType.DRUMMER &&
+                 u.regimentLeaderId === null && u.garrisonedIn === null &&
+                 Math.hypot(u.col - officer.col, u.row - officer.row) <= 10,
+          );
+          if (soldiers.length < 9) continue;
+          officer.regimentLeaderId = officer.id;
+          drummer.regimentLeaderId = officer.id;
+          for (const s of soldiers.slice(0, 15)) s.regimentLeaderId = officer.id;
+        }
+      }
 
       // Difficulty: base scale multiplier adjusted by adaptive bias
       const baseDiff = game.difficulty === 'easy' ? 2.2 : game.difficulty === 'hard' ? 0.6 : 1.0;
@@ -831,7 +859,16 @@ export class AISystem {
           const weight = preferredTypes.has(u.type) ? 3 : 1;
           return Array<typeof u>(weight).fill(u);
         });
-        const pick = pool[Math.floor(Math.random() * pool.length)];
+        let pick = pool[Math.floor(Math.random() * pool.length)];
+        // Command staff first: a 12+ army without an officer trains one, then a drummer
+        const armySize   = player.aliveUnits.filter(u => !u.isHero).length;
+        const hasOfficer = player.aliveUnits.some(u => u.type === UnitType.OFFICER);
+        const hasDrummer = player.aliveUnits.some(u => u.type === UnitType.DRUMMER);
+        if (armySize >= 12 && !hasOfficer) {
+          pick = affordableElites.find(u => u.type === UnitType.OFFICER) ?? pick;
+        } else if (armySize >= 12 && !hasDrummer) {
+          pick = affordableElites.find(u => u.type === UnitType.DRUMMER) ?? pick;
+        }
         const cost = TRAIN_COSTS[pick.type as UnitType]!;
         if (barracks.trainUnit(pick.type as UnitType)) {
           player.resources.food  -= cost.food;
