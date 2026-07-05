@@ -79,6 +79,7 @@ export class Unit {
   private _levelRing:  THREE.Mesh | null = null;
   private _statusRing: THREE.Mesh | null = null;
   private _statusRingT = Math.random() * 6.28;
+  private _regimentBanner: THREE.Group | null = null;
   private selected    = false;
   private animT       = Math.random() * 10;
   private attackAnim  = 0;
@@ -291,6 +292,22 @@ export class Unit {
       this.buildCavalry(bodyMat, skin, dark, metal, wood, accMat);
     } else {
       this.buildFootSoldier(bodyMat, cloth, skin, dark, metal, wood, leather, jade, gold, accMat, isConq);
+    }
+
+    // Officer regiment banner: a flag raised above the officer while a regiment is formed
+    if (this.type === UnitType.OFFICER) {
+      const banner = new THREE.Group();
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.4, 6), wood);
+      pole.position.y = 2.6;
+      const flag = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.65, 0.4),
+        new THREE.MeshStandardMaterial({ color: civColor, roughness: 0.7, side: THREE.DoubleSide, emissive: civColor, emissiveIntensity: 0.25 }),
+      );
+      flag.position.set(0.35, 3.05, 0);
+      banner.add(pole, flag);
+      banner.visible = false;
+      this.mesh.add(banner);
+      this._regimentBanner = banner;
     }
 
     // 30 % scale-up for better close-range presence
@@ -922,6 +939,14 @@ export class Unit {
     this.attackTimer  = Math.max(0, this.attackTimer - dt);
     if (this.berserkTimer > 0) this.berserkTimer = Math.max(0, this.berserkTimer - dt);
     this.animT += dt;
+
+    // Officer banner: raised while the regiment is formed; gentle flag sway
+    if (this._regimentBanner) {
+      this._regimentBanner.visible = this.regimentLeaderId !== null;
+      if (this._regimentBanner.visible) {
+        this._regimentBanner.rotation.y = Math.sin(this.animT * 1.8) * 0.25;
+      }
+    }
 
     // Status ring: pulsing colored aura for panic / berserk / DoT effects
     const statusColor = this.panicked ? 0xff2222
