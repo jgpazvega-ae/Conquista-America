@@ -565,12 +565,22 @@ class GameInstance {
         if (player.resources.gold  < cost.gold)          return;
         if (player.resources.stone < (cost.stone ?? 0))  return;
         if (player.resources.wood  < (cost.wood  ?? 0))  return;
+        if ((player.resources.coal ?? 0) < (cost.coal ?? 0)) {
+          this.hud.notify('⚫ Falta carbón — envía trabajadores a las vetas de las montañas', 'warning');
+          return;
+        }
+        if ((player.resources.iron ?? 0) < (cost.iron ?? 0)) {
+          this.hud.notify('🔩 Falta hierro — envía trabajadores a las vetas de las montañas', 'warning');
+          return;
+        }
         if (!building.trainUnit(unitType))                return;
         player.resources.food  -= cost.food;
         player.resources.gold  -= cost.gold;
         player.resources.stone -= cost.stone ?? 0;
         player.resources.wood  -= cost.wood  ?? 0;
-        this._totalResourcesSpent += cost.food + cost.gold + (cost.stone ?? 0) + (cost.wood ?? 0);
+        player.resources.coal  = (player.resources.coal ?? 0) - (cost.coal ?? 0);
+        player.resources.iron  = (player.resources.iron ?? 0) - (cost.iron ?? 0);
+        this._totalResourcesSpent += cost.food + cost.gold + (cost.stone ?? 0) + (cost.wood ?? 0) + (cost.coal ?? 0) + (cost.iron ?? 0);
         this.audio.playBuild();
         this.prodPanel.refresh();
       };

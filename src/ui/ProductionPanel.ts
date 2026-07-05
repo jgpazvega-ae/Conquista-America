@@ -239,7 +239,9 @@ export class ProductionPanel {
       const canAfford = p.resources.food >= cost.food
         && p.resources.gold  >= cost.gold
         && (p.resources.stone ?? 0) >= (cost.stone ?? 0)
-        && (p.resources.wood  ?? 0) >= (cost.wood  ?? 0);
+        && (p.resources.wood  ?? 0) >= (cost.wood  ?? 0)
+        && (p.resources.coal  ?? 0) >= (cost.coal  ?? 0)
+        && (p.resources.iron  ?? 0) >= (cost.iron  ?? 0);
 
       const minEra  = UNIT_MIN_ERA[ut] ?? 1;
       const eraLocked = this.playerEra < minEra;
@@ -262,7 +264,7 @@ export class ProductionPanel {
           <div class="prod-unit-cost">
             ${eraLocked
               ? `<span style="color:#ffcc44">🔒 ${ERA_NAMES[minEra]} requerida</span>`
-              : `🌽${cost.food} ⚜️${cost.gold}${cost.stone ? ` 🪨${cost.stone}` : ''}${cost.wood ? ` 🪵${cost.wood}` : ''}`}
+              : `🌽${cost.food} ⚜️${cost.gold}${cost.stone ? ` 🪨${cost.stone}` : ''}${cost.wood ? ` 🪵${cost.wood}` : ''}${cost.coal ? ` ⚫${cost.coal}` : ''}${cost.iron ? ` 🔩${cost.iron}` : ''}`}
           </div>
         </div>
       `;
