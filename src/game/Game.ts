@@ -2013,6 +2013,20 @@ export class Game {
       u.nearDrummer   = hasDrummer;
       u.nearSynergy   = hasSynergy;
       u.heroPowerBuff = hasHeroPower;
+      // Regiment upkeep: buff holds while the officer lives and is within 8 tiles
+      if (u.regimentLeaderId !== null) {
+        const leader = this.getUnitById(u.regimentLeaderId);
+        if (!leader || !leader.isAlive()) {
+          // Officer fell — the regiment breaks; survivors suffer a morale shock
+          u.regimentLeaderId = null;
+          u.regimentBuff = false;
+          u.loseMorale(15);
+        } else {
+          u.regimentBuff = Math.hypot(leader.col - u.col, leader.row - u.row) <= 8;
+        }
+      } else {
+        u.regimentBuff = false;
+      }
       // Veteran teaching: level-3 same-type unit within 3 tiles accelerates XP gain (+30%)
       u._nearVeteranTeacher = u.level < 3 && !u.isHero && active.some(
         v => v !== u && v.playerId === u.playerId && v.level >= 3 && !v.isHero &&

@@ -225,6 +225,8 @@ export class CombatSystem {
           if (playersWithLeader.has(unit.playerId)) dmg = Math.round(dmg * 1.05);
           // Officer discipline: fighting under a field officer's command (+10% damage)
           if (unit.nearOfficer) dmg = Math.round(dmg * 1.10);
+          // Regiment: formed troops strike as one (+15% damage)
+          if (unit.regimentBuff) dmg = Math.round(dmg * 1.15);
           // Civ unit synergy: +10% damage when fighting alongside a complementary unit type
           if (unit.nearSynergy) dmg = Math.round(dmg * 1.10);
           // Hero passive specialization: +15% when hero's signature unit type fights nearby
@@ -258,6 +260,8 @@ export class CombatSystem {
           if (unit.meleePinned) dmg = Math.max(1, Math.round(dmg * 0.6));
           // Officer aura: units near a hero or veteran champion take -2 damage
           if (target.nearOfficer) dmg = Math.max(1, dmg - 2);
+          // Regiment ranks: formed troops cover each other (−3 damage taken)
+          if (target.regimentBuff) dmg = Math.max(1, dmg - 3);
           // Homeland defender: Nv.3 units fighting on HOLD near their own settlement
           // fight with supreme determination — additional 10% damage absorption
           if (target.level >= 3 && target.state === UnitState.HOLD && target._nearSettlement) {

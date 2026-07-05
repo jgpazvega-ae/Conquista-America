@@ -3011,6 +3011,31 @@ class GameInstance {
         this.hud.notify(`🎯 Prioridad de ataque → ${label} (${sel.length} unidad${sel.length !== 1 ? 'es' : ''})`, 'info');
         return;
       }
+      // Alt+B: form/disband a regiment (AC style) — needs an Officer, a Drummer, and 9+ soldiers
+      if (e.code === 'KeyB' && e.altKey && !e.ctrlKey) {
+        e.preventDefault();
+        const sel = this.input.getSelectedUnits().filter(
+          u => u.playerId === this.game.humanPlayerId && u.isAlive() && u.garrisonedIn === null,
+        );
+        if (sel.length === 0) { this.hud.notify('Selecciona tropas para formar un regimiento', 'info'); return; }
+        // Already formed? → disband
+        if (sel.some(u => u.regimentLeaderId !== null)) {
+          for (const u of sel) { u.regimentLeaderId = null; u.regimentBuff = false; }
+          this.hud.notify('🚩 Regimiento disuelto', 'info');
+          return;
+        }
+        const officer = sel.find(u => u.type === UnitType.OFFICER);
+        const drummer = sel.find(u => u.type === UnitType.DRUMMER);
+        const soldiers = sel.filter(u => u.type !== UnitType.OFFICER && u.type !== UnitType.DRUMMER);
+        if (!officer || !drummer || soldiers.length < 9) {
+          this.hud.notify('🚩 Un regimiento requiere: 1 Oficial 🎖️ + 1 Tambor 🥁 + 9 soldados', 'info');
+          return;
+        }
+        for (const u of sel) u.regimentLeaderId = officer.id;
+        this.hud.notify(`🚩 ¡Regimiento formado! ${sel.length} tropas — +15% ATK, −3 daño recibido, moral mínima 30 (mantén al oficial vivo y cerca)`, 'success');
+        this.audio.playMove();
+        return;
+      }
       // Alt+A: cycle unit AI stance (Aggressive → Defensive → Balanced)
       if (e.code === 'KeyA' && e.altKey && !e.ctrlKey) {
         e.preventDefault();
