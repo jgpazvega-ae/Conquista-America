@@ -1711,6 +1711,40 @@ export class Game {
       }
     }
 
+    // Artillery capture (AC style): a crippled cannon (≤30% HP) with an enemy melee unit
+    // adjacent for 3 seconds changes hands instead of being destroyed.
+    for (const cannon of this.allUnits) {
+      if (!cannon.isAlive() || cannon.type !== UnitType.CANNON) continue;
+      if (cannon.hp > cannon.maxHp * 0.30) { cannon._crewCaptureTimer = 0; continue; }
+      let captor: Unit | null = null;
+      for (const other of this.allUnits) {
+        if (!other.isAlive() || other.playerId === cannon.playerId) continue;
+        if (other.attackRange > 1.5 || other.garrisonedIn !== null || other.panicked) continue;
+        if (Math.hypot(other.col - cannon.col, other.row - cannon.row) <= 1.8) { captor = other; break; }
+      }
+      if (!captor) { cannon._crewCaptureTimer = 0; continue; }
+      cannon._crewCaptureTimer += dt;
+      if (cannon._crewCaptureTimer < 3) continue;
+      cannon._crewCaptureTimer = 0;
+      const origPlayer = this.players[cannon.playerId];
+      const newPlayer  = this.players[captor.playerId];
+      if (!origPlayer || !newPlayer) continue;
+      if (newPlayer.aliveUnits.length >= this.getPopCap(newPlayer.id)) continue; // pop cap blocks capture
+      origPlayer.units = origPlayer.units.filter(u => u !== cannon);
+      (cannon as any).playerId = captor.playerId;
+      newPlayer.units.push(cannon);
+      cannon.attackTarget = null;
+      cannon.attackBuildingTarget = null;
+      cannon.state = UnitState.IDLE;
+      cannon.heal(cannon.maxHp * 0.20); // fresh crew patches the gun up a little
+      if (captor.playerId === this.humanPlayerId) {
+        this.pendingEventMessages.push('💣 ¡Cañón enemigo capturado! La pieza de artillería ahora es tuya');
+      } else if (origPlayer.id === this.humanPlayerId) {
+        this.pendingEventMessages.push('⚠️ ¡El enemigo ha capturado uno de tus cañones!');
+      }
+      captor.gainXP(30);
+    }
+
     // Field healing (AC style): idle Shamans/Missionaries mend the most-wounded ally within 4 tiles (3 HP/s)
     for (const unit of this.allUnits) {
       if (!unit.isAlive()) continue;
