@@ -2,7 +2,7 @@ import type { Renderer } from './Renderer';
 import type { RTSCamera } from './Camera';
 import type { Game } from '../game/Game';
 import type { Unit } from '../game/Unit';
-import { UnitState } from '../game/types';
+import { UnitState, UnitType } from '../game/types';
 import { findPath } from '../game/Pathfinding';
 import { TILE_SIZE } from '../game/constants';
 
@@ -249,10 +249,30 @@ export class InputHandler {
         : 0;
       const useGridSpread = maxSpread < 1.5 && myUnits.length > 1;
 
+      // Regiment rank march (AC style): a formed regiment deploys in ranks —
+      // officer front and center, drummer at his side, soldiers in rows behind.
+      const leaderId = myUnits[0]?.regimentLeaderId ?? null;
+      const isRegiment = leaderId !== null && myUnits.length >= 6 &&
+        myUnits.every(u => u.regimentLeaderId === leaderId);
+      let rankOrder: typeof myUnits = myUnits;
+      if (isRegiment) {
+        const officer  = myUnits.filter(u => u.type === UnitType.OFFICER);
+        const drummer  = myUnits.filter(u => u.type === UnitType.DRUMMER);
+        const soldiers = myUnits.filter(u => u.type !== UnitType.OFFICER && u.type !== UnitType.DRUMMER);
+        rankOrder = [...officer, ...drummer, ...soldiers];
+      }
+
       let sumX = 0, sumZ = 0, moved = 0;
-      myUnits.forEach((unit, i) => {
+      rankOrder.forEach((unit, i) => {
         let offsetC: number, offsetR: number;
-        if (useGridSpread) {
+        if (isRegiment) {
+          // Rows of 6, centered; row 0 (officer + drummer) leads at the click point
+          const width = 6;
+          const r = Math.floor(i / width);
+          const k = i % width;
+          offsetC = k - Math.floor(width / 2);
+          offsetR = r;
+        } else if (useGridSpread) {
           [offsetC, offsetR] = this.spreadOffset(i, myUnits.length);
         } else {
           offsetC = myUnits.length > 1 ? Math.round(unit.col - cx) : 0;
