@@ -161,6 +161,11 @@ export class Unit {
   // Recomputed periodically by Game.updateFormations.
   nearDrummer = false;
 
+  // Regiment (AC style): formed with Alt+B from officer + drummer + 9 soldiers.
+  // While the officer lives and is within 8 tiles: +15% attack, −3 damage taken, morale floor 30.
+  regimentLeaderId: number | null = null;
+  regimentBuff = false;
+
   // Civ unit synergy: complementary elite unit type nearby (Eagle+Jaguar, Quechua+Antis, etc.)
   // Grants +10% damage when active. Recomputed periodically by Game.updateFormations.
   nearSynergy = false;
@@ -785,7 +790,9 @@ export class Unit {
     if (this.isHero) return;
     // Drummer aura: the steady beat halves morale damage (panic resistance)
     if (this.nearDrummer) amount = Math.ceil(amount * 0.5);
-    this.morale = Math.max(0, this.morale - amount);
+    // Regiment discipline: formed troops never rout — morale can't drop below 30
+    const floor = this.regimentBuff ? 30 : 0;
+    this.morale = Math.max(floor, this.morale - amount);
     this._moraleCooldown = 3;
   }
 
