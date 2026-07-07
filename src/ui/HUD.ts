@@ -17,8 +17,9 @@ import { BUILDING_DEFS } from '../game/buildingDefs';
 import { getUnitDef } from '../game/civilizations';
 import { WorkerTask } from '../game/Worker';
 
-function hex(n: number): string {
-  return '#' + n.toString(16).padStart(6, '0');
+function hex(n: number | undefined): string {
+  // Defensive: an unknown color (e.g. neutral buildings) must never crash the render loop
+  return '#' + (n ?? 0x8a9a60).toString(16).padStart(6, '0');
 }
 
 const TERRAIN_INFO: Partial<Record<TerrainType, { name: string; emoji: string; desc: string }>> = {
@@ -1316,7 +1317,10 @@ export class HUD {
     // Draw buildings
     for (const building of this.game.allBuildings) {
       if (!building.isAlive()) continue;
-      const col = CIV_COLORS[building.playerId >= 0 && building.playerId < this.game.players.length ? this.game.players[building.playerId].civType : 0];
+      // Neutral buildings (villages, playerId -1) get a mossy grey-green; owned ones their civ color
+      const owner = building.playerId >= 0 && building.playerId < this.game.players.length
+        ? this.game.players[building.playerId] : null;
+      const col = owner ? CIV_COLORS[owner.civType] : 0x8a9a60;
       ctx.fillStyle = hex(col);
       ctx.globalAlpha = building.isComplete() ? 0.8 : 0.4;
       ctx.beginPath();
