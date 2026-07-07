@@ -3,8 +3,14 @@ import { CIVILIZATIONS } from '../game/civilizations';
 import { CIV_COLORS, CIV_NAMES, CIV_EMOJIS } from '../game/constants';
 import type { SaveSystem } from '../game/SaveSystem';
 
-function hex(n: number): string {
-  return '#' + n.toString(16).padStart(6, '0');
+function hex(n: number | undefined): string {
+  return '#' + (n ?? 0x888888).toString(16).padStart(6, '0');
+}
+
+// A session/profile from an older build may carry a civType that no longer exists.
+// Coerce anything unknown back to a valid civilization so rendering never crashes.
+function validCiv(civ: CivilizationType | undefined): CivilizationType {
+  return civ != null && CIV_COLORS[civ] !== undefined ? civ : CivilizationType.AZTEC;
 }
 
 const CIV_DESCRIPTIONS: Record<CivilizationType, string> = {
@@ -74,6 +80,7 @@ export class CivSelectScreen {
   setOnStart(cb: (civ: CivilizationType) => void) { this.onStart = cb; }
 
   show(preferredCiv?: CivilizationType) {
+    preferredCiv = validCiv(preferredCiv);
     this.el.classList.remove('hidden');
     this.selectCiv(preferredCiv ?? CivilizationType.AZTEC);
   }
@@ -145,6 +152,7 @@ export class CivSelectScreen {
   }
 
   private selectCiv(civ: CivilizationType) {
+    civ = validCiv(civ);
     this.selected = civ;
 
     // Update card selection
