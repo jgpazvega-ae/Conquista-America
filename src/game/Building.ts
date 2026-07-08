@@ -90,6 +90,7 @@ export class Building {
       case BuildingType.HARBOR:     return 2;
       case BuildingType.HOUSE:      return 2; // shelter — up to 2 units can hide inside
       case BuildingType.WALL:       return 4; // archers on the wall
+      case BuildingType.GATE:       return 4; // gatehouse defenders
       default:                      return 0;
     }
   }
@@ -157,7 +158,7 @@ export class Building {
       this.buildHarbor(stone, stone2, trim);
     } else if (this.type === BuildingType.MARKET) {
       this.buildMarket(stone, stone2, trim);
-    } else if (this.type === BuildingType.WALL) {
+    } else if (this.type === BuildingType.WALL || this.type === BuildingType.GATE) {
       this.buildWall(stone, stone2, trim);
     } else {
       switch (this.civType) {

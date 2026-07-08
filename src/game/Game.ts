@@ -548,6 +548,8 @@ export class Game {
 
     for (const b of this.newlyDestroyedBuildings) {
       this.buildingsLostByPlayer.set(b.playerId, (this.buildingsLostByPlayer.get(b.playerId) ?? 0) + 1);
+      // A razed wall no longer blocks movement — reopen its tile.
+      if (b.type === BuildingType.WALL) this.map.unblockTile(b.col, b.row);
     }
     this.newlySpawnedUnits = [];
     this.newlyPlacedBuildings = [];
@@ -2675,6 +2677,8 @@ export class Game {
     player.resources.food  -= def.cost.food;
     player.resources.gold  -= def.cost.gold;
     player.resources.stone -= def.cost.stone;
+    // A wall segment makes its tile impassable; a gate stays open (passable).
+    if (type === BuildingType.WALL) this.map.blockTile(col, row);
     return true;
   }
 

@@ -37,6 +37,7 @@ const BUILDABLE: BuildingType[] = [
   BuildingType.MARKET,
   BuildingType.WATCHTOWER,
   BuildingType.WALL,
+  BuildingType.GATE,
   BuildingType.STOREHOUSE,
   BuildingType.TEMPLE,
   BuildingType.FORGE,

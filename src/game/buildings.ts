@@ -12,6 +12,7 @@ export enum BuildingType {
   HARBOR = 'HARBOR',              // Puerto — produce unidades navales (requiere agua adyacente)
   MARKET = 'MARKET',              // Mercado — comercio de recursos por oro
   WALL = 'WALL',                  // Muralla — barrera defensiva de alta resistencia
+  GATE = 'GATE',                  // Puerta — muralla transitable: mismo blindaje, deja pasar a las tropas
 }
 
 export interface BuildingDef {

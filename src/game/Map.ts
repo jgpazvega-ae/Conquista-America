@@ -42,9 +42,17 @@ export class GameMap {
   readonly rows: number = MAP_ROWS;
   private tiles: Tile[][] = [];
 
+  // Tiles occupied by a solid wall segment — impassable to all units (gates excluded).
+  // Populated by Game when a WALL is placed and cleared when it is destroyed.
+  private blockedTiles = new Set<number>();
+
   constructor(seed = 42) {
     this.generate(seed);
   }
+
+  blockTile(col: number, row: number)   { this.blockedTiles.add(row * this.cols + col); }
+  unblockTile(col: number, row: number) { this.blockedTiles.delete(row * this.cols + col); }
+  isBlocked(col: number, row: number): boolean { return this.blockedTiles.has(row * this.cols + col); }
 
   private generate(seed: number) {
     for (let r = 0; r < this.rows; r++) {
@@ -261,6 +269,7 @@ export class GameMap {
   isWalkable(col: number, row: number): boolean {
     const tile = this.getTile(col, row);
     if (!tile) return false;
+    if (this.isBlocked(col, row)) return false; // solid wall segment
     return TERRAIN_WALKABLE[tile.terrain] ?? false;
   }
 
