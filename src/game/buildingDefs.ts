@@ -132,4 +132,14 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     buildRadius: 1,
     description: 'Barrera defensiva de piedra. Alta resistencia al daño. Las unidades no pueden atravesarla.',
   },
+  [BuildingType.GATE]: {
+    type: BuildingType.GATE,
+    name: 'Puerta',
+    emoji: '🚪',
+    cost: { food: 0, gold: 60, stone: 150 },
+    buildTime: 10,
+    maxHp: 320,
+    buildRadius: 1,
+    description: 'Puerta fortificada. Mismo blindaje que la muralla pero deja pasar a las tropas: úsala como acceso controlado en tus murallas.',
+  },
 };

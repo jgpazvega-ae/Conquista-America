@@ -82,6 +82,7 @@ export class AIBuildingPlanner {
       [BuildingType.HARBOR]: 0,
       [BuildingType.MARKET]: 0,
       [BuildingType.WALL]: 0,
+      [BuildingType.GATE]: 0,
     };
 
     for (const b of buildings) {
