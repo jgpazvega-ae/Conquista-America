@@ -1701,6 +1701,23 @@ export class Game {
         unit.path = [];
         unit.pathIndex = 0;
       }
+
+      // Fishing (AC style): an idle boat sitting beside a coastal fishing ground (FOOD node)
+      // hauls in a passive food catch for its owner. Light craft (canoes) fish best; warships
+      // are clumsy netters. Slowly depletes the ground, which regenerates like any node.
+      if (unit.state === UnitState.IDLE && unit.attackTarget === null) {
+        let ground: import('./ResourceNode').ResourceNode | null = null;
+        for (const node of this.resourceNodes) {
+          if (node.type !== ResourceType.FOOD || node.isEmpty()) continue;
+          if (Math.hypot(node.col - unit.col, node.row - unit.row) <= 2.2) { ground = node; break; }
+        }
+        if (ground) {
+          const rate = (unit.type === UnitType.CANOE || unit.type === UnitType.WAR_CANOE) ? 3 : 1.5;
+          const caught = ground.gather(rate * dt);
+          const player = this.players[unit.playerId];
+          if (player) player.resources.food = Math.min(2000, player.resources.food + caught);
+        }
+      }
     }
 
     // Worker capture (AC style): an enemy melee soldier adjacent to an unprotected worker
