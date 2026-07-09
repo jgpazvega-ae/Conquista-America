@@ -44,9 +44,12 @@ export interface DamageEvent {
 
 export class CombatSystem {
   private events: DamageEvent[] = [];
+  private _pinTick = 0; // standalone melee-pin scan runs 1 in 6 frames (attack path refreshes engaged units every frame)
 
   update(allUnits: Unit[], map: GameMap, weather?: WeatherSystem, isNight?: boolean) {
     this.events = [];
+    this._pinTick = (this._pinTick + 1) % 6;
+    const runPinScan = this._pinTick === 0;
 
     // Build a map of target id → number of allied attackers for flanking bonus
     const attackerCount = new Map<number, number>();
@@ -67,14 +70,17 @@ export class CombatSystem {
 
       // Melee-pin detection: ranged units fighting while an adjacent enemy melee unit is present
       // suffer -40% damage (they can't aim/reload properly while being rushed).
-      if (!unit.outOfAmmo && unit.attackRange > 1.5 && unit.type !== UnitType.CANNON) {
-        const meleeThreat = allUnits.some(e =>
-          e.isAlive() && e.playerId !== unit.playerId && e.attackRange <= 1.5 &&
-          e.garrisonedIn === null && unit.distanceTo(e) <= 1.6,
-        );
-        unit.meleePinned = meleeThreat;
-      } else {
-        unit.meleePinned = false;
+      // Throttled — O(n²) at scale; the attack path below refreshes engaged units every frame.
+      if (runPinScan) {
+        if (!unit.outOfAmmo && unit.attackRange > 1.5 && unit.type !== UnitType.CANNON) {
+          const meleeThreat = allUnits.some(e =>
+            e.isAlive() && e.playerId !== unit.playerId && e.attackRange <= 1.5 &&
+            e.garrisonedIn === null && unit.distanceTo(e) <= 1.6,
+          );
+          unit.meleePinned = meleeThreat;
+        } else {
+          unit.meleePinned = false;
+        }
       }
 
       // Process active combat (ATTACKING or HOLD with a target)
