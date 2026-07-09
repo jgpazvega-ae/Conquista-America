@@ -281,7 +281,7 @@ button { cursor: pointer; border: none; background: none; }
 /* ═══════════════════════════════════════ CIV SELECT ══ */
 #civ-select-screen {
   position: fixed; inset: 0; z-index: 900;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
   overflow-y: auto; padding: 16px;
 }
 .civ-select-bg {
@@ -292,6 +292,9 @@ button { cursor: pointer; border: none; background: none; }
   position: relative; z-index: 1;
   width: 100%; max-width: 960px;
   display: flex; flex-direction: column; gap: 20px;
+  /* margin auto = centered when it fits, scrollable from the top when it overflows
+     (align-items:center on the scroller clips overflowing content) */
+  margin: auto;
 }
 .civ-select-header { text-align: center; }
 .civ-select-title {

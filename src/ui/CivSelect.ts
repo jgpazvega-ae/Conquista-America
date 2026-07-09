@@ -2,6 +2,8 @@ import { CivilizationType } from '../game/types';
 import { CIVILIZATIONS } from '../game/civilizations';
 import { CIV_COLORS, CIV_NAMES, CIV_EMOJIS } from '../game/constants';
 import type { SaveSystem } from '../game/SaveSystem';
+import { SCENARIOS } from '../game/Scenarios';
+import type { ScenarioDef } from '../game/Scenarios';
 
 function hex(n: number | undefined): string {
   return '#' + (n ?? 0x888888).toString(16).padStart(6, '0');
@@ -66,11 +68,13 @@ export class CivSelectScreen {
   private _difficulty: Difficulty = 'normal';
   private _numAI = 3;
   private onStart: ((civ: CivilizationType) => void) | null = null;
+  private onStartScenario: ((scenario: ScenarioDef) => void) | null = null;
 
   constructor(saveSystem: SaveSystem) {
     this.saveSystem = saveSystem;
     this.el = document.getElementById('civ-select-screen')!;
     this.build();
+    this.buildScenarios();
     this.bind();
   }
 
@@ -78,6 +82,21 @@ export class CivSelectScreen {
   getNumAI(): number { return this._numAI; }
 
   setOnStart(cb: (civ: CivilizationType) => void) { this.onStart = cb; }
+  setOnStartScenario(cb: (scenario: ScenarioDef) => void) { this.onStartScenario = cb; }
+
+  /** Historical scenario buttons in the footer (AC campaign style). */
+  private buildScenarios() {
+    const row = this.el.querySelector('#scenario-row');
+    if (!row) return;
+    for (const sc of SCENARIOS) {
+      const btn = document.createElement('button');
+      btn.className = 'diff-btn';
+      btn.textContent = `${sc.emoji} ${sc.name} (${sc.year})`;
+      btn.title = sc.description;
+      btn.addEventListener('click', () => this.onStartScenario?.(sc));
+      row.appendChild(btn);
+    }
+  }
 
   show(preferredCiv?: CivilizationType) {
     preferredCiv = validCiv(preferredCiv);

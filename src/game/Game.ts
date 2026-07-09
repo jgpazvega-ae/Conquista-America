@@ -90,6 +90,7 @@ export class Game {
   gameTime = 0;
   difficulty: 'easy' | 'normal' | 'hard' = 'normal';
   numAI = 3;
+  private _aiCivsOverride: CivilizationType[] | null = null; // scenario-forced AI civs
   mapSeed = 0;
   pendingEventMessages: string[] = [];
   private _eventTimer = 60 + Math.random() * 60;
@@ -147,9 +148,10 @@ export class Game {
 
   constructor(
     humanCiv: CivilizationType = CivilizationType.AZTEC,
-    opts: { numAI?: number; mapSeed?: number; difficulty?: 'easy' | 'normal' | 'hard' } = {},
+    opts: { numAI?: number; mapSeed?: number; difficulty?: 'easy' | 'normal' | 'hard'; aiCivs?: CivilizationType[] } = {},
   ) {
-    this.numAI     = opts.numAI     ?? 3;
+    this.numAI     = opts.aiCivs ? opts.aiCivs.length : (opts.numAI ?? 3);
+    this._aiCivsOverride = opts.aiCivs ?? null;
     this.mapSeed   = opts.mapSeed   ?? (Math.floor(Math.random() * 999983) + 1);
     this.difficulty = opts.difficulty ?? 'normal';
     this.map = new GameMap(this.mapSeed);
@@ -175,14 +177,15 @@ export class Game {
   }
 
   private spawnPlayers(humanCiv: CivilizationType) {
-    // Put the human civ first (player 0), rest as AI (limited by this.numAI)
+    // Put the human civ first (player 0), rest as AI (limited by this.numAI).
+    // Historical scenarios force specific AI civilizations via _aiCivsOverride.
     const allCivs = [
       CivilizationType.AZTEC,
       CivilizationType.MAYA,
       CivilizationType.INCA,
       CivilizationType.CONQUISTADOR,
     ];
-    const aiCivs = allCivs.filter(c => c !== humanCiv).slice(0, this.numAI);
+    const aiCivs = this._aiCivsOverride ?? allCivs.filter(c => c !== humanCiv).slice(0, this.numAI);
     const civs = [humanCiv, ...aiCivs];
 
     civs.forEach((civ, idx) => {
@@ -297,14 +300,11 @@ export class Game {
   }
 
   private spawnInitialBuildings() {
-    const civs = [
-      CivilizationType.AZTEC,
-      CivilizationType.MAYA,
-      CivilizationType.INCA,
-      CivilizationType.CONQUISTADOR,
-    ];
-
-    civs.forEach((civ, idx) => {
+    // Iterate over the REAL player list (not a hardcoded civ list): games with fewer
+    // AI players (1-2 enemies, historical scenarios) must not spawn orphan bases/workers.
+    this.players.forEach((player) => {
+      const civ = player.civType;
+      const idx = player.id;
       const [baseCol, baseRow] = START_POSITIONS[civ];
       const color = CIV_COLORS[civ];
 

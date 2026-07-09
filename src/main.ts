@@ -23,6 +23,7 @@ import { ResourceType } from './game/ResourceNode';
 import { findPath } from './game/Pathfinding';
 import { WorkerTask } from './game/Worker';
 import type { Difficulty } from './ui/CivSelect';
+import type { ScenarioDef } from './game/Scenarios';
 import { TECH_DEFS, TechType } from './game/Tech';
 import { activateCivPower, CIV_POWER_DEFS } from './game/CivPowers';
 import { AllianceType } from './game/Diplomacy';
@@ -117,6 +118,13 @@ async function boot() {
     civSelect.hide();
     narrative.play(civ, () => { startGame(civ, diff, numAI).catch(showFatalError); });
   });
+
+  civSelect.setOnStartScenario((sc) => {
+    civSelect.hide();
+    narrative.play(sc.humanCiv, () => {
+      startGame(sc.humanCiv, sc.difficulty, sc.aiCivs.length, sc).catch(showFatalError);
+    });
+  });
 }
 
 function showCivSelect(screen: CivSelectScreen, preferred: CivilizationType) {
@@ -142,7 +150,7 @@ function showFatalError(err: unknown) {
 }
 
 // ── Game lifecycle ─────────────────────────────────────────────────────────────
-async function startGame(civ: CivilizationType, difficulty: Difficulty = 'normal', numAI = 3) {
+async function startGame(civ: CivilizationType, difficulty: Difficulty = 'normal', numAI = 3, scenario?: ScenarioDef) {
   // WebGL availability check — fail fast with a clear message
   const testCanvas = document.createElement('canvas');
   const gl = testCanvas.getContext('webgl2') ?? testCanvas.getContext('webgl');
@@ -158,7 +166,7 @@ async function startGame(civ: CivilizationType, difficulty: Difficulty = 'normal
     activeGame = null;
   }
 
-  activeGame = new GameInstance(civ, saveSystem, difficulty, numAI);
+  activeGame = new GameInstance(civ, saveSystem, difficulty, numAI, scenario);
   await activeGame.init();
 }
 
@@ -254,19 +262,40 @@ class GameInstance {
   }
 
   private numAI: number;
+  private _scenario: ScenarioDef | null = null;
 
-  constructor(civ: CivilizationType, saveSystem: SaveSystem, difficulty: Difficulty = 'normal', numAI = 3) {
+  constructor(civ: CivilizationType, saveSystem: SaveSystem, difficulty: Difficulty = 'normal', numAI = 3, scenario?: ScenarioDef) {
     this.civ        = civ;
     this.saveSystem = saveSystem;
     this.difficulty = difficulty;
     this.numAI      = numAI;
+    this._scenario  = scenario ?? null;
   }
 
   async init() {
     const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
 
-    // Override human player's civilization
-    this.game = new Game(this.civ, { difficulty: this.difficulty, numAI: this.numAI });
+    // Override human player's civilization; scenarios force map seed and enemy civs
+    this.game = this._scenario
+      ? new Game(this.civ, { difficulty: this._scenario.difficulty, mapSeed: this._scenario.mapSeed, aiCivs: this._scenario.aiCivs })
+      : new Game(this.civ, { difficulty: this.difficulty, numAI: this.numAI });
+    // Scenario flavor: apply starting-resource bonuses that recreate the historical matchup
+    if (this._scenario) {
+      const sc = this._scenario;
+      const apply = (res: typeof this.game.humanPlayer.resources, bonus?: ScenarioDef['humanBonus']) => {
+        if (!bonus) return;
+        res.food  += bonus.food  ?? 0;
+        res.gold  += bonus.gold  ?? 0;
+        res.stone += bonus.stone ?? 0;
+        res.wood  = (res.wood  ?? 0) + (bonus.wood ?? 0);
+        res.coal  = (res.coal  ?? 0) + (bonus.coal ?? 0);
+        res.iron  = (res.iron  ?? 0) + (bonus.iron ?? 0);
+      };
+      apply(this.game.humanPlayer.resources, sc.humanBonus);
+      for (const p of this.game.players) {
+        if (!p.isHuman) apply(p.resources, sc.aiBonus);
+      }
+    }
     this.renderer = new Renderer(canvas);
     this.hud      = new HUD(this.game);
     this.camera   = new RTSCamera(this.renderer.camera);
@@ -808,6 +837,11 @@ class GameInstance {
     await loadingStep(100, '¡Que comience la conquista!');
     await sleep(400);
     this.hud.hideLoading();
+
+    // Historical scenario intro banner
+    if (this._scenario) {
+      this.hud.notify(this._scenario.intro, 'warning');
+    }
 
     // Auto-hide controls hint
     setTimeout(() => {
