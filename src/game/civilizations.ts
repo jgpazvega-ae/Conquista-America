@@ -149,6 +149,31 @@ const UNIT_DEFS: Record<UnitType, UnitDef> = {
     description: 'Poderoso galeón de guerra con cañones pesados. Domina el océano.',
     stats: { maxHp: 280, attack: 70, defense: 30, speed: 2.0, attackRange: 9.0, sight: 12, attackCooldown: 5.0 },
   },
+  // ── MAPUCHE ────────────────────────────────────────────
+  [UnitType.WEICHAFE]: {
+    type: UnitType.WEICHAFE, name: 'Weichafe', emoji: '🪓',
+    isRanged: false, isCavalry: false,
+    description: 'Guerrero mapuche: rápido, barato y feroz. La columna vertebral de Arauco.',
+    stats: { maxHp: 85, attack: 17, defense: 11, speed: 3.6, attackRange: 1.5, sight: 6, attackCooldown: 1.4 },
+  },
+  [UnitType.LANCERO_MAPUCHE]: {
+    type: UnitType.LANCERO_MAPUCHE, name: 'Lancero de Arauco', emoji: '🔱',
+    isRanged: false, isCavalry: false,
+    description: 'Pica larga adoptada para destrozar la caballería española. Su especialidad histórica.',
+    stats: { maxHp: 95, attack: 16, defense: 14, speed: 2.9, attackRange: 2.0, sight: 5, attackCooldown: 1.5 },
+  },
+  [UnitType.BOLEADORA]: {
+    type: UnitType.BOLEADORA, name: 'Boleador', emoji: '🪃',
+    isRanged: true, isCavalry: false,
+    description: 'Lanza boleadoras que enredan las piernas de cualquier enemigo — incluso jinetes.',
+    stats: { maxHp: 55, attack: 13, defense: 6, speed: 3.2, attackRange: 4.5, sight: 7, attackCooldown: 1.7 },
+  },
+  [UnitType.TOQUI]: {
+    type: UnitType.TOQUI, name: 'Toqui', emoji: '🗿',
+    isRanged: false, isCavalry: false,
+    description: 'Jefe de guerra portador del hacha toki. Élite que lidera desde el frente.',
+    stats: { maxHp: 145, attack: 27, defense: 17, speed: 3.0, attackRange: 1.5, sight: 7, attackCooldown: 1.7 },
+  },
   // ── ESPIRITUAL ─────────────────────────────────────────
   [UnitType.SHAMAN]: {
     type: UnitType.SHAMAN, name: 'Chamán', emoji: '🌀',
@@ -236,6 +261,21 @@ export const CIVILIZATIONS: Record<CivilizationType, CivDef> = {
       ...Array(8).fill(UnitType.ARQUEBUSIER),
       ...Array(7).fill(UnitType.CAVALRY),
       ...Array(3).fill(UnitType.CANNON),
+    ],
+  },
+  [CivilizationType.MAPUCHE]: {
+    type: CivilizationType.MAPUCHE,
+    name: 'Nación Mapuche',
+    emoji: '🌋',
+    color: 0x3a7bd5,
+    accentColor: 0x2255a0,
+    description: 'El pueblo indómito del Wallmapu: 300 años resistiendo a los imperios con guerrilla y picas.',
+    units: [UNIT_DEFS[UnitType.WEICHAFE], UNIT_DEFS[UnitType.LANCERO_MAPUCHE], UNIT_DEFS[UnitType.BOLEADORA], UNIT_DEFS[UnitType.TOQUI], UNIT_DEFS[UnitType.CANOE], UNIT_DEFS[UnitType.WAR_CANOE], UNIT_DEFS[UnitType.SHAMAN], UNIT_DEFS[UnitType.OFFICER], UNIT_DEFS[UnitType.DRUMMER]],
+    startUnits: [
+      ...Array(12).fill(UnitType.WEICHAFE),
+      ...Array(8).fill(UnitType.LANCERO_MAPUCHE),
+      ...Array(7).fill(UnitType.BOLEADORA),
+      ...Array(3).fill(UnitType.TOQUI),
     ],
   },
 };

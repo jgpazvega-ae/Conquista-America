@@ -43,6 +43,14 @@ export const CIV_POWER_DEFS: Record<CivilizationType, PowerDef> = {
     duration: 20,
     key: 'E',
   },
+  [CivilizationType.MAPUCHE]: {
+    name: 'Levantamiento',
+    emoji: '🔥',
+    description: 'Guerrilla de Arauco: +25% ataque y +35% velocidad por 18s',
+    cooldown: 75,
+    duration: 18,
+    key: 'E',
+  },
 };
 
 /**
@@ -79,6 +87,22 @@ export function activateCivPower(game: Game, selectedUnitId?: number): string | 
       player.powerActiveTimer = def.duration;
       player.powerCooldown    = def.cooldown;
       return `✨ Unidad: todas las unidades +30% ataque y velocidad (${def.duration}s)`;
+    }
+
+    case CivilizationType.MAPUCHE: {
+      // Levantamiento de Arauco: guerrilla surge — reuses the generic pre-buff/restore machinery
+      if (player.aliveUnits.length === 0) return null;
+      for (const u of player.aliveUnits) {
+        u.incaBuff        = true;
+        u._preBuffAttack  = u.attack;
+        u._preBuffSpeed   = u.speed;
+        u.attack = Math.round(u.attack * 1.25);
+        u.speed  = Math.min(u.speed * 1.35, u.def.stats.speed * 3);
+      }
+      player.powerActive      = true;
+      player.powerActiveTimer = def.duration;
+      player.powerCooldown    = def.cooldown;
+      return `🔥 Levantamiento: +25% ataque y +35% velocidad (${def.duration}s)`;
     }
 
     case CivilizationType.MAYA: {

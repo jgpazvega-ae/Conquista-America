@@ -14,6 +14,7 @@ export enum CivilizationType {
   INCA = 'INCA',
   MAYA = 'MAYA',
   CONQUISTADOR = 'CONQUISTADOR',
+  MAPUCHE = 'MAPUCHE',
 }
 
 export enum UnitType {
@@ -43,6 +44,11 @@ export enum UnitType {
   // Naval — Conquistador
   BRIGANTINE = 'BRIGANTINE',
   GALLEON = 'GALLEON',
+  // Mapuche
+  WEICHAFE = 'WEICHAFE',
+  LANCERO_MAPUCHE = 'LANCERO_MAPUCHE',
+  BOLEADORA = 'BOLEADORA',
+  TOQUI = 'TOQUI',
   // Spiritual/conversion units
   SHAMAN = 'SHAMAN',         // native civs — heals & curses
   MISSIONARY = 'MISSIONARY', // Conquistador — converts enemies

@@ -90,5 +90,6 @@ export function civEmoji(civ: CivilizationType): string {
     case CivilizationType.MAYA:         return '🔭';
     case CivilizationType.INCA:         return '🌄';
     case CivilizationType.CONQUISTADOR: return '⚔️';
+    case CivilizationType.MAPUCHE:      return '🌋';
   }
 }

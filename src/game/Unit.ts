@@ -14,6 +14,7 @@ const SKIN_TONES: Record<CivilizationType, number> = {
   [CivilizationType.INCA]:         0xb87040,
   [CivilizationType.MAYA]:         0xca8050,
   [CivilizationType.CONQUISTADOR]: 0xdba870,
+  [CivilizationType.MAPUCHE]:      0xb87848,
 };
 
 export class Unit {
@@ -259,6 +260,7 @@ export class Unit {
         [UnitType.SLINGER]:     30,
         [UnitType.ARQUEBUSIER]: 15,
         [UnitType.CANNON]:      10,
+        [UnitType.BOLEADORA]:   26,
       };
       this.maxAmmo = AMMO[this.type] ?? 20;
       this.ammo    = this.maxAmmo;
@@ -353,6 +355,7 @@ export class Unit {
       case CivilizationType.INCA:         return 0xffcc20;
       case CivilizationType.MAYA:         return 0x30e070;
       case CivilizationType.CONQUISTADOR: return 0xe03030;
+      case CivilizationType.MAPUCHE:      return 0x55aaff;
     }
   }
 
@@ -1021,7 +1024,8 @@ export class Unit {
       if (tile) {
         const t = tile.terrain;
         const onHome =
-          ((this.civType === CivilizationType.AZTEC || this.civType === CivilizationType.MAYA) &&
+          ((this.civType === CivilizationType.AZTEC || this.civType === CivilizationType.MAYA ||
+            this.civType === CivilizationType.MAPUCHE) &&
            t === TerrainType.JUNGLE) ||
           (this.civType === CivilizationType.INCA &&
            (t === TerrainType.HIGHLAND || t === TerrainType.MOUNTAIN));
@@ -1241,9 +1245,10 @@ export class Unit {
         (tile?.terrain === TerrainType.HIGHLAND || tile?.terrain === TerrainType.MOUNTAIN)) {
       terrainMult *= 1.22; // Inca highland/mountain runners
     }
-    if ((this.civType === CivilizationType.AZTEC || this.civType === CivilizationType.MAYA) &&
+    if ((this.civType === CivilizationType.AZTEC || this.civType === CivilizationType.MAYA ||
+         this.civType === CivilizationType.MAPUCHE) &&
         !this.isHero && tile?.terrain === TerrainType.JUNGLE) {
-      terrainMult *= 1.28; // Native jungle expertise (partially offsets 0.62× penalty)
+      terrainMult *= 1.28; // Native jungle/forest expertise (partially offsets 0.62× penalty)
     }
     if (this.civType === CivilizationType.CONQUISTADOR && !this.isHero &&
         tile?.terrain === TerrainType.JUNGLE) {
