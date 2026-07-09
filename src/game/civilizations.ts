@@ -212,10 +212,10 @@ export const CIVILIZATIONS: Record<CivilizationType, CivDef> = {
     description: 'El poderoso Imperio Mexica, maestros de la guerra florida.',
     units: [UNIT_DEFS[UnitType.EAGLE_WARRIOR], UNIT_DEFS[UnitType.JAGUAR_KNIGHT], UNIT_DEFS[UnitType.ATLATL], UNIT_DEFS[UnitType.CUACHIC], UNIT_DEFS[UnitType.CANOE], UNIT_DEFS[UnitType.WAR_CANOE], UNIT_DEFS[UnitType.SHAMAN], UNIT_DEFS[UnitType.OFFICER], UNIT_DEFS[UnitType.DRUMMER]],
     startUnits: [
-      ...Array(12).fill(UnitType.EAGLE_WARRIOR),
-      ...Array(6).fill(UnitType.JAGUAR_KNIGHT),
-      ...Array(8).fill(UnitType.ATLATL),
-      ...Array(4).fill(UnitType.CUACHIC),
+      ...Array(6).fill(UnitType.EAGLE_WARRIOR),
+      ...Array(3).fill(UnitType.JAGUAR_KNIGHT),
+      ...Array(4).fill(UnitType.ATLATL),
+      ...Array(2).fill(UnitType.CUACHIC),
     ],
   },
   [CivilizationType.INCA]: {
@@ -227,10 +227,10 @@ export const CIVILIZATIONS: Record<CivilizationType, CivDef> = {
     description: 'El vasto Imperio Inca, maestros de organización y arquitectura.',
     units: [UNIT_DEFS[UnitType.QUECHUA], UNIT_DEFS[UnitType.SLINGER], UNIT_DEFS[UnitType.CHAKANA_GUARD], UNIT_DEFS[UnitType.ANTIS_WARRIOR], UNIT_DEFS[UnitType.CANOE], UNIT_DEFS[UnitType.SHAMAN], UNIT_DEFS[UnitType.OFFICER], UNIT_DEFS[UnitType.DRUMMER]],
     startUnits: [
-      ...Array(12).fill(UnitType.QUECHUA),
-      ...Array(8).fill(UnitType.SLINGER),
-      ...Array(5).fill(UnitType.CHAKANA_GUARD),
-      ...Array(5).fill(UnitType.ANTIS_WARRIOR),
+      ...Array(6).fill(UnitType.QUECHUA),
+      ...Array(4).fill(UnitType.SLINGER),
+      ...Array(3).fill(UnitType.CHAKANA_GUARD),
+      ...Array(3).fill(UnitType.ANTIS_WARRIOR),
     ],
   },
   [CivilizationType.MAYA]: {
@@ -242,10 +242,10 @@ export const CIVILIZATIONS: Record<CivilizationType, CivDef> = {
     description: 'Las ciudades-estado mayas, guerreros de la selva y ciencias avanzadas.',
     units: [UNIT_DEFS[UnitType.SPEARMAN], UNIT_DEFS[UnitType.ARCHER], UNIT_DEFS[UnitType.AHAU_WARRIOR], UNIT_DEFS[UnitType.BALAM_JAGUAR], UNIT_DEFS[UnitType.WAR_CANOE], UNIT_DEFS[UnitType.SHAMAN], UNIT_DEFS[UnitType.OFFICER], UNIT_DEFS[UnitType.DRUMMER]],
     startUnits: [
-      ...Array(12).fill(UnitType.SPEARMAN),
-      ...Array(8).fill(UnitType.ARCHER),
-      ...Array(5).fill(UnitType.AHAU_WARRIOR),
-      ...Array(6).fill(UnitType.BALAM_JAGUAR),
+      ...Array(6).fill(UnitType.SPEARMAN),
+      ...Array(4).fill(UnitType.ARCHER),
+      ...Array(3).fill(UnitType.AHAU_WARRIOR),
+      ...Array(3).fill(UnitType.BALAM_JAGUAR),
     ],
   },
   [CivilizationType.CONQUISTADOR]: {
@@ -257,10 +257,10 @@ export const CIVILIZATIONS: Record<CivilizationType, CivDef> = {
     description: 'Soldados europeos con tecnología superior: acero, pólvora y caballos.',
     units: [UNIT_DEFS[UnitType.SOLDIER], UNIT_DEFS[UnitType.ARQUEBUSIER], UNIT_DEFS[UnitType.CAVALRY], UNIT_DEFS[UnitType.CANNON], UNIT_DEFS[UnitType.BRIGANTINE], UNIT_DEFS[UnitType.GALLEON], UNIT_DEFS[UnitType.MISSIONARY], UNIT_DEFS[UnitType.OFFICER], UNIT_DEFS[UnitType.DRUMMER]],
     startUnits: [
-      ...Array(10).fill(UnitType.SOLDIER),
-      ...Array(8).fill(UnitType.ARQUEBUSIER),
-      ...Array(7).fill(UnitType.CAVALRY),
-      ...Array(3).fill(UnitType.CANNON),
+      ...Array(5).fill(UnitType.SOLDIER),
+      ...Array(4).fill(UnitType.ARQUEBUSIER),
+      ...Array(4).fill(UnitType.CAVALRY),
+      ...Array(2).fill(UnitType.CANNON),
     ],
   },
   [CivilizationType.MAPUCHE]: {
@@ -272,10 +272,10 @@ export const CIVILIZATIONS: Record<CivilizationType, CivDef> = {
     description: 'El pueblo indómito del Wallmapu: 300 años resistiendo a los imperios con guerrilla y picas.',
     units: [UNIT_DEFS[UnitType.WEICHAFE], UNIT_DEFS[UnitType.LANCERO_MAPUCHE], UNIT_DEFS[UnitType.BOLEADORA], UNIT_DEFS[UnitType.TOQUI], UNIT_DEFS[UnitType.CANOE], UNIT_DEFS[UnitType.WAR_CANOE], UNIT_DEFS[UnitType.SHAMAN], UNIT_DEFS[UnitType.OFFICER], UNIT_DEFS[UnitType.DRUMMER]],
     startUnits: [
-      ...Array(12).fill(UnitType.WEICHAFE),
-      ...Array(8).fill(UnitType.LANCERO_MAPUCHE),
-      ...Array(7).fill(UnitType.BOLEADORA),
-      ...Array(3).fill(UnitType.TOQUI),
+      ...Array(6).fill(UnitType.WEICHAFE),
+      ...Array(4).fill(UnitType.LANCERO_MAPUCHE),
+      ...Array(4).fill(UnitType.BOLEADORA),
+      ...Array(2).fill(UnitType.TOQUI),
     ],
   },
 };

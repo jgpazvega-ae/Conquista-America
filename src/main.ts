@@ -282,7 +282,7 @@ class GameInstance {
 
     // Override human player's civilization; scenarios force map seed and enemy civs
     this.game = this._scenario
-      ? new Game(this.civ, { difficulty: this._scenario.difficulty, mapSeed: this._scenario.mapSeed, aiCivs: this._scenario.aiCivs })
+      ? new Game(this.civ, { difficulty: this._scenario.difficulty, mapSeed: this._scenario.mapSeed, aiCivs: this._scenario.aiCivs, startAtWar: this._scenario.startAtWar })
       : new Game(this.civ, { difficulty: this.difficulty, numAI: this.numAI });
     // Scenario flavor: apply starting-resource bonuses that recreate the historical matchup
     if (this._scenario) {
@@ -1039,7 +1039,7 @@ class GameInstance {
 
     // Day/night cycle: one full cycle every 480 game-seconds
     const DAY_CYCLE = 480;
-    const dayT = (this.game.gameTime % DAY_CYCLE) / DAY_CYCLE;
+    const dayT = this.game.dayT;
     this.renderer.setDayNight(dayT);
     // Rain during the night half of the cycle (t 0.75–1.0 and 0.0–0.25)
     const isNight = dayT > 0.75 || dayT < 0.15;
@@ -1401,7 +1401,7 @@ class GameInstance {
 
       // Jungle ambush notification: enemy attacks a human unit from jungle cover
       if (this._ambushWarnTimer <= 0) {
-        const dayT2 = (this.game.gameTime % 480) / 480;
+        const dayT2 = this.game.dayT;
         const isNight2 = dayT2 > 0.75 || dayT2 < 0.15;
         for (const evt of this.game.damageEvents) {
           if (!evt.attacker || evt.target.playerId !== this.game.humanPlayerId) continue;
@@ -1540,7 +1540,7 @@ class GameInstance {
     for (const decl of this.game.newWarDeclarations) {
       if (decl.toPlayerId === this.game.humanPlayerId) {
         const civNames: Record<string, string> = {
-          AZTEC: 'Los Aztecas', MAYA: 'Los Mayas', INCA: 'Los Incas', CONQUISTADOR: 'Los Conquistadores',
+          AZTEC: 'Los Aztecas', MAYA: 'Los Mayas', INCA: 'Los Incas', CONQUISTADOR: 'Los Conquistadores', MAPUCHE: 'Los Mapuches',
         };
         const aggressor = this.game.players[decl.fromPlayerId];
         const civName = civNames[aggressor?.civType ?? ''] ?? 'El enemigo';

@@ -23,7 +23,7 @@ export class DiplomacyManager {
 
   getRelation(civA: number, civB: number): AllianceType {
     const key = this.key(civA, civB);
-    return this.relations.get(key) ?? AllianceType.ENEMY;
+    return this.relations.get(key) ?? AllianceType.NEUTRAL;
   }
 
   isEnemy(civA: number, civB: number): boolean {
@@ -75,10 +75,13 @@ export class DiplomacyManager {
     return a < b ? `${a}-${b}` : `${b}-${a}`;
   }
 
-  init() {
-    for (let i = 0; i < 4; i++) {
-      for (let j = i + 1; j < 4; j++) {
-        this.setRelation(i, j, AllianceType.ENEMY);
+  /** AC-style start: everyone begins NEUTRAL — wars are DECLARED (by the AI when it
+   *  launches its first wave, or automatically on first blood). The old init hardcoded
+   *  4 players at permanent ENEMY, which made every army auto-aggro from second 0. */
+  init(totalPlayers = 4) {
+    for (let i = 0; i < totalPlayers; i++) {
+      for (let j = i + 1; j < totalPlayers; j++) {
+        this.setRelation(i, j, AllianceType.NEUTRAL);
       }
     }
   }

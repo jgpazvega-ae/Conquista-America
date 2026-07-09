@@ -46,7 +46,8 @@ export class CombatSystem {
   private events: DamageEvent[] = [];
   private _pinTick = 0; // standalone melee-pin scan runs 1 in 6 frames (attack path refreshes engaged units every frame)
 
-  update(allUnits: Unit[], map: GameMap, weather?: WeatherSystem, isNight?: boolean) {
+  update(allUnits: Unit[], map: GameMap, weather?: WeatherSystem, isNight?: boolean, gameTime = Infinity,
+         isEnemy: (a: number, b: number) => boolean = () => true) {
     this.events = [];
     this._pinTick = (this._pinTick + 1) % 6;
     const runPinScan = this._pinTick === 0;
@@ -104,11 +105,17 @@ export class CombatSystem {
             unit.attackTarget = null;
             continue;
           }
-          const path = findPath(map, unit.gridPos(), target.gridPos(), 200);
-          if (path.length > 0) {
-            unit.state     = UnitState.MOVING;
-            unit.path      = path;
-            unit.pathIndex = 0;
+          // Repath throttle: recomputing A* every frame for every chasing unit melts
+          // large battles (the "pathfinding storm"). Reuse the current path for 0.6 s.
+          unit._chaseRepathTimer -= 1 / 60;
+          if (unit._chaseRepathTimer <= 0 || unit.pathIndex >= unit.path.length) {
+            unit._chaseRepathTimer = 0.6;
+            const path = findPath(map, unit.gridPos(), target.gridPos(), 200);
+            if (path.length > 0) {
+              unit.state     = UnitState.MOVING;
+              unit.path      = path;
+              unit.pathIndex = 0;
+            }
           }
           continue;
         }
@@ -384,16 +391,19 @@ export class CombatSystem {
         }
       }
 
-      // Auto-aggro for IDLE, ATTACK_MOVE, and HOLD units
-      if (unit.state === UnitState.IDLE || unit.state === UnitState.ATTACK_MOVE || unit.state === UnitState.HOLD) {
-        this.tryAutoAggro(unit, allUnits, map);
+      // Auto-aggro for IDLE, ATTACK_MOVE, and HOLD units.
+      // Deployment truce: scattered spawn formations must not cascade into war at second 0
+      // (matches the same grace window in Game.runAutoAttack).
+      if (gameTime >= 25 &&
+          (unit.state === UnitState.IDLE || unit.state === UnitState.ATTACK_MOVE || unit.state === UnitState.HOLD)) {
+        this.tryAutoAggro(unit, allUnits, map, isEnemy);
       }
     }
 
     return this.events;
   }
 
-  private tryAutoAggro(unit: Unit, allUnits: Unit[], map: GameMap) {
+  private tryAutoAggro(unit: Unit, allUnits: Unit[], map: GameMap, isEnemy: (a: number, b: number) => boolean) {
     if (unit.panicked) return; // routed troops don't fight back
     // Out-of-ammo ranged: only scan at melee range
     const baseRange = unit.outOfAmmo ? 1.5 : unit.attackRange;
@@ -407,6 +417,7 @@ export class CombatSystem {
     for (const other of allUnits) {
       if (!other.isAlive()) continue;
       if (other.playerId === unit.playerId) continue;
+      if (!isEnemy(unit.playerId, other.playerId)) continue; // only at war (AC style)
       if (other.garrisonedIn !== null) continue; // can't target troops inside buildings
       const d = unit.distanceTo(other);
       if (d > scanRange) continue;

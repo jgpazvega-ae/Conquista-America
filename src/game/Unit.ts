@@ -99,6 +99,7 @@ export class Unit {
   wantsRetreat     = false; // set by takeDamage when HP < 20%; cleared by Game
   _missionaryTimer = 0;    // conversion/curse timer for Missionary and Shaman units
   _crewCaptureTimer = 0;   // CANNON only: seconds an enemy melee unit has been seizing this crippled gun
+  _chaseRepathTimer = 0;   // throttles per-frame A* while chasing a combat target
 
   // Status effects (damage over time)
   burning  = 0;  // remaining burn duration (s); 2 HP every 0.5 s
