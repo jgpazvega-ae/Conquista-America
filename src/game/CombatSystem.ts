@@ -351,6 +351,10 @@ export class CombatSystem {
           if (unit.type === UnitType.SLINGER && target.isAlive() && target.attackRange <= 1.5) {
             target.slowed = Math.max(target.slowed, 2);
           }
+          // Boleadora: bolas entangle the legs of ANY target — infantry or horse (-40% speed, 2.5s)
+          if (unit.type === UnitType.BOLEADORA && target.isAlive()) {
+            target.slowed = Math.max(target.slowed, 2.5);
+          }
           // Atlatl javelin stagger: 20% chance to slow target 1s (javelin weight disrupts movement)
           if (unit.type === UnitType.ATLATL && target.isAlive() && target.attackRange <= 1.5 && Math.random() < 0.20) {
             target.slowed = Math.max(target.slowed, 1);

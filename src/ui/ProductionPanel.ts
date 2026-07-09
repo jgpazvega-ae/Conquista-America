@@ -26,6 +26,7 @@ const UPGRADE_DEFS: UpgradeDef[] = [
   { key: 'civTech', name: 'Caminos del Inca',     emoji: '🛤️', desc: 'Todas las unidades +0.6 velocidad', food: 100, gold: 200, stone: 150, civ: CivilizationType.INCA },
   { key: 'civTech', name: 'Observatorio Maya',    emoji: '🔭', desc: 'Todas las unidades +3 tiles de visión', food: 100, gold: 200, stone: 150, civ: CivilizationType.MAYA },
   { key: 'civTech', name: 'Pólvora Avanzada',     emoji: '💣', desc: 'Todas las unidades +12 ataque', food: 100, gold: 200, stone: 150, civ: CivilizationType.CONQUISTADOR },
+  { key: 'civTech', name: 'Doma del Caballo',     emoji: '🐎', desc: 'Todas las unidades +0.5 velocidad y +5 ataque', food: 100, gold: 200, stone: 150, civ: CivilizationType.MAPUCHE },
 ];
 
 const BUILDABLE: BuildingType[] = [

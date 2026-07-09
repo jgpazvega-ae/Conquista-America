@@ -48,6 +48,7 @@ export const CIV_COLORS: Record<string, number> = {
   INCA:         0xe8c020,
   MAYA:         0x30c060,
   CONQUISTADOR: 0xe03030,
+  MAPUCHE:      0x3a7bd5,
 };
 
 export const CIV_NAMES: Record<string, string> = {
@@ -55,6 +56,7 @@ export const CIV_NAMES: Record<string, string> = {
   INCA:         'Tawantinsuyu (Incas)',
   MAYA:         'Ciudades-Estado Mayas',
   CONQUISTADOR: 'Conquistadores',
+  MAPUCHE:      'Nación Mapuche',
 };
 
 export const CIV_EMOJIS: Record<string, string> = {
@@ -62,6 +64,7 @@ export const CIV_EMOJIS: Record<string, string> = {
   INCA:         '🌄',
   MAYA:         '🌿',
   CONQUISTADOR: '⚔️',
+  MAPUCHE:      '🌋',
 };
 
 export const WONDER_NAMES: Record<string, string> = {
@@ -69,6 +72,7 @@ export const WONDER_NAMES: Record<string, string> = {
   INCA:         'Machu Picchu',
   MAYA:         'Chichén Itzá',
   CONQUISTADOR: 'Fortaleza del Rey',
+  MAPUCHE:      'Rewe Sagrado',
 };
 
 export const WONDER_EMOJIS: Record<string, string> = {
@@ -76,6 +80,7 @@ export const WONDER_EMOJIS: Record<string, string> = {
   INCA:         '⛰️',
   MAYA:         '🔭',
   CONQUISTADOR: '🏰',
+  MAPUCHE:      '🌳',
 };
 
 export const STARTING_RESOURCES = {

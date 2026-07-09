@@ -98,6 +98,12 @@ const NATIVE_FLAVOR: Record<CivilizationType, { name: string; home: string; year
     omen: 'Los códices hablaban del fin de un ciclo; el cielo y la tierra parecían contener el aliento.',
   },
   [CivilizationType.CONQUISTADOR]: { name: '', home: '', year: '', omen: '' },
+  [CivilizationType.MAPUCHE]: {
+    name: 'la Nación Mapuche',
+    home: 'el Wallmapu, tierras del sur',
+    year: '1550 · Comienza la Guerra de Arauco',
+    omen: 'Los machis vieron en sueños barcos de madera vomitando hombres de hierro; el Biobío bajó teñido de ceniza.',
+  },
 };
 
 export class NarrativeScreen {

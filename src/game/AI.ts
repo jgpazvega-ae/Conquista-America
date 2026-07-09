@@ -316,11 +316,13 @@ export class AISystem {
             [CivilizationType.MAYA]:         ['🌟 Las estrellas ya escribieron vuestro destino final.', '🐍 ¡Kukulkán os reclama!', '🔭 El calendario predijo exactamente este momento.'],
             [CivilizationType.INCA]:         ['🏔️ ¡El Tahuantinsuyu os absorberá!', '🦅 ¡No hay escape al poder del Sol!', '🛤️ ¡Cuzco será vuestro nuevo amo!'],
             [CivilizationType.CONQUISTADOR]: ['🔥 ¡En nombre del Rey, rendíos!', '💰 ¡Vuestro oro pasará a la corona!', '🏳️ ¿Aún resistís? Admirable… e inútil.'],
+            [CivilizationType.MAPUCHE]:      ['🌋 ¡El Wallmapu no se rinde jamás!', '🪓 ¡Trescientos años resistiremos si hace falta!', '🔥 ¡Marichiweu! ¡Diez veces venceremos!'],
           } : {
             [CivilizationType.AZTEC]:        ['⚔️ ¡Los guerreros Jaguar no conocen la derrota!', '🐆 ¡Tláloc demanda tu sangre!', '☀️ ¡El sol exige tu sacrificio!'],
             [CivilizationType.MAYA]:         ['🔭 Las estrellas ya profetizaron tu fin.', '🏛️ ¡Chichen Itzá jamás caerá!', '🐍 ¡La serpiente emplumada despertó!'],
             [CivilizationType.INCA]:         ['🦅 ¡Los hijos del Sol marchan!', '🛤️ ¡Todos los caminos llevan a Cuzco!', '🏔️ ¡El Sapa Inca nos guía!'],
             [CivilizationType.CONQUISTADOR]: ['💣 ¡Por el Rey y la Gloria!', '⚔️ ¡Santiago y cierra España!', '🔥 ¡La pólvora decide todo!'],
+            [CivilizationType.MAPUCHE]:      ['🪓 ¡Weichafes, al ataque!', '🌋 ¡Lautaro nos enseñó a vencerlos!', '🔥 ¡Marichiweu!'],
           };
           const msgs = taunts[player.civType] ?? [];
           if (msgs.length > 0) {
@@ -338,6 +340,7 @@ export class AISystem {
             [CivilizationType.MAYA]:         ['🏛️ ¡La ciudad resistirá como siempre lo ha hecho!', '🔭 ¡El oráculo prometió nuestra supervivencia!', '🛡️ ¡Nuestros ancestros guían nuestras manos!'],
             [CivilizationType.INCA]:         ['🏔️ ¡Como el Ande resiste, resistimos!', '🦅 ¡La montaña no cede y tampoco nosotros!', '🛤️ ¡Nunca habéis encontrado murallas así!'],
             [CivilizationType.CONQUISTADOR]: ['🏰 ¡Resistid por el honor de España!', '💣 ¡Cada centímetro se defenderá con cañones!', '⚔️ ¡Dios está con nosotros, no tembléis!'],
+            [CivilizationType.MAPUCHE]:      ['🌲 ¡El bosque pelea con nosotros!', '🪓 ¡Ni el Inca ni el español nos doblegaron!', '🔥 ¡Cada ruca es una fortaleza!'],
           };
           const msgs = defenseTaunts[player.civType] ?? [];
           if (msgs.length > 0) {
@@ -358,6 +361,7 @@ export class AISystem {
               [CivilizationType.MAYA]:         ['🌙 Las estrellas no dan aún señal de guerra…', '🕰️ El tiempo es nuestro mayor aliado.'],
               [CivilizationType.INCA]:         ['🏔️ Los Andes nos dan paciencia y fortaleza…', '🦅 Observamos y aprendemos vuestras tácticas.'],
               [CivilizationType.CONQUISTADOR]: ['📜 Por ahora observamos… pero no olvidamos.', '🗺️ Cartografiamos vuestra posición con precisión.'],
+              [CivilizationType.MAPUCHE]:      ['🌲 El bosque nos oculta mientras crecemos…', '🪓 Aprendemos vuestras armas para volverlas en vuestra contra.'],
             };
             const msgs = respectTaunts[player.civType] ?? [];
             if (msgs.length > 0) {
@@ -1134,10 +1138,12 @@ export class AISystem {
     const COOLDOWNS: Record<CivilizationType, number> = {
       [CivilizationType.AZTEC]: 40, [CivilizationType.INCA]: 80,
       [CivilizationType.MAYA]: 60,  [CivilizationType.CONQUISTADOR]: 70,
+      [CivilizationType.MAPUCHE]: 75,
     };
     const DURATIONS: Record<CivilizationType, number> = {
       [CivilizationType.AZTEC]: 0, [CivilizationType.INCA]: 25,
       [CivilizationType.MAYA]: 0,  [CivilizationType.CONQUISTADOR]: 20,
+      [CivilizationType.MAPUCHE]: 18,
     };
     player.powerCooldown = COOLDOWNS[player.civType] ?? 60;
 
@@ -1172,6 +1178,14 @@ export class AISystem {
         }
         player.powerActive = true; player.powerActiveTimer = DURATIONS[player.civType];
         break;
+      case CivilizationType.MAPUCHE:
+        for (const u of player.aliveUnits) {
+          u.incaBuff = true; u._preBuffAttack = u.attack; u._preBuffSpeed = u.speed;
+          u.attack = Math.round(u.attack * 1.25);
+          u.speed  = Math.min(u.speed * 1.35, u.def.stats.speed * 3);
+        }
+        player.powerActive = true; player.powerActiveTimer = DURATIONS[player.civType];
+        break;
     }
 
     // Alert the human player so they can react
@@ -1180,6 +1194,7 @@ export class AISystem {
       [CivilizationType.INCA]:         '🌄 INCA activa UNIDAD — ¡+30% ataque y velocidad 25s! Mantente alerta',
       [CivilizationType.MAYA]:         '🌿 MAYA activa PROFECÍA — tus posiciones han sido reveladas',
       [CivilizationType.CONQUISTADOR]: '⚔️ CONQUISTADOR activa CONQUISTA — ¡+80% daño 20s! Retira tus tropas débiles',
+      [CivilizationType.MAPUCHE]:      '🌋 MAPUCHE activa LEVANTAMIENTO — ¡+25% ataque y +35% velocidad 18s!',
     };
     const msg = POWER_ALERTS[player.civType];
     if (msg) game.pendingEventMessages.push(msg);

@@ -31,6 +31,7 @@ const START_POSITIONS: Record<CivilizationType, [number, number]> = {
   [CivilizationType.MAYA]:         [38, 14],   // Yucatan peninsula
   [CivilizationType.INCA]:         [19, 36],   // Peruvian Andes
   [CivilizationType.CONQUISTADOR]: [46, 24],   // Caribbean coast
+  [CivilizationType.MAPUCHE]:      [29, 60],   // Araucanía / southern cone (verified walkable across seeds)
 };
 
 export type GameStatus = 'PLAYING' | 'VICTORY' | 'DEFEAT';
@@ -184,6 +185,7 @@ export class Game {
       CivilizationType.MAYA,
       CivilizationType.INCA,
       CivilizationType.CONQUISTADOR,
+      CivilizationType.MAPUCHE,
     ];
     const aiCivs = this._aiCivsOverride ?? allCivs.filter(c => c !== humanCiv).slice(0, this.numAI);
     const civs = [humanCiv, ...aiCivs];
@@ -197,6 +199,7 @@ export class Game {
         case CivilizationType.MAYA:          player.resources.gold  +=  50; break; // trade routes
         case CivilizationType.INCA:          player.resources.stone += 100; break; // Andean quarrying
         case CivilizationType.CONQUISTADOR:  player.resources.gold  += 150; break; // gold seekers
+        case CivilizationType.MAPUCHE:       player.resources.wood  += 150; break; // Araucanía forests
       }
       // Difficulty scaling: human player only (Easy bonus, Hard penalty)
       if (isHuman) {
@@ -220,6 +223,7 @@ export class Game {
       case CivilizationType.MAYA:         unit.sight  = Math.min(18,  unit.sight  +  1); break; // astronomical science
       case CivilizationType.INCA:         unit.hp     = Math.min(unit.maxHp, unit.hp + 15); unit.maxHp += 15; break; // highland endurance
       case CivilizationType.CONQUISTADOR: unit.attack = Math.min(Math.round(unit.def.stats.attack * 1.25), unit.attack + 2); break; // steel weapons
+      case CivilizationType.MAPUCHE:      unit.speed  = Math.min(unit.def.stats.speed * 1.3, unit.speed + 0.3); break; // guerrilla mobility
     }
   }
 
@@ -228,6 +232,7 @@ export class Game {
     [CivilizationType.MAYA]:         { name: 'Lady Xoc',       unitType: UnitType.AHAU_WARRIOR   },
     [CivilizationType.INCA]:         { name: 'Pachacuti',      unitType: UnitType.CHAKANA_GUARD  },
     [CivilizationType.CONQUISTADOR]: { name: 'Hernán Cortés',  unitType: UnitType.CAVALRY        },
+    [CivilizationType.MAPUCHE]:      { name: 'Lautaro',        unitType: UnitType.TOQUI          },
   };
 
   private spawnHero(player: Player): Unit | null {

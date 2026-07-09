@@ -107,6 +107,23 @@ export const UNIT_COUNTERS: Record<UnitType, CounterMatrix> = {
   },
   [UnitType.OFFICER]: {},
   [UnitType.DRUMMER]: {},
+  // Mapuches
+  [UnitType.WEICHAFE]: {
+    [UnitType.SLINGER]: { multiplier: 1.2, reason: 'Rápido vs ranged' },
+    [UnitType.ARQUEBUSIER]: { multiplier: 0.7, reason: 'Vulnerable a fuego' },
+  },
+  [UnitType.LANCERO_MAPUCHE]: {
+    [UnitType.CAVALRY]: { multiplier: 1.9, reason: 'Picas de Arauco — la perdición de la caballería' },
+    [UnitType.CANNON]: { multiplier: 0.4, reason: 'Indefenso contra artillería' },
+  },
+  [UnitType.BOLEADORA]: {
+    [UnitType.CAVALRY]: { multiplier: 1.5, reason: 'Boleadoras enredan las patas del caballo' },
+    [UnitType.SOLDIER]: { multiplier: 0.8, reason: 'Armadura resiste el impacto' },
+  },
+  [UnitType.TOQUI]: {
+    [UnitType.SOLDIER]: { multiplier: 1.2, reason: 'El toki quiebra el acero' },
+    [UnitType.CANNON]: { multiplier: 0.35, reason: 'Artillería devastadora' },
+  },
 };
 
 export function getDamageMultiplier(attacker: UnitType, defender: UnitType): number {

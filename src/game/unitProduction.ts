@@ -36,6 +36,11 @@ export const TRAIN_COSTS: Partial<Record<UnitType, TrainCost>> = {
   // Naval — Conquistador
   [UnitType.BRIGANTINE]:    { food: 80,  gold: 120, wood: 150, iron: 20 },
   [UnitType.GALLEON]:       { food: 100, gold: 250, wood: 250, stone: 50, coal: 30, iron: 50 },
+  // Mapuche
+  [UnitType.WEICHAFE]:        { food: 45, gold: 14 },
+  [UnitType.LANCERO_MAPUCHE]: { food: 48, gold: 16 },
+  [UnitType.BOLEADORA]:       { food: 38, gold: 20 },
+  [UnitType.TOQUI]:           { food: 90, gold: 45 },
   // Espiritual
   [UnitType.SHAMAN]:        { food: 80,  gold: 60 },
   [UnitType.MISSIONARY]:    { food: 60,  gold: 80 },
@@ -51,6 +56,7 @@ export const ELITE_UNITS = new Set<UnitType>([
   UnitType.AHAU_WARRIOR, UnitType.BALAM_JAGUAR,  // Maya elite
   UnitType.CAVALRY, UnitType.CANNON,             // Conquistador elite
   UnitType.OFFICER, UnitType.DRUMMER,            // command units (Barracks-trained)
+  UnitType.TOQUI, UnitType.LANCERO_MAPUCHE,      // Mapuche elite
 ]);
 
 export const TRAIN_TIMES: Partial<Record<UnitType, number>> = {
@@ -74,6 +80,10 @@ export const TRAIN_TIMES: Partial<Record<UnitType, number>> = {
   [UnitType.WAR_CANOE]:     28,
   [UnitType.BRIGANTINE]:    40,
   [UnitType.GALLEON]:       70,
+  [UnitType.WEICHAFE]:        13,
+  [UnitType.LANCERO_MAPUCHE]: 14,
+  [UnitType.BOLEADORA]:       11,
+  [UnitType.TOQUI]:           24,
   [UnitType.SHAMAN]:        22,
   [UnitType.MISSIONARY]:    25,
   [UnitType.OFFICER]:       26,

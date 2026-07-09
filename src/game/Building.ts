@@ -131,6 +131,7 @@ export class Building {
       case CivilizationType.MAYA:         return 0xcdbd95;
       case CivilizationType.INCA:         return 0x8d8782;
       case CivilizationType.CONQUISTADOR: return 0xc9bfa6;
+      case CivilizationType.MAPUCHE:      return 0x9a8f7a;
     }
   }
 

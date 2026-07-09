@@ -20,6 +20,7 @@ const CIV_DESCRIPTIONS: Record<CivilizationType, string> = {
   [CivilizationType.INCA]: `El Tawantinsuyu, el vasto Imperio Inca, se extendía por toda la cordillera de los Andes desde Ecuador hasta Chile. Su sistema de caminos, los quipus y su organización militar eran legendarios.`,
   [CivilizationType.MAYA]: `Las ciudades-estado mayas florecieron en Yucatán y Centroamérica con avanzados conocimientos en astronomía, matemáticas y escritura. Sus guerreros son expertos en el terreno selvático.`,
   [CivilizationType.CONQUISTADOR]: `Los soldados españoles y portugueses llegaron al Nuevo Mundo con una ventaja tecnológica decisiva: acero toledano, arcabuces, cañones y caballos. Su objetivo: el oro y la gloria.`,
+  [CivilizationType.MAPUCHE]: `El pueblo indómito del Wallmapu resistió 300 años a los imperios: primero al Inca y luego a España en la Guerra de Arauco. Maestros de la guerrilla, adoptaron la pica y el caballo del enemigo para vencerlo.`,
 };
 
 const CIV_BONUSES: Record<CivilizationType, string[]> = {
@@ -43,6 +44,11 @@ const CIV_BONUSES: Record<CivilizationType, string[]> = {
     '🐎 Caballería: la unidad más rápida del juego',
     '💣 Cañones: destrozan edificios y defensa',
   ],
+  [CivilizationType.MAPUCHE]: [
+    '🪓 Weichafes rápidos, baratos y feroces',
+    '🔱 Lanceros de Arauco: la perdición de la caballería',
+    '🪃 Boleadoras enredan a cualquier unidad — incluso jinetes',
+  ],
 };
 
 const CIV_DIFFICULTY: Record<CivilizationType, string> = {
@@ -50,6 +56,7 @@ const CIV_DIFFICULTY: Record<CivilizationType, string> = {
   [CivilizationType.INCA]:  'Difícil',
   [CivilizationType.MAYA]:  'Fácil',
   [CivilizationType.CONQUISTADOR]: 'Muy Difícil',
+  [CivilizationType.MAPUCHE]: 'Intermedio',
 };
 
 const CIV_PLAYSTYLE: Record<CivilizationType, string> = {
@@ -57,6 +64,7 @@ const CIV_PLAYSTYLE: Record<CivilizationType, string> = {
   [CivilizationType.INCA]:  'Balanceado / Económico',
   [CivilizationType.MAYA]:  'Ranged / Táctico',
   [CivilizationType.CONQUISTADOR]: 'Tecnológico / Control',
+  [CivilizationType.MAPUCHE]: 'Guerrilla / Móvil',
 };
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
@@ -113,6 +121,7 @@ export class CivSelectScreen {
       CivilizationType.INCA,
       CivilizationType.MAYA,
       CivilizationType.CONQUISTADOR,
+      CivilizationType.MAPUCHE,
     ];
 
     grid.innerHTML = '';

@@ -33,6 +33,13 @@ export const STRATEGY_BY_CIV: Record<CivilizationType, StrategyConfig> = {
     unitComposition: [UnitType.QUECHUA, UnitType.SLINGER, UnitType.CHAKANA_GUARD],
     researchPriority: ['AGRICULTURE', 'MINING', 'INCA_ROAD_SYSTEM'],
   },
+  [CivilizationType.MAPUCHE]: {
+    strategy: AIStrategy.AGGRESSIVE,
+    militaryRatio: 0.75,
+    buildOrder: [BuildingType.HOUSE, BuildingType.FARM, BuildingType.BARRACKS, BuildingType.HOUSE, BuildingType.WATCHTOWER, BuildingType.FARM, BuildingType.TEMPLE, BuildingType.MARKET, BuildingType.HARBOR],
+    unitComposition: [UnitType.WEICHAFE, UnitType.LANCERO_MAPUCHE, UnitType.BOLEADORA],
+    researchPriority: ['AGRICULTURE', 'BRONZE_WORKING', 'MILITARY_TACTICS'],
+  },
   [CivilizationType.MAYA]: {
     strategy: AIStrategy.BALANCED,
     militaryRatio: 0.55,

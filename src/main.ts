@@ -51,6 +51,11 @@ const CIV_VETERAN_NAMES: Record<CivilizationType, string[]> = {
     'El Feroz', 'La Lanza', 'Mano Dura', 'El Audaz', 'El Implacable',
     'El Bravo', 'El Temible', 'El Fuerte', 'El Guerrero', 'El Infatigable',
   ],
+  [CivilizationType.MAPUCHE]: [
+    'Caupolicán', 'Galvarino', 'Colocolo', 'Pelantaro', 'Lientur',
+    'Anganamón', 'Curiñancu', 'Millantú', 'Nahuelpán', 'Huentemil',
+    'Lemucaguin', 'Paillamachu', 'Cayeguano', 'Loble', 'Millalelmo',
+  ],
 };
 
 // ── Choice event type ──────────────────────────────────────────────────────────
@@ -621,6 +626,7 @@ class GameInstance {
             [CivilizationType.INCA]:         '🛤️ Caminos del Inca',
             [CivilizationType.MAYA]:         '🔭 Observatorio Maya',
             [CivilizationType.CONQUISTADOR]: '💣 Pólvora Avanzada',
+            [CivilizationType.MAPUCHE]:      '🐎 Doma del Caballo',
           };
           const names: Record<string, string> = {
             metallurgy:    'Metalurgia',
