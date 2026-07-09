@@ -934,7 +934,8 @@ export class HUD {
     const ratioClass = ratio >= 1.15 ? 'ahead' : ratio < 0.87 ? 'behind' : 'even';
 
     el.classList.remove('hidden', 'losing', 'winning');
-    el.classList.add(ratioClass === 'ahead' ? 'winning' : ratioClass === 'behind' ? 'losing' : '');
+    if (ratioClass === 'ahead') el.classList.add('winning');
+    else if (ratioClass === 'behind') el.classList.add('losing');
     el.innerHTML =
       `<span class="ap-icon">⚔️</span>` +
       `<div class="ap-info">` +
@@ -1449,6 +1450,7 @@ export class HUD {
     const idlePulse = 0.5 + 0.5 * Math.sin(Date.now() / 350);
     for (const worker of this.game.allWorkers) {
       const player = this.game.players[worker.playerId];
+      if (!player) continue; // orphan worker (should not happen) — never crash the minimap
       const isIdle = worker.task === WorkerTask.IDLE && worker.playerId === this.game.humanPlayerId;
       ctx.fillStyle = isIdle ? '#ffee44' : hex(CIV_COLORS[player.civType]);
       ctx.globalAlpha = isIdle ? 0.4 + 0.6 * idlePulse : 0.6;
