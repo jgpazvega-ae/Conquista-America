@@ -6,6 +6,7 @@ import { findPath } from './Pathfinding';
 import { BuildingType } from './buildings';
 import { BUILDING_DEFS } from './buildingDefs';
 import { Building } from './Building';
+import { AllianceType } from './Diplomacy';
 import type { Worker } from './Worker';
 import { WorkerTask } from './Worker';
 import { ResourceType } from './ResourceNode';
@@ -141,13 +142,20 @@ export class AISystem {
       const elapsed  = game.gameTime;
       const timeMult = Math.max(0.5, 1.0 - elapsed / 600); // down to 50% at 10 min
       const scale    = timeMult * diffMult;
+      // Wave thresholds must exceed the STARTING army size (~16 units) — the old caps
+      // (8/15) were below it, so every AI opened with an all-out attack at t=0.
       const rallyCap = game.difficulty === 'easy'
-        ? 8
-        : 15 + Math.floor(elapsed / 60) * (game.difficulty === 'hard' ? 3 : 2);
+        ? 20
+        : 24 + Math.floor(elapsed / 60) * (game.difficulty === 'hard' ? 3 : 2);
+      // AC-style buildup: no full attack wave during the opening minutes, regardless of size
+      const firstWaveAt = game.difficulty === 'easy' ? 240 : game.difficulty === 'hard' ? 120 : 180;
 
-      // Check if base is under attack (any owned building damaged below 70% HP)
+      // Check if base is under attack (any COMPLETED building damaged below 70% HP).
+      // Buildings under construction grow hp from 0 and must not trip this alarm —
+      // otherwise every AI flips to panic-defense (and attacks bystanders) the moment
+      // it starts its first construction.
       const baseUnderAttack = game.allBuildings.some(
-        b => b.playerId === player.id && b.isAlive() && b.hp < b.maxHp * 0.7,
+        b => b.playerId === player.id && b.isAlive() && b.isComplete() && b.hp < b.maxHp * 0.7,
       );
 
       // Phase-based attack logic (thresholds use scale factor)
@@ -204,16 +212,20 @@ export class AISystem {
         const milRatio = STRATEGY_BY_CIV[player.civType]?.militaryRatio ?? 0.6;
         const gatherMult = 1.3 - milRatio * 0.7;          // 0.8 (aggressive) .. 1.1 (turtle)
         const rallyMult  = 0.6 + (1 - milRatio) * 0.8;    // ~0.84 (aggressive) .. ~1.2 (turtle)
-        if (state.phaseTimer >= GATHER_DURATION * scale * gatherMult ||
-            player.aliveUnits.length >= Math.round(rallyCap * rallyMult)) {
+        if (game.gameTime >= firstWaveAt &&
+            (state.phaseTimer >= GATHER_DURATION * scale * gatherMult ||
+             player.aliveUnits.length >= Math.round(rallyCap * rallyMult))) {
           state.phase = 'attacking';
           state.phaseTimer = 0;
           // Offensive stance: charge in wedge (+25% atk)
           this.applyFormation(player, 'WEDGE');
-          // First time each AI declares war on the human player
+          // First time each AI declares war on the human player — this SETS the relation
+          // (it used to be a notification only, while everyone already spawned at ENEMY)
           const key = `${player.id}→${game.humanPlayerId}`;
           if (!this._warDeclared.has(key)) {
             this._warDeclared.add(key);
+            game.diplomacy.setRelation(player.id, game.humanPlayerId, AllianceType.ENEMY);
+            game.diplomacy.setRelation(game.humanPlayerId, player.id, AllianceType.ENEMY);
             game.newWarDeclarations.push({ fromPlayerId: player.id, toPlayerId: game.humanPlayerId });
           }
         }
@@ -435,7 +447,8 @@ export class AISystem {
       if (idleCavalry.length >= 2) {
         const raidTarget = game.allBuildings
           .filter(b =>
-            b.playerId !== player.id && b.playerId >= 0 && b.isAlive() && b.isComplete() &&
+            b.playerId !== player.id && b.playerId >= 0 && game.diplomacy.isEnemy(player.id, b.playerId) &&
+            b.isAlive() && b.isComplete() &&
             b.type !== BuildingType.SETTLEMENT && b.type !== BuildingType.WONDER &&
             b.type !== BuildingType.VILLAGE,
           )
@@ -504,7 +517,7 @@ export class AISystem {
     }
 
     const damagedBuilding = game.allBuildings
-      .filter(b => b.playerId === player.id && b.isAlive() && b.hp < b.maxHp * 0.85)
+      .filter(b => b.playerId === player.id && b.isAlive() && b.isComplete() && b.hp < b.maxHp * 0.85)
       .sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0]; // most-damaged first
     if (!damagedBuilding) return;
 
@@ -1092,13 +1105,16 @@ export class AISystem {
     );
     if (raiders.length === 0) return;
 
+    // Raids only strike players we are AT WAR with — neutral raids would silently
+    // start wars during the AC-style peaceful opening.
+    const atWar = (pid: number) => pid >= 0 && game.diplomacy.isEnemy(player.id, pid);
     // Priority 1: enemy workers within sight
-    const enemyWorkers = game.allWorkers.filter(w => w.playerId !== player.id);
+    const enemyWorkers = game.allWorkers.filter(w => w.playerId !== player.id && atWar(w.playerId));
     // Priority 2: enemy resource nodes (deny the enemy their economy)
     const enemyNodes = game.resourceNodes.filter(n => !n.isEmpty());
     // Priority 3: isolated enemy units (no ally within 5 tiles)
     const enemyUnits = game.allUnits.filter(u =>
-      u.playerId !== player.id && u.isAlive() && u.garrisonedIn === null,
+      u.playerId !== player.id && u.isAlive() && u.garrisonedIn === null && atWar(u.playerId),
     );
 
     for (const raider of raiders) {

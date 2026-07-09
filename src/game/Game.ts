@@ -26,12 +26,15 @@ import { TRAIN_COSTS } from './unitProduction';
 
 // Positions aligned to the real-geography map:
 // Mexico (top-center), Yucatan (top-right), Peru/Andes (mid-left), Caribbean (mid-right)
+// Every position verified walkable (≥12 open tiles in a 5×5) across 10 map seeds by a
+// headless scan — the old INCA spot [19,36] fell on the impassable Andes ridge after the
+// real-geography map rewrite, spawning the Inca with ZERO units (instant elimination).
 const START_POSITIONS: Record<CivilizationType, [number, number]> = {
-  [CivilizationType.AZTEC]:        [28,  8],   // Mexican highlands
-  [CivilizationType.MAYA]:         [38, 14],   // Yucatan peninsula
-  [CivilizationType.INCA]:         [19, 36],   // Peruvian Andes
-  [CivilizationType.CONQUISTADOR]: [46, 24],   // Caribbean coast
-  [CivilizationType.MAPUCHE]:      [29, 60],   // Araucanía / southern cone (verified walkable across seeds)
+  [CivilizationType.AZTEC]:        [23, 14],   // central Mexico (clear of the map's north edge)
+  [CivilizationType.MAYA]:         [41, 11],   // Yucatan peninsula
+  [CivilizationType.INCA]:         [29, 34],   // upper Amazon, east of the Andes ridge
+  [CivilizationType.CONQUISTADOR]: [48, 28],   // Caribbean coast
+  [CivilizationType.MAPUCHE]:      [26, 57],   // Araucanía / southern cone
 };
 
 export type GameStatus = 'PLAYING' | 'VICTORY' | 'DEFEAT';
@@ -51,7 +54,7 @@ export class Game {
   weatherChangeEvent: WeatherState | null = null; // set when weather changes this frame
   private economy       = new EconomyManager();
   getEconomyStats(playerId: number) { return this.economy.getStats(playerId); }
-  private diplomacy     = new DiplomacyManager();
+  readonly diplomacy    = new DiplomacyManager();
   readonly fog: FogOfWarManager;
   readonly objectives: ObjectiveSystem;
 
@@ -150,7 +153,7 @@ export class Game {
 
   constructor(
     humanCiv: CivilizationType = CivilizationType.AZTEC,
-    opts: { numAI?: number; mapSeed?: number; difficulty?: 'easy' | 'normal' | 'hard'; aiCivs?: CivilizationType[] } = {},
+    opts: { numAI?: number; mapSeed?: number; difficulty?: 'easy' | 'normal' | 'hard'; aiCivs?: CivilizationType[]; startAtWar?: boolean } = {},
   ) {
     this.numAI     = opts.aiCivs ? opts.aiCivs.length : (opts.numAI ?? 3);
     this._aiCivsOverride = opts.aiCivs ?? null;
@@ -161,7 +164,15 @@ export class Game {
     this.generateResourceNodes();
     this.spawnInitialBuildings();
     this.spawnNeutralVillages();
-    this.diplomacy.init();
+    this.diplomacy.init(this.players.length);
+    // Historical scenarios are battles already underway — the matchup starts at war
+    if (opts.startAtWar) {
+      for (const p of this.players) {
+        if (p.isHuman) continue;
+        this.diplomacy.setRelation(this.humanPlayerId, p.id, AllianceType.ENEMY);
+        this.diplomacy.setRelation(p.id, this.humanPlayerId, AllianceType.ENEMY);
+      }
+    }
     this.fog = new FogOfWarManager(this.players.length);
     this.objectives = new ObjectiveSystem(this);
     this.generateTreasureCaches();
@@ -280,6 +291,21 @@ export class Game {
       while (pos && occupied.has(`${pos[0]},${pos[1]}`) && guard < 12) {
         pos = this.map.findWalkableNear(targetCol + (guard % 3) - 1, targetRow + Math.floor(guard / 3), 4);
         guard++;
+      }
+      // Guaranteed placement: cramped/edge terrain must never silently swallow start
+      // units (the Aztec spawn once dropped to 4 units this way) — widen around the base.
+      if (!pos || occupied.has(`${pos[0]},${pos[1]}`)) {
+        for (let radius = 3; radius <= 14 && (!pos || occupied.has(`${pos[0]},${pos[1]}`)); radius += 2) {
+          pos = this.map.findWalkableNear(baseCol + ((placed * 7) % 5) - 2, baseRow + ((placed * 3) % 5) - 2, radius);
+          if (pos && occupied.has(`${pos[0]},${pos[1]}`)) {
+            let found: [number, number] | null = null;
+            for (let dc = -radius; dc <= radius && !found; dc++) for (let dr = -radius; dr <= radius && !found; dr++) {
+              const cc = baseCol + dc, rr = baseRow + dr;
+              if (this.map.isWalkable(cc, rr) && !occupied.has(`${cc},${rr}`)) found = [cc, rr];
+            }
+            pos = found;
+          }
+        }
       }
       if (!pos) continue;
       occupied.add(`${pos[0]},${pos[1]}`);
@@ -438,7 +464,9 @@ export class Game {
     return this.players[this.humanPlayerId];
   }
 
-  get dayT(): number { return (this.gameTime % 480) / 480; }
+  /** Day cycle 0..1. Offset so matches begin at DAWN (0.2) — a 0-offset cycle put the
+   *  first 72 seconds of every game in pitch-black night ("the screen is just stars"). */
+  get dayT(): number { return ((this.gameTime + 96) % 480) / 480; }
   get isNight(): boolean { const d = this.dayT; return d > 0.75 || d < 0.15; }
   get allianceRewardTimer(): number { return this._allianceRewardTimer; }
   get explorationPercent(): number { return this.fog.explorationPercent(this.humanPlayerId); }
@@ -915,7 +943,24 @@ export class Game {
     this.weatherChangeEvent = this.weather.update(dt);
     // Wet ground slows movement: rain 0.9×, storm 0.8×, otherwise normal
     Unit.weatherSpeedMult = this.weather.state === 'STORM' ? 0.8 : this.weather.state === 'RAIN' ? 0.9 : 1.0;
-    this.damageEvents = this.combat.update(this.allUnits, this.map, this.weather, this.isNight);
+    this.damageEvents = this.combat.update(this.allUnits, this.map, this.weather, this.isNight, this.gameTime,
+      (a, b) => this.diplomacy.isEnemy(a, b));
+
+    // First blood between neutral players is a de-facto declaration of war (AC style)
+    for (const evt of this.damageEvents) {
+      if (!evt.attacker || !evt.target) continue;
+      const a = evt.attacker.playerId, t = evt.target.playerId;
+      if (a === t || a < 0 || t < 0) continue;
+      if (this.diplomacy.getRelation(a, t) === AllianceType.NEUTRAL) {
+        this.diplomacy.setRelation(a, t, AllianceType.ENEMY);
+        this.diplomacy.setRelation(t, a, AllianceType.ENEMY);
+        if (a === this.humanPlayerId || t === this.humanPlayerId) {
+          const other = this.players[a === this.humanPlayerId ? t : a];
+          const name = other ? CIVILIZATIONS[other.civType].name : 'El enemigo';
+          this.pendingEventMessages.push(`⚔️ ¡Guerra con ${name}!`);
+        }
+      }
+    }
 
     // Track kills per player from this frame's damage events
     for (const evt of this.damageEvents) {
@@ -1441,7 +1486,7 @@ export class Game {
     this.applyBuildingBonuses(dt);
 
     // Sight reduced by 40% at night (day cycle 0.75–1.0 and 0.0–0.15)
-    const dayT = (this.gameTime % 480) / 480;
+    const dayT = this.dayT;
     const isNight = dayT > 0.75 || dayT < 0.15;
     if (this.stormTimer > 0) this.stormTimer -= dt;
     const stormMult = this.stormTimer > 0 ? 0.5 : 1.0;
@@ -1949,7 +1994,13 @@ export class Game {
     }
   }
 
+  /** Deployment truce (s): armies settling into formation must not auto-aggro across
+   *  players — neighbouring starts (Aztec/Maya are 12 tiles apart, as in geography)
+   *  otherwise cascade into total war at second 0. Manual orders are unaffected. */
+  private static readonly DEPLOYMENT_TRUCE = 25;
+
   private runAutoAttack() {
+    if (this.gameTime < Game.DEPLOYMENT_TRUCE) return;
     for (const unit of this.allUnits) {
       if (!unit.isAlive()) continue;
       // HOLD units silently re-acquire nearest in-range enemy after each kill (no movement)
@@ -1959,6 +2010,7 @@ export class Game {
         let bestDist = unit.attackRange + 1.5;
         for (const e of this.allUnits) {
           if (!e.isAlive() || e.playerId === unit.playerId) continue;
+          if (!this.diplomacy.isEnemy(unit.playerId, e.playerId)) continue;
           const d = unit.distanceTo(e);
           if (d < bestDist) { bestDist = d; best = e; }
         }
@@ -1976,6 +2028,7 @@ export class Game {
       const effectiveSight = unit.sight * sightMult;
       for (const enemy of this.allUnits) {
         if (!enemy.isAlive() || enemy.playerId === unit.playerId) continue;
+        if (!this.diplomacy.isEnemy(unit.playerId, enemy.playerId)) continue; // only at war (AC style)
         const d = unit.distanceTo(enemy);
         if (d > effectiveSight) continue;
         const score =
@@ -1991,6 +2044,8 @@ export class Game {
       let bestBldgDist = unit.sight * 0.8; // slightly shorter range for buildings
       for (const b of this.allBuildings) {
         if (!b.isAlive() || b.playerId === unit.playerId) continue;
+        // Neutral villages are for CAPTURING, not auto-razing; other buildings need a war
+        if (b.playerId < 0 || !this.diplomacy.isEnemy(unit.playerId, b.playerId)) continue;
         const d = Math.sqrt((unit.col - b.col) ** 2 + (unit.row - b.row) ** 2);
         if (d < bestBldgDist) { bestBldgDist = d; bestBldg = b; }
       }
@@ -2204,6 +2259,7 @@ export class Game {
         let nearestDist = range;
         for (const e of this.allUnits) {
           if (!e.isAlive() || e.playerId === b.playerId || e.garrisonedIn !== null) continue;
+          if (b.playerId >= 0 && e.playerId >= 0 && !this.diplomacy.isEnemy(b.playerId, e.playerId)) continue;
           const d = Math.sqrt((e.col - b.col) ** 2 + (e.row - b.row) ** 2);
           if (d < nearestDist) { nearestDist = d; nearest = e; }
         }

@@ -18,6 +18,8 @@ export interface ScenarioDef {
   aiBonus?: { food?: number; gold?: number; stone?: number; wood?: number; coal?: number; iron?: number };
   /** Intro line shown in the HUD when the scenario begins. */
   intro: string;
+  /** Battles already underway start at war (skips the neutral opening). */
+  startAtWar?: boolean;
 }
 
 export const SCENARIOS: ScenarioDef[] = [
@@ -35,6 +37,7 @@ export const SCENARIOS: ScenarioDef[] = [
     mapSeed: 15211,
     humanBonus: { food: 300, stone: 200 },          // the island city's granaries and causeways
     aiBonus:    { gold: 300, coal: 150, iron: 200 }, // Cortés' armory: powder and steel
+    startAtWar: true,
     intro: '🏯 Tenochtitlán, 1521 — ¡Cortés avanza sobre la ciudad! Resiste el asedio y expulsa al invasor.',
   },
   {
@@ -51,6 +54,7 @@ export const SCENARIOS: ScenarioDef[] = [
     mapSeed: 15322,
     humanBonus: { stone: 300, food: 200 },           // Andean strongholds and terraced farms
     aiBonus:    { gold: 250, coal: 120, iron: 180 },  // Pizarro's small but deadly expedition
+    startAtWar: true,
     intro: '⛰️ Cajamarca, 1532 — ¡Emboscada! Pizarro ataca sin aviso. Reagrupa al Tawantinsuyu y resiste.',
   },
   {
@@ -67,6 +71,7 @@ export const SCENARIOS: ScenarioDef[] = [
     mapSeed: 15201,
     humanBonus: { gold: 400, coal: 100, iron: 120 },  // the looted treasure of Moctezuma
     aiBonus:    { food: 500, stone: 200 },            // the roused Mexica host
+    startAtWar: true,
     intro: '🌙 La Noche Triste, 1520 — Huyes de Tenochtitlán con el tesoro. ¡Los mexicas vienen por ti!',
   },
   {
@@ -83,6 +88,7 @@ export const SCENARIOS: ScenarioDef[] = [
     mapSeed: 15202,
     humanBonus: { food: 400, gold: 150 },             // the full levy of the Triple Alliance
     aiBonus:    { iron: 100, coal: 80 },              // battered but disciplined survivors
+    startAtWar: true,
     intro: '🌾 Otumba, 1520 — El invasor está herido y sin pólvora. ¡Acaba con él antes de que se recupere!',
   },
   {
@@ -99,6 +105,7 @@ export const SCENARIOS: ScenarioDef[] = [
     mapSeed: 15721,
     humanBonus: { food: 300, wood: 300 },             // jungle refuge: timber and hidden crops
     aiBonus:    { gold: 400, coal: 200, iron: 250 },  // the viceroy's fully equipped expedition
+    startAtWar: true,
     intro: '🌿 Vilcabamba, 1572 — La última ciudad libre del Tawantinsuyu. ¡Resiste o desaparece de la historia!',
   },
 ];
