@@ -96,6 +96,7 @@ export class Game {
   pendingEventMessages: string[] = [];
   private _eventTimer = 60 + Math.random() * 60;
   private _autoAttackTimer = 0;
+  private _proximityTimer  = 0.5; // fire the proximity pass on the very first frame
   private _bonusTimer = 0;
   stormTimer = 0;            // seconds remaining in tropical storm
   private _approachTimer = 0; // throttle for enemy-approach notifications
@@ -492,34 +493,43 @@ export class Game {
       }
     }
 
+    // Proximity flags change slowly (units cross a tile in ~0.3s+), so the O(units × buildings)
+    // and O(units²) passes below run at 2 Hz instead of every frame — key for large battles.
+    this._proximityTimer += dt;
+    const updateProximity = this._proximityTimer >= 0.5;
+    if (updateProximity) this._proximityTimer = 0;
+
     for (const unit of this.allUnits) {
-      // Near settlement (4 tiles) OR near temple (5 tiles) → boosted healing & morale regen
-      const settlements = settlementsByPlayer.get(unit.playerId) ?? [];
-      const temples     = templesByPlayer.get(unit.playerId)     ?? [];
-      unit._nearSettlement = settlements.some(
-        s => Math.abs(unit.col - s.col) <= 4 && Math.abs(unit.row - s.row) <= 4,
-      ) || temples.some(
-        t => Math.abs(unit.col - t.col) <= 5 && Math.abs(unit.row - t.row) <= 5,
-      );
-      // Storehouses act as field supply depots — within 4 tiles replenishes ammo
-      const storehouses = storehousesByPlayer.get(unit.playerId) ?? [];
-      unit._nearSupplyDepot = storehouses.some(
-        s => Math.abs(unit.col - s.col) <= 4 && Math.abs(unit.row - s.row) <= 4,
-      );
-      // Isolated penalty: no friendly alive unit within 6 tiles → half morale regen
-      const allyUnits = unitsByPlayer.get(unit.playerId) ?? [];
-      unit._isolated = allyUnits.filter(u => u !== unit && u.isAlive()).every(
-        ally => Math.abs(unit.col - ally.col) > 6 || Math.abs(unit.row - ally.row) > 6,
-      );
-      // Supply line: calculate distance to nearest friendly building (for stat penalties)
-      let minSupplyDist = Infinity;
-      for (const bldg of this.allBuildings) {
-        if (bldg.playerId === unit.playerId && bldg.isAlive()) {
-          const d = Math.sqrt((unit.col - bldg.col) ** 2 + (unit.row - bldg.row) ** 2);
-          if (d < minSupplyDist) minSupplyDist = d;
+      if (updateProximity) {
+        // Near settlement (4 tiles) OR near temple (5 tiles) → boosted healing & morale regen
+        const settlements = settlementsByPlayer.get(unit.playerId) ?? [];
+        const temples     = templesByPlayer.get(unit.playerId)     ?? [];
+        unit._nearSettlement = settlements.some(
+          s => Math.abs(unit.col - s.col) <= 4 && Math.abs(unit.row - s.row) <= 4,
+        ) || temples.some(
+          t => Math.abs(unit.col - t.col) <= 5 && Math.abs(unit.row - t.row) <= 5,
+        );
+        // Storehouses act as field supply depots — within 4 tiles replenishes ammo
+        const storehouses = storehousesByPlayer.get(unit.playerId) ?? [];
+        unit._nearSupplyDepot = storehouses.some(
+          s => Math.abs(unit.col - s.col) <= 4 && Math.abs(unit.row - s.row) <= 4,
+        );
+        // Isolated penalty: no friendly alive unit within 6 tiles → half morale regen
+        const allyUnits = unitsByPlayer.get(unit.playerId) ?? [];
+        unit._isolated = !allyUnits.some(
+          ally => ally !== unit && ally.isAlive() &&
+                  Math.abs(unit.col - ally.col) <= 6 && Math.abs(unit.row - ally.row) <= 6,
+        );
+        // Supply line: calculate distance to nearest friendly building (for stat penalties)
+        let minSupplyDist = Infinity;
+        for (const bldg of this.allBuildings) {
+          if (bldg.playerId === unit.playerId && bldg.isAlive()) {
+            const d = Math.sqrt((unit.col - bldg.col) ** 2 + (unit.row - bldg.row) ** 2);
+            if (d < minSupplyDist) minSupplyDist = d;
+          }
         }
+        unit.supplyDist = minSupplyDist === Infinity ? 0 : minSupplyDist;
       }
-      unit.supplyDist = minSupplyDist === Infinity ? 0 : minSupplyDist;
       unit.update(dt, this.map);
 
       // Hero death → start respawn countdown (60s)
@@ -2450,7 +2460,9 @@ export class Game {
     const villages = this.allBuildings.filter(
       b => b.playerId === playerId && b.type === BuildingType.VILLAGE && b.isAlive(),
     ).length;
-    return 20 + houses * 12 + storehouses * 5 + villages * 5;
+    // Larger battles (AC scale): raised from 20 + 12/house + 5 after the 2 Hz
+    // proximity-pass optimization freed the per-frame budget.
+    return 30 + houses * 14 + storehouses * 6 + villages * 5;
   }
 
   applyUpgrade(upgrade: keyof import('./Player').PlayerUpgrades, playerId: number): boolean {
