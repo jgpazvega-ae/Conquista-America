@@ -85,6 +85,29 @@ export class FogOfWar {
     }
   }
 
+  /** Serialize explored memory as a row-major '0'/'1' string (for mid-game saves). */
+  exportMemory(): string {
+    let out = '';
+    for (let r = 0; r < MAP_ROWS; r++) {
+      for (let c = 0; c < MAP_COLS; c++) out += this.playerMemory[r][c] > 0 ? '1' : '0';
+    }
+    return out;
+  }
+
+  importMemory(s: string) {
+    if (s.length < MAP_ROWS * MAP_COLS) return;
+    for (let r = 0; r < MAP_ROWS; r++) {
+      for (let c = 0; c < MAP_COLS; c++) {
+        if (s[r * MAP_COLS + c] === '1') {
+          this.playerMemory[r][c] = 1;
+          if (this.playerVisibility[r][c] === TileVisibility.UNEXPLORED) {
+            this.playerVisibility[r][c] = TileVisibility.FOGGED;
+          }
+        }
+      }
+    }
+  }
+
   getVisibility(col: number, row: number): TileVisibility {
     if (col < 0 || col >= MAP_COLS || row < 0 || row >= MAP_ROWS) return TileVisibility.UNEXPLORED;
     return this.playerVisibility[row][col];

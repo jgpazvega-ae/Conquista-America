@@ -24,6 +24,8 @@ import { findPath } from './game/Pathfinding';
 import { WorkerTask } from './game/Worker';
 import type { Difficulty } from './ui/CivSelect';
 import type { ScenarioDef } from './game/Scenarios';
+import { serializeGame, storeSave, loadSave, clearSave } from './game/SaveGame';
+import type { SaveData } from './game/SaveGame';
 import { TECH_DEFS, TechType } from './game/Tech';
 import { activateCivPower, CIV_POWER_DEFS } from './game/CivPowers';
 import { AllianceType } from './game/Diplomacy';
@@ -107,6 +109,7 @@ async function boot() {
   // If already logged in (remembered session), skip auth
   if (saveSystem.isLoggedIn()) {
     const sess = saveSystem.getSession()!;
+    authScreen.hide(); // the auth screen is visible by default in the markup — it must not cover civ-select
     showCivSelect(civSelect, sess.civType);
   } else {
     authScreen.show();
@@ -123,6 +126,24 @@ async function boot() {
     civSelect.hide();
     narrative.play(civ, () => { startGame(civ, diff, numAI).catch(showFatalError); });
   });
+
+  // Mid-game save: offer to resume (AC style). Shown in the civ-select footer.
+  const savedGame = loadSave();
+  if (savedGame) {
+    const row = document.getElementById('scenario-row');
+    if (row) {
+      const btn = document.createElement('button');
+      btn.className = 'auth-btn primary sm';
+      const mins = Math.floor(savedGame.gameTime / 60);
+      btn.textContent = `💾 Continuar partida (min ${mins})`;
+      btn.style.cssText = 'padding:6px 14px;font-size:0.85rem;';
+      btn.addEventListener('click', () => {
+        civSelect.hide();
+        startGame(savedGame.humanCiv, savedGame.difficulty, 3, undefined, savedGame).catch(showFatalError);
+      });
+      row.prepend(btn);
+    }
+  }
 
   civSelect.setOnStartScenario((sc) => {
     civSelect.hide();
@@ -155,7 +176,7 @@ function showFatalError(err: unknown) {
 }
 
 // ── Game lifecycle ─────────────────────────────────────────────────────────────
-async function startGame(civ: CivilizationType, difficulty: Difficulty = 'normal', numAI = 3, scenario?: ScenarioDef) {
+async function startGame(civ: CivilizationType, difficulty: Difficulty = 'normal', numAI = 3, scenario?: ScenarioDef, restore?: SaveData) {
   // WebGL availability check — fail fast with a clear message
   const testCanvas = document.createElement('canvas');
   const gl = testCanvas.getContext('webgl2') ?? testCanvas.getContext('webgl');
@@ -171,7 +192,7 @@ async function startGame(civ: CivilizationType, difficulty: Difficulty = 'normal
     activeGame = null;
   }
 
-  activeGame = new GameInstance(civ, saveSystem, difficulty, numAI, scenario);
+  activeGame = new GameInstance(civ, saveSystem, difficulty, numAI, scenario, restore);
   await activeGame.init();
 }
 
@@ -268,20 +289,26 @@ class GameInstance {
 
   private numAI: number;
   private _scenario: ScenarioDef | null = null;
+  private _restore: SaveData | null = null;
+  private _autosaveTimer = 60;
 
-  constructor(civ: CivilizationType, saveSystem: SaveSystem, difficulty: Difficulty = 'normal', numAI = 3, scenario?: ScenarioDef) {
+  constructor(civ: CivilizationType, saveSystem: SaveSystem, difficulty: Difficulty = 'normal', numAI = 3, scenario?: ScenarioDef, restore?: SaveData) {
     this.civ        = civ;
     this.saveSystem = saveSystem;
     this.difficulty = difficulty;
     this.numAI      = numAI;
     this._scenario  = scenario ?? null;
+    this._restore   = restore ?? null;
   }
 
   async init() {
     const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
 
-    // Override human player's civilization; scenarios force map seed and enemy civs
-    this.game = this._scenario
+    // Override human player's civilization; scenarios force map seed and enemy civs;
+    // a mid-game save restores the whole match instead.
+    this.game = this._restore
+      ? new Game(this._restore.humanCiv, { restore: this._restore })
+      : this._scenario
       ? new Game(this.civ, { difficulty: this._scenario.difficulty, mapSeed: this._scenario.mapSeed, aiCivs: this._scenario.aiCivs, startAtWar: this._scenario.startAtWar })
       : new Game(this.civ, { difficulty: this.difficulty, numAI: this.numAI });
     // Scenario flavor: apply starting-resource bonuses that recreate the historical matchup
@@ -311,6 +338,11 @@ class GameInstance {
     this.audio     = new AudioManager();
     this.prodPanel = new ProductionPanel();
     this.settings  = new SettingsPanel(this.saveSystem);
+    document.getElementById('save-game-btn')?.addEventListener('click', () => {
+      if (this.destroyed || this.game.status !== 'PLAYING') return;
+      const ok = storeSave(serializeGame(this.game));
+      this.hud.notify(ok ? '💾 Partida guardada' : '⚠️ No se pudo guardar (almacenamiento lleno)', ok ? 'success' : 'warning');
+    });
 
     this.input.onSelectionChange = () => {
       const sel = this.input.getSelectedUnits();
@@ -848,6 +880,9 @@ class GameInstance {
     if (this._scenario) {
       this.hud.notify(this._scenario.intro, 'warning');
     }
+    if (this._restore) {
+      this.hud.notify(`💾 Partida restaurada — minuto ${Math.floor(this.game.gameTime / 60)}`, 'success');
+    }
 
     // Auto-hide controls hint
     setTimeout(() => {
@@ -867,6 +902,16 @@ class GameInstance {
 
     this.updateFpsCounter(rawDt);
     if (this._tradeCooldown > 0) this._tradeCooldown = Math.max(0, this._tradeCooldown - rawDt);
+
+    // Autosave (AC style): persist the whole match every 60 s so a tab reload never
+    // loses the game — critical on mobile where Safari evicts tabs constantly.
+    if (this.game.status === 'PLAYING') {
+      this._autosaveTimer -= rawDt;
+      if (this._autosaveTimer <= 0) {
+        this._autosaveTimer = 60;
+        storeSave(serializeGame(this.game));
+      }
+    }
     if (this._starvWarnTimer    > 0) this._starvWarnTimer    = Math.max(0, this._starvWarnTimer    - rawDt);
     if (this._ambushWarnTimer   > 0) this._ambushWarnTimer   = Math.max(0, this._ambushWarnTimer   - rawDt);
     if (this._nightAttackTimer  > 0) this._nightAttackTimer  = Math.max(0, this._nightAttackTimer  - rawDt);
@@ -1755,11 +1800,11 @@ class GameInstance {
       this.hud.notify(`🏃 ${humanRetreats.length > 1 ? `${humanRetreats.length} unidades retroceden` : 'Unidad retrocediendo'}`, 'warning');
     }
 
-    // Economic victory approach warning (at 75% of 800 gold target)
+    // Economic victory approach warning (at 75% of the gold target)
     const goldNow = this.game.humanPlayer.resources.gold;
-    if (!this._treasuryWarned75 && goldNow >= 600) {
+    if (!this._treasuryWarned75 && goldNow >= Game.ECONOMIC_VICTORY_GOLD * 0.75) {
       this._treasuryWarned75 = true;
-      this.hud.notify('💰 ¡75% hacia la victoria económica! Acumula 800 ⚜️ oro', 'info');
+      this.hud.notify(`💰 ¡75% hacia la victoria económica! Acumula ${Game.ECONOMIC_VICTORY_GOLD} ⚜️ oro`, 'info');
     }
 
     // Idle worker warning: notify every 30 s of game time while workers are idle
@@ -1973,6 +2018,7 @@ class GameInstance {
   }
 
   private showEndScreen(won: boolean, seconds: number) {
+    clearSave(); // the match is over — a finished game must not be resumable
     const screen = document.getElementById('endgame-screen')!;
     const icon   = document.getElementById('endgame-icon')!;
     const title  = document.getElementById('endgame-title')!;

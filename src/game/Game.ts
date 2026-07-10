@@ -85,7 +85,9 @@ export class Game {
   private _heroRespawnTimers = new Map<number, number>(); // playerId → seconds until respawn
   status: GameStatus = 'PLAYING';
   victoryType: 'MILITARY' | 'ECONOMIC' | 'WONDER' = 'MILITARY';
-  static readonly ECONOMIC_VICTORY_GOLD = 800;
+  // Full treasury (the 2000 resource cap): with the current economy the old 800 target
+  // was reached passively in ~1-2 minutes, ending every match on its own.
+  static readonly ECONOMIC_VICTORY_GOLD = 2000;
   static readonly WONDER_VICTORY_DURATION = 180;
   wonderCountdown: number | null = null;
   private _wonderWasAlive = false;
@@ -153,17 +155,22 @@ export class Game {
 
   constructor(
     humanCiv: CivilizationType = CivilizationType.AZTEC,
-    opts: { numAI?: number; mapSeed?: number; difficulty?: 'easy' | 'normal' | 'hard'; aiCivs?: CivilizationType[]; startAtWar?: boolean } = {},
+    opts: { numAI?: number; mapSeed?: number; difficulty?: 'easy' | 'normal' | 'hard'; aiCivs?: CivilizationType[]; startAtWar?: boolean; restore?: import('./SaveGame').SaveData } = {},
   ) {
     this.numAI     = opts.aiCivs ? opts.aiCivs.length : (opts.numAI ?? 3);
     this._aiCivsOverride = opts.aiCivs ?? null;
     this.mapSeed   = opts.mapSeed   ?? (Math.floor(Math.random() * 999983) + 1);
     this.difficulty = opts.difficulty ?? 'normal';
+    if (opts.restore) this.mapSeed = opts.restore.mapSeed;
     this.map = new GameMap(this.mapSeed);
+    if (opts.restore) {
+      this.restoreFrom(opts.restore);
+    } else {
     this.spawnPlayers(humanCiv);
     this.generateResourceNodes();
     this.spawnInitialBuildings();
     this.spawnNeutralVillages();
+    }
     this.diplomacy.init(this.players.length);
     // Historical scenarios are battles already underway — the matchup starts at war
     if (opts.startAtWar) {
@@ -173,9 +180,17 @@ export class Game {
         this.diplomacy.setRelation(p.id, this.humanPlayerId, AllianceType.ENEMY);
       }
     }
+    if (opts.restore) {
+      // Saved relations override the neutral defaults
+      for (const rel of opts.restore.relations) this.diplomacy.setRelation(rel.a, rel.b, rel.rel);
+    }
     this.fog = new FogOfWarManager(this.players.length);
+    if (opts.restore) {
+      this.fog.getFog(this.humanPlayerId)?.importMemory(opts.restore.fog);
+      this.gameTime = opts.restore.gameTime;
+    }
     this.objectives = new ObjectiveSystem(this);
-    this.generateTreasureCaches();
+    if (!opts.restore) this.generateTreasureCaches();
 
     // Gunpowder economy (AC style): each arquebus round costs 1⚫+1🔩; each cannonball 3⚫+3🔩
     Unit.tryConsumeGunpowder = (playerId: number, unitType: UnitType) => {
@@ -386,6 +401,77 @@ export class Game {
       (village as any).state = 'COMPLETE';
       village.progressBar.visible = false;
       this.allBuildings.push(village);
+    }
+  }
+
+  /** Rebuild the full match from a mid-game save (see SaveGame.ts). */
+  private restoreFrom(data: import('./SaveGame').SaveData) {
+    this.difficulty = data.difficulty;
+
+    // Players
+    data.players.forEach((pd, idx) => {
+      const player = new Player(idx, pd.civ, pd.isHuman);
+      player.resources = { ...pd.resources };
+      player.upgrades  = { ...pd.upgrades };
+      this.players.push(player);
+    });
+
+    // Buildings first (units may be garrisoned inside them)
+    const buildingByIndex: Building[] = [];
+    for (const bd of data.buildings) {
+      const civColor = bd.p >= 0 ? CIV_COLORS[this.players[bd.p]?.civType ?? bd.civ] : 0x8a9a60;
+      const b = new Building(bd.t, BUILDING_DEFS[bd.t], bd.p, bd.c, bd.r, civColor, bd.civ);
+      b.buildProgress = bd.prog;
+      b.hp = bd.hp;
+      if (bd.prog >= 1) {
+        b.state = 'COMPLETE' as any;
+        b.progressBar.visible = false;
+      }
+      if (bd.t === BuildingType.WALL) this.map.blockTile(bd.c, bd.r);
+      this.allBuildings.push(b);
+      buildingByIndex.push(b);
+    }
+
+    // Units
+    for (const ud of data.units) {
+      const player = this.players[ud.p];
+      if (!player) continue;
+      const u = new Unit(ud.t, player.civType, ud.p, ud.c, ud.r, CIV_COLORS[player.civType]);
+      u.maxHp = ud.mhp; u.hp = Math.min(ud.hp, ud.mhp);
+      u.attack = ud.atk; u.defense = ud.def; u.speed = ud.spd;
+      u.attackRange = ud.rng; u.sight = ud.sgt; u.attackCooldown = ud.cd;
+      u.xp = ud.xp; u.level = ud.lvl; u.ammo = ud.ammo; u.maxAmmo = ud.mammo; u.morale = ud.mor;
+      if (ud.hero) u.markAsHero(ud.hero);
+      if (ud.g !== undefined && buildingByIndex[ud.g]) {
+        const host = buildingByIndex[ud.g];
+        host.garrison.push(u);
+        u.garrisonedIn = host.id;
+        u.mesh.visible = false;
+      }
+      player.addUnit(u);
+      this.allUnits.push(u);
+    }
+
+    // Workers
+    for (const wd of data.workers) {
+      const player = this.players[wd.p];
+      if (!player) continue;
+      this.allWorkers.push(new Worker(wd.p, wd.c, wd.r, CIV_COLORS[player.civType]));
+    }
+
+    // Resource nodes (their layout is random at generation, so they are saved verbatim)
+    for (const nd of data.nodes) {
+      const n = new ResourceNode(nd.t, nd.c, nd.r, nd.max);
+      n.amount = nd.amt;
+      n.updateVisibility();
+      this.resourceNodes.push(n);
+    }
+
+    // Treasure caches and allied villages
+    this.treasureCaches.push(...data.caches.map(cch => ({ ...cch })));
+    for (const idx of data.allianceVillages) {
+      const b = buildingByIndex[idx];
+      if (b) this.allianceVillages.add(b.id);
     }
   }
 
