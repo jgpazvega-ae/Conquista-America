@@ -30,8 +30,10 @@ export class RTSCamera {
   private _rightDragDist = 0; // accumulated pixels dragged; reset on mousedown
 
   // Edge pan
-  private mouseX = 0;
-  private mouseY = 0;
+  // Start at screen center: (0,0) would edge-scroll the camera to the map corner
+  // until the user's first real mouse movement.
+  private mouseX = typeof window !== 'undefined' ? window.innerWidth / 2 : 0;
+  private mouseY = typeof window !== 'undefined' ? window.innerHeight / 2 : 0;
 
   // Camera shake
   private _shakeIntensity = 0;

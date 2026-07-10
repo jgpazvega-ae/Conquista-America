@@ -72,7 +72,7 @@ export class HUD {
   private elPopBarFill      = document.getElementById('pop-bar-fill') as HTMLDivElement | null;
   private elTreasuryWrap    = document.getElementById('treasury-wrap') as HTMLElement | null;
   private elTreasuryFill    = document.getElementById('treasury-bar-fill') as HTMLDivElement | null;
-  static readonly ECON_GOAL = 800;
+  static readonly ECON_GOAL = 2000; // must match Game.ECONOMIC_VICTORY_GOLD
   private elMoraleGauge     = document.getElementById('morale-gauge') as HTMLElement | null;
   private elMoralePct       = document.getElementById('morale-pct') as HTMLElement | null;
   private elMoraleBarFill   = document.getElementById('morale-bar-fill') as HTMLDivElement | null;
