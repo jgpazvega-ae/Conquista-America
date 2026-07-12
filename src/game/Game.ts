@@ -2602,9 +2602,10 @@ export class Game {
     const villages = this.allBuildings.filter(
       b => b.playerId === playerId && b.type === BuildingType.VILLAGE && b.isAlive(),
     ).length;
-    // Larger battles (AC scale): raised from 20 + 12/house + 5 after the 2 Hz
-    // proximity-pass optimization freed the per-frame budget.
-    return 30 + houses * 14 + storehouses * 6 + villages * 5;
+    // Larger battles (AC scale): second raise, funded by the far-zoom LOD
+    // (draw calls -75%) on top of the 2 Hz proximity-pass optimization.
+    // Typical late game: 40 + 4 houses = ~104 units per player.
+    return 40 + houses * 16 + storehouses * 8 + villages * 5;
   }
 
   applyUpgrade(upgrade: keyof import('./Player').PlayerUpgrades, playerId: number): boolean {
