@@ -85,6 +85,12 @@ export class Unit {
   private _statusRing: THREE.Mesh | null = null;
   private _statusRingT = Math.random() * 6.28;
   private _regimentBanner: THREE.Group | null = null;
+  private _lodProxy: THREE.Mesh | null = null;
+  private _lodLow = false;
+  /** Global LOD flag, set once per frame by the main loop from the camera zoom.
+   *  Far zoom swaps every detailed rig (~14 meshes) for a single box — draw calls
+   *  are the mobile bottleneck in big battles. */
+  static lowDetail = false;
   private selected    = false;
   private animT       = Math.random() * 10;
   private attackAnim  = 0;
@@ -319,6 +325,15 @@ export class Unit {
 
     // 30 % scale-up for better close-range presence
     this.rig.scale.setScalar(1.3);
+
+    // Far-zoom LOD proxy: one civ-colored block standing in for the whole rig
+    this._lodProxy = new THREE.Mesh(
+      new THREE.BoxGeometry(0.55, 1.15, 0.55),
+      new THREE.MeshLambertMaterial({ color: civColor }),
+    );
+    this._lodProxy.position.y = 0.6;
+    this._lodProxy.visible = false;
+    this.mesh.add(this._lodProxy);
 
     // ── Health bar ──────────────────────────────────────────────────────────────
     const barY = 2.55;
@@ -947,6 +962,14 @@ export class Unit {
     this.attackTimer  = Math.max(0, this.attackTimer - dt);
     if (this.berserkTimer > 0) this.berserkTimer = Math.max(0, this.berserkTimer - dt);
     this.animT += dt;
+
+    // Far-zoom LOD swap (cheap: only when the global flag flips).
+    // Dead units never reach this point — update() exits early during the death animation.
+    if (Unit.lowDetail !== this._lodLow) {
+      this._lodLow = Unit.lowDetail;
+      this.rig.visible = !this._lodLow;
+      if (this._lodProxy) this._lodProxy.visible = this._lodLow;
+    }
 
     // Officer banner: raised while the regiment is formed; gentle flag sway
     if (this._regimentBanner) {

@@ -901,6 +901,8 @@ class GameInstance {
     const dt = rawDt * this._gameSpeed;
 
     this.updateFpsCounter(rawDt);
+    // Far-zoom LOD: swap unit rigs for single blocks past ~55% zoom-out
+    Unit.lowDetail = this.camera.getZoom() > 34;
     if (this._tradeCooldown > 0) this._tradeCooldown = Math.max(0, this._tradeCooldown - rawDt);
 
     // Autosave (AC style): persist the whole match every 60 s so a tab reload never
@@ -1665,6 +1667,7 @@ class GameInstance {
         const humanFog = this.game.fog.getFog(this.game.humanPlayerId);
         const threat = this.game.allUnits.find(u =>
           u.playerId !== this.game.humanPlayerId && u.isAlive() && u.garrisonedIn === null &&
+          this.game.diplomacy.isEnemy(this.game.humanPlayerId, u.playerId) && // neutral scouts are not a threat
           Math.abs(u.col - settle.col) <= 12 && Math.abs(u.row - settle.row) <= 12 &&
           (!humanFog || humanFog.canSeeUnit(u, this.game.humanPlayerId)),
         );
