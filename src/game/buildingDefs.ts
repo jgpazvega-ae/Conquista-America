@@ -10,7 +10,7 @@ export const BUILDING_DEFS: Record<BuildingType, BuildingDef> = {
     buildTime: 7,
     maxHp: 80,
     buildRadius: 2,
-    description: 'Vivienda para tus súbditos. Cada casa aumenta el límite de población en +14 unidades.',
+    description: 'Vivienda para tus súbditos. Cada casa aumenta el límite de población en +16 unidades.',
   },
   [BuildingType.SETTLEMENT]: {
     type: BuildingType.SETTLEMENT,
